@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LexisGraph | 智能合同审查系统</title>
+  
+  <!-- 离线本地核心库：100% 稳定秒开，杜绝 CDN 挂掉导致网页点不动 -->
+  <script src="/static/vendor/vue.global.prod.js"></script>
+  
+  <script src="/static/session.js"></script>
+  <script src="/static/workbench-workspace.js"></script>
+  <link rel="stylesheet" href="/static/vendor/tailwind.css">
+
+  <style>
+    /* 清爽极简商务滚动条 */
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: #f8fafc; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    
+    /* 商务条款风险高亮（温和内敛护眼、大字号清晰） */
+    .clause-critical {
+      background-color: #FEF2F2 !important;
+      border-left: 4px solid #DC2626 !important;
+      border-radius: 0 4px 4px 0;
+      padding-left: 12px;
+    }
+    .clause-warning {
+      background-color: #FFFBEB !important;
+      border-left: 4px solid #D97706 !important;
+      border-radius: 0 4px 4px 0;
+      padding-left: 12px;
+    }
+    .clause-info {
+      background-color: #F0FDF4 !important;
+      border-left: 4px solid #059669 !important;
+      border-radius: 0 4px 4px 0;
+      padding-left: 12px;
+    }
+
+    /* 选中聚焦框 */
+    .clause-active {
+      box-shadow: 0 0 0 2px #2563EB, 0 4px 12px rgba(37, 99, 235, 0.15) !important;
+    }
+
+    /* 打印报告 */
+    @media print {
+      body * { visibility: hidden; }
+      #printable-report, #printable-report * { visibility: visible; }
+      #printable-report { position: absolute; left: 0; top: 0; width: 100%; }
+      .no-print { display: none !important; }
+    }
+    [v-cloak] { display: none; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    button:focus-visible, a:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+    @media (max-width: 1100px) {
+      header { height: auto !important; min-height: 64px; flex-wrap: wrap; gap: 12px; padding: 12px 20px !important; }
+    }
+    header { white-space: nowrap; }
+    header > div { flex-shrink: 0; }
+    @media (max-width: 1400px) {
+      header { height: auto !important; min-height: 64px; flex-wrap: wrap; gap: 12px; padding: 12px 20px !important; }
+      main > aside:first-child { width: 248px !important; }
+      main > aside:last-child { width: 360px !important; }
+      #contract-viewer { padding: 20px !important; }
+      #contract-viewer > div { padding: 24px !important; }
+    }
+    @media (max-width: 1050px) { main { overflow-x: auto !important; } main > section { min-width: 480px; } }
+    @media print {
+      html, body, #app { height: auto !important; overflow: visible !important; }
+      #app > :not(:has(#printable-report)) { display: none !important; }
+      #app > :has(#printable-report), #app > :has(#printable-report) > div { position: static !important; display: block !important; height: auto !important; max-height: none !important; overflow: visible !important; background: white !important; border: 0 !important; padding: 0 !important; box-shadow: none !important; }
+      #app > :has(#printable-report) > div > :not(#printable-report) { display: none !important; }
+      #printable-report { position: static !important; overflow: visible !important; padding: 0 !important; }
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 min-h-screen font-sans antialiased flex flex-col selection:bg-blue-100 selection:text-blue-900">
+  <div id="app" v-cloak class="flex flex-col h-screen overflow-hidden">
+
+    <!-- 顶部全局提示条（采纳成功/网络提示） -->
+    <div v-if="toastMessage" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-slate-900 text-white text-xs px-4 py-2 rounded-lg shadow-xl flex items-center space-x-2 transition-all">
+      <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <span>{{ toastMessage }}</span>
+    </div>
+
+    <!-- 审查中沉浸式专业商务遮罩（阻止误操作，流畅呈现 LangGraph 状态流） -->
+    <div v-if="isReviewing" class="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all">
+      <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl p-8 max-w-lg w-full flex flex-col space-y-6">
+        
+        <!-- 头部图标与标题 -->
+        <div class="flex items-center space-x-4 border-b border-slate-100 pb-5">
+          <div class="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
+            <svg class="animate-spin w-6 h-6 text-blue-600" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <h3 class="text-base font-bold text-slate-900">正在审查合同</h3>
+              <span class="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">{{ reviewProgress }}%</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">完成的步骤由服务端实时返回，可随时取消本次审查。</p>
+          </div>
+        </div>
+
+        <button @click="cancelReview" class="text-xs text-slate-500 hover:text-red-600 self-end">取消本次审查</button>
+        <!-- 流畅进度条 -->
+        <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+          <div class="bg-blue-600 h-full rounded-full transition-all duration-300 ease-out" :style="{ width: reviewProgress + '%' }"></div>
+        </div>
+
+        <!-- 5 个节点实时推进流水线 -->
+        <div class="space-y-2.5 text-xs">
+          <div v-for="(node, idx) in pipelineNodes" :key="node.id" 
+               class="flex items-center justify-between p-2.5 rounded-lg transition-all"
+               :class="nodeStates[node.id] === 'running' ? 'bg-blue-50/80 border border-blue-200 text-blue-900 font-semibold' : (nodeStates[node.id] === 'completed' ? 'bg-slate-50 text-slate-700' : 'text-slate-400')">
+            <div class="flex items-center space-x-3">
+              <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                    :class="nodeStates[node.id] === 'completed' ? 'bg-emerald-500 text-white' : (nodeStates[node.id] === 'running' ? 'bg-blue-600 text-white animate-pulse' : 'bg-slate-200 text-slate-500')">
+                <svg v-if="nodeStates[node.id] === 'completed'" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span v-else>{{ idx + 1 }}</span>
+              </span>
+              <span>{{ node.name }}</span>
+            </div>
+
+            <div class="text-[11px] font-mono">
+              <span v-if="nodeStates[node.id] === 'completed'" class="text-emerald-600 font-bold">已完成</span>
+              <span v-else-if="nodeStates[node.id] === 'running'" class="text-blue-600 font-bold animate-pulse">审查中...</span>
+              <span v-else class="text-slate-300">等待中</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部当前实时日志 -->
+        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600 flex items-center space-x-2">
+          <span class="w-2 h-2 rounded-full bg-blue-600 animate-ping"></span>
+          <span class="truncate">{{ latestLogMessage || '正在初始化法律分析引擎...' }}</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 顶部导航条：纯净白底、极简商务、一目了然 -->
+    <header class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 z-20">
+      
+      <!-- 左侧品牌与范本快速切换 -->
+      <div class="flex items-center space-x-5">
+        <a href="/" @click.prevent="workspace.leaveFor('/')" class="flex items-center space-x-2.5 cursor-pointer hover:opacity-85 transition" title="返回首页">
+          <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm font-bold text-base">
+            ⚖
+          </div>
+          <div>
+            <div class="font-bold text-slate-900 text-base tracking-tight flex items-center space-x-2">
+              <span>LexisGraph</span>
+              <span class="text-xs bg-blue-50 text-blue-700 font-medium px-2 py-0.5 rounded border border-blue-200">工作台</span>
+              <span class="text-xs text-slate-400 hover:text-blue-600 flex items-center space-x-0.5">
+                <span>← 首页</span>
+              </span>
+            </div>
+          </div>
+        </a>
+
+        <div class="h-5 w-px bg-slate-200"></div>
+
+        <a href="/" @click.prevent="workspace.leaveFor('/')" class="text-xs text-blue-600 font-semibold border border-blue-200 bg-blue-50 px-3 py-2 rounded-lg">新建审查</a>
+        <a href="/records" @click.prevent="workspace.leaveFor('/records')" class="text-xs text-slate-500">审查记录</a>
+        <span class="text-[11px] text-slate-400">{{ saveStatus }}</span>
+      </div>
+
+      <!-- 中间当前审查立场胶囊切换 -->
+      <div class="flex items-center space-x-2 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-medium">
+        <span class="text-slate-500 px-1">审查立场:</span>
+        <button :disabled="workspace.historical || workspace.loading" @click="partyRole = '乙方(卖方/开发方/服务方)'" 
+                :class="partyRole.includes('乙方') ? 'bg-white text-blue-700 font-semibold shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                class="px-3 py-1 rounded-md transition text-xs cursor-pointer">
+          乙方 · 供应商/防守
+        </button>
+        <button :disabled="workspace.historical || workspace.loading" @click="partyRole = '甲方(买方/采购方/委托方)'" 
+                :class="partyRole.includes('甲方') ? 'bg-white text-blue-700 font-semibold shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                class="px-3 py-1 rounded-md transition text-xs cursor-pointer">
+          甲方 · 买方/采购
+        </button>
+        <button :disabled="workspace.historical || workspace.loading" @click="partyRole = '中立审慎'" :class="partyRole === '中立审慎' ? 'bg-white text-blue-700 font-semibold shadow-sm' : 'text-slate-600 hover:text-slate-900'" class="px-3 py-1 rounded-md transition text-xs cursor-pointer">中立</button>
+      </div>
+
+      <!-- 右侧：动态模型切换、导出意见书与审查主按钮 -->
+      <div class="flex items-center space-x-3">
+        <!-- 动态模型选择 -->
+        <div class="flex items-center space-x-1.5 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5">
+          <span class="text-slate-500 text-xs">模型:</span>
+          <select v-model="selectedModel" class="bg-transparent text-xs text-slate-800 font-semibold outline-none cursor-pointer">
+            <option v-if="!['deepseek-v4-flash', 'deepseek-chat', 'deepseek-reasoner', 'gpt-4o', 'qwen-plus', 'custom'].includes(selectedModel)" :value="selectedModel">{{ selectedModel }}</option>
+            <option value="deepseek-v4-flash">DeepSeek-V4 Flash</option>
+            <option value="deepseek-chat">DeepSeek-V3</option>
+            <option value="deepseek-reasoner">DeepSeek-R1 (深度推理)</option>
+            <option value="gpt-4o">GPT-4o (OpenAI)</option>
+            <option value="qwen-plus">通义千问 Qwen-Plus</option>
+            <option value="custom">自定义端点...</option>
+          </select>
+          <button @click="openModelModal" title="设置 API Key 与 Base URL" class="text-slate-400 hover:text-blue-600 transition ml-1 cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- 导出/查看法务审查意见书 -->
+        <button @click="showReportModal = true" :disabled="!reviewResult || resultStale" class="flex items-center space-x-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 transition shadow-sm cursor-pointer">
+          <svg class="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          <span>审查意见书</span>
+        </button>
+
+        <!-- 主操作按钮：绝不锁死，可随时点击重新审查 -->
+        <button @click="startReview" 
+                :disabled="isReviewing || workspace.loading || workspace.historical || workspace.task?.status === 'running' || !contractText.trim()"
+                class="flex items-center space-x-2 text-sm font-semibold px-5 py-2 rounded-lg transition shadow-sm cursor-pointer"
+                :class="isReviewing ? 'bg-blue-400 text-white cursor-wait' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20 active:scale-95'">
+          <svg v-if="isReviewing" class="animate-spin w-4 h-4 text-white" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          <svg v-else class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <span>{{ isReviewing ? '正在审查…' : (reviewResult ? '重新审查' : '开始审查') }}</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 主工作区：大字号、清爽呼吸感的现代商务工作台 -->
+    <main class="flex-1 flex overflow-hidden">
+
+      <!-- 左栏：合规健康评分、财税4大要件核验、LangGraph工作流状态 -->
+      <aside class="w-80 bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto p-4 space-y-4">
+        
+        <div v-if="reviewResult" class="text-[11px] text-slate-500 px-1 leading-relaxed">结果来源：{{ reviewSource }}<br>{{ reviewResult.summary.compliance_score == null ? "本模式不计算健康分。" : "评分基于审查原文，采纳修订后不会自动重算。" }}</div>
+        <div v-if="reviewResult?.checklist_findings" class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
+          <h3 class="text-xs font-semibold text-slate-700">{{ workspace.conditions.checklist?.name }} · v{{ workspace.conditions.checklist?.version }}</h3>
+          <div v-for="finding in reviewResult.checklist_findings" class="border-t border-slate-100 pt-3 mt-3 text-xs"><div class="flex justify-between gap-2"><span class="font-medium">{{ finding.title }}</span><span class="shrink-0" :class="finding.status === 'pass' ? 'text-emerald-700' : finding.status === 'fail' ? 'text-red-700' : 'text-amber-700'">{{ {pass:'通过',fail:'未通过',needs_review:'待确认',not_applicable:'不适用'}[finding.status] }}</span></div><p class="text-[11px] text-slate-500 mt-1 leading-relaxed">{{ finding.explanation }}</p></div>
+        </div>
+        <div v-if="reviewResult?.differences" class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm text-xs"><h3 class="font-semibold mb-2">合同差异概览</h3><p class="text-slate-500">共 {{ reviewResult.differences.length }} 处变更</p><p class="text-[11px] text-slate-400 mt-2">文字变化需结合交易背景评估，删除内容可在右栏查看。</p></div>
+<div v-if="reviewResult?.coverage" class="text-[11px] text-slate-500 px-1 leading-relaxed">{{ reviewResult.coverage }}</div>
+        <!-- 合规健康分卡片 -->
+        <div v-if="!['checklist','compare'].includes(workspace.conditions.mode)" class="border border-slate-200 rounded-xl p-4 bg-slate-50/60 shadow-sm">
+          <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">合规健康度量化</div>
+          
+          <div v-if="reviewResult" class="flex items-baseline space-x-2">
+            <span class="text-4xl font-extrabold font-mono" :class="reviewResult.summary.compliance_score == null ? 'text-slate-400' : getScoreColor(reviewResult.summary.compliance_score)">
+              {{ reviewResult.summary.compliance_score ?? '—' }}
+            </span>
+            <span class="text-xs text-slate-400 font-medium">{{ reviewResult.summary.compliance_score == null ? "不计算健康分" : "/ 100分" }}</span>
+            <span class="ml-auto text-xs font-bold px-2.5 py-0.5 rounded-full" 
+                  :class="reviewResult.summary.compliance_score == null ? 'bg-slate-100 text-slate-600' : reviewResult.summary.compliance_score < 60 ? 'bg-red-100 text-red-700' : (reviewResult.summary.compliance_score < 80 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')">
+              {{ reviewResult.summary.risk_level }}
+            </span>
+          </div>
+          <div v-else class="text-xs text-slate-400 py-3 text-center">
+            点击右上角【开始审查】计算健康度
+          </div>
+
+          <!-- 风险数量统计 -->
+          <div v-if="reviewResult" class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-200 text-center">
+            <div class="bg-white border border-slate-200 rounded-lg py-1.5">
+              <div class="text-base font-bold font-mono text-red-600">{{ reviewResult.summary.critical_count }}</div>
+              <div class="text-[11px] text-slate-500">重大风险</div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-lg py-1.5">
+              <div class="text-base font-bold font-mono text-amber-600">{{ reviewResult.summary.warning_count }}</div>
+              <div class="text-[11px] text-slate-500">一般风险</div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-lg py-1.5">
+              <div class="text-base font-bold font-mono text-slate-700">{{ reviewResult.summary.info_count }}</div>
+              <div class="text-[11px] text-slate-500">优化建议</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 商务合作合同 · 财税与结算专项审核卡 (4大核心审核点) -->
+        <div v-if="workspace.conditions.mode === 'quick' || workspace.conditions.mode === 'deep'" class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
+          <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+            <span class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+              <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6"/><path d="M16 12h-6"/><path d="M14 16h-4"/>
+              </svg>
+              <span>财税与结算专项审核 (4大要件)</span>
+            </span>
+          </div>
+
+          <div v-if="reviewResult && currentTaxSettlement" class="space-y-2.5 text-xs">
+            <!-- 审核点 1：是否单列增值税税额 -->
+            <div class="p-2.5 rounded-lg border flex flex-col space-y-1 transition"
+                 :class="currentTaxSettlement.has_separate_vat_amount ? 'bg-emerald-50/50 border-emerald-200' : 'bg-red-50/50 border-red-200'">
+              <div class="flex items-center justify-between font-semibold">
+                <span class="flex items-center space-x-1.5">
+                  <span class="w-2 h-2 rounded-full" :class="currentTaxSettlement.has_separate_vat_amount ? 'bg-emerald-500' : 'bg-red-500'"></span>
+                  <span :class="currentTaxSettlement.has_separate_vat_amount ? 'text-emerald-900' : 'text-red-900'">1. 增值税税额单列</span>
+                </span>
+                <span class="text-[11px] font-bold" :class="currentTaxSettlement.has_separate_vat_amount ? 'text-emerald-700' : 'text-red-700'">
+                  {{ currentTaxSettlement.has_separate_vat_amount ? '已单列' : '未单列(总额混淆)' }}
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-500 leading-snug">{{ currentTaxSettlement.vat_amount_detail }}</p>
+            </div>
+
+            <!-- 审核点 2：增值税税率是多少 -->
+            <div class="p-2.5 rounded-lg border flex flex-col space-y-1 transition"
+                 :class="currentTaxSettlement.vat_rate !== '未明确税率' ? 'bg-slate-50 border-slate-200' : 'bg-amber-50/50 border-amber-200'">
+              <div class="flex items-center justify-between font-semibold">
+                <span class="flex items-center space-x-1.5">
+                  <span class="w-2 h-2 rounded-full" :class="currentTaxSettlement.vat_rate !== '未明确税率' ? 'bg-blue-500' : 'bg-amber-500'"></span>
+                  <span :class="currentTaxSettlement.vat_rate !== '未明确税率' ? 'text-slate-900' : 'text-amber-900'">2. 增值税税率核验</span>
+                </span>
+                <span class="text-[11px] font-bold font-mono px-1.5 py-0.5 rounded" :class="currentTaxSettlement.vat_rate !== '未明确税率' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'">
+                  {{ currentTaxSettlement.vat_rate }}
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-500 leading-snug">{{ currentTaxSettlement.vat_rate_evaluation }}</p>
+            </div>
+
+            <!-- 审核点 3：是否是增值税专用发票 -->
+            <div class="p-2.5 rounded-lg border flex flex-col space-y-1 transition"
+                 :class="currentTaxSettlement.is_special_vat_invoice ? 'bg-emerald-50/50 border-emerald-200' : 'bg-red-50/50 border-red-200'">
+              <div class="flex items-center justify-between font-semibold">
+                <span class="flex items-center space-x-1.5">
+                  <span class="w-2 h-2 rounded-full" :class="currentTaxSettlement.is_special_vat_invoice ? 'bg-emerald-500' : 'bg-red-500'"></span>
+                  <span :class="currentTaxSettlement.is_special_vat_invoice ? 'text-emerald-900' : 'text-red-900'">3. 增值税专用发票</span>
+                </span>
+                <span class="text-[11px] font-bold" :class="currentTaxSettlement.is_special_vat_invoice ? 'text-emerald-700' : 'text-red-700'">
+                  {{ currentTaxSettlement.is_special_vat_invoice ? '明确专票' : '未锁定专票(普票风险)' }}
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-500 leading-snug">{{ currentTaxSettlement.invoice_detail }}</p>
+            </div>
+
+            <!-- 审核点 4：结算方式与结算条件 -->
+            <div class="p-2.5 rounded-lg border flex flex-col space-y-1 transition bg-amber-50/40 border-amber-200">
+              <div class="flex items-center justify-between font-semibold">
+                <span class="flex items-center space-x-1.5">
+                  <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <span class="text-amber-900">4. 结算方式与条件</span>
+                </span>
+                <span class="text-[11px] font-bold text-amber-800">
+                  {{ currentTaxSettlement.settlement_method && currentTaxSettlement.settlement_method.includes('承兑') ? '承兑汇票(高危)' : '需关注前置' }}
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-600 leading-snug">{{ currentTaxSettlement.settlement_condition_analysis }}</p>
+            </div>
+          </div>
+
+          <div v-else class="text-xs text-slate-400 py-3 text-center">
+            审查后即刻呈现增值税与结算 4 大核验详情
+          </div>
+        </div>
+
+        <!-- LangGraph 工作流编排（极简商务步骤条） -->
+        <div class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm flex-1 flex flex-col">
+          <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+            <span class="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center space-x-1.5">
+              <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <line x1="3" y1="12" x2="9" y2="12"></line>
+                <line x1="15" y1="12" x2="21" y2="12"></line>
+              </svg>
+              <span>审查进度</span>
+            </span>
+          </div>
+
+          <div class="space-y-3 relative text-xs">
+            <div v-for="(node, idx) in pipelineNodes" :key="node.id" class="flex items-start space-x-3">
+              <!-- 状态标点 -->
+              <div class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[11px] font-semibold"
+                   :class="nodeStates[node.id] === 'completed' ? 'bg-emerald-100 text-emerald-700' : (nodeStates[node.id] === 'running' ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-500/30' : 'bg-slate-100 text-slate-400')">
+                <svg v-if="nodeStates[node.id] === 'completed'" class="w-3 h-3 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span v-else>{{ idx + 1 }}</span>
+              </div>
+
+              <!-- 节点信息 -->
+              <div class="flex-1">
+                <div class="font-medium text-xs text-slate-800" :class="nodeStates[node.id] === 'running' ? 'text-blue-700 font-bold' : ''">
+                  {{ node.name }}
+                </div>
+                <div class="text-[11px] text-slate-400 mt-0.5">{{ node.description }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 实时进展提示 -->
+          <div v-if="latestLogMessage" class="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg leading-relaxed">
+            <span class="font-semibold text-blue-600">当前：</span>{{ latestLogMessage }}
+          </div>
+        </div>
+
+      </aside>
+
+      <!-- 中间栏：合同正文阅卷室 (清晰大字号 15px - 16px、舒适行高、白底黑字、护眼商务) -->
+      <section class="flex-1 flex flex-col bg-slate-100/60 overflow-hidden">
+        <!-- 顶栏工具 -->
+        <div class="bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap gap-3 items-center justify-between shrink-0">
+          <div class="flex items-center space-x-3 min-w-0 w-full">
+            <span class="font-semibold text-sm text-slate-900 truncate" :title="contractTitle">{{ contractTitle }}</span>
+            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 truncate max-w-[220px]" :title="contractType">{{ contractType }}</span>
+          </div>
+
+          <div class="flex items-center flex-wrap gap-2 text-xs whitespace-nowrap">
+            <!-- 模式切换：原文模式 vs 修订后合规模式 -->
+            <div class="bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-medium flex">
+              <button v-if="workspace.conditions.source_id" @click="viewMode='original'" :class="viewMode==='original' ? 'bg-white text-blue-700 shadow-sm font-semibold' : 'text-slate-500'" class="px-3 py-1 rounded-md transition">原件预览</button>
+              <button @click="viewMode = 'raw'" 
+                      :class="viewMode === 'raw' ? 'bg-white text-slate-900 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-800'"
+                      class="px-3 py-1 rounded-md transition cursor-pointer">
+                审查文本
+              </button>
+              <button @click="viewMode = 'redlined'" 
+                      :class="viewMode === 'redlined' ? 'bg-white text-emerald-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-800'"
+                      class="px-3 py-1 rounded-md transition cursor-pointer">
+                已采纳修订稿
+              </button>
+              <button v-if="workspace.conditions.mode==='compare'" @click="viewMode='comparison'" :disabled="!reviewResult?.differences" :class="viewMode==='comparison' ? 'bg-white text-blue-700 font-semibold shadow-sm' : 'text-slate-500'" class="px-3 py-1 rounded-md transition">差异对照</button>
+            </div>
+
+            <span class="text-xs text-blue-700 font-semibold">{{ workspace.modeName }} · {{ workspace.conditions.scale }}</span>
+            <button @click="workspace.showConditions=true" class="text-xs text-slate-600 px-2 py-1">审查条件</button>
+            <button @click="workspace.save" :disabled="workspace.saving || workspace.historical" class="text-xs text-blue-600 px-2 py-1">保存</button>
+            <select v-if="workspace.versions.length" aria-label="审查历史版本" @change="workspace.leaveFor('/workbench?task='+workspace.taskId+'&run='+$event.target.value)" :value="workspace.run?.id" class="text-xs border border-slate-200 rounded-lg px-2 py-1.5"><option v-for="version in workspace.versions" :value="version.id">第 {{ version.number }} 次 · {{ version.status === 'completed' ? '已完成' : '未完成' }}</option></select>
+            <button @click="exportContract" :disabled="workspace.loading || workspace.historical || workspace.task?.status === 'running' || !contractText.trim()" class="text-xs text-blue-600 px-2 py-1">导出修订稿</button>
+            <button @click="openEditor" :disabled="workspace.historical || workspace.loading" class="text-xs text-slate-600 px-2 py-1">编辑正文</button>
+          </div>
+        </div>
+
+        <div v-if="workspace.run?.result" class="px-6 py-2 bg-white border-b border-slate-200 flex flex-wrap gap-2 items-center text-xs">
+          <select v-model="workspace.exportScope" aria-label="Word导出范围" class="border border-slate-200 rounded-lg px-2 py-1.5"><option value="current">当前修订稿 Word</option><option value="tracked">当前修订稿 Word（含修订痕迹）</option><option value="all">全部建议稿 Word（应用所有建议）</option><option value="report">全部审查意见书 Word</option><option value="applied_report">仅已采纳意见书 Word</option></select>
+          <button @click="workspace.exportWord" :disabled="resultStale" class="px-3 py-1.5 text-blue-700 bg-blue-50 border border-blue-200 rounded-lg">导出 Word</button>
+          <button v-if="appliedIssueIds.length && !workspace.historical" @click="reviewAcceptedDraft" :disabled="resultStale || isReviewing" class="px-3 py-1.5 text-emerald-700 border border-emerald-200 bg-emerald-50 rounded-lg">以已采纳稿再审查</button>
+          <button v-if="!workspace.historical" @click="workspace.finish" :disabled="resultStale || workspace.task?.status !== 'pending_review'" class="ml-auto px-3 py-1.5 text-slate-600 border border-slate-200 rounded-lg">完成复核</button>
+        </div>
+        <!-- 审查结论总评通栏（审查后直接呈现，去AI味、清晰商务） -->
+        <div v-if="reviewResult" class="bg-blue-50/70 border-b border-blue-100 px-6 py-3 flex items-center justify-between gap-3 text-xs shrink-0">
+          <div class="flex items-center space-x-3 min-w-0 flex-1">
+            <span class="px-2 py-0.5 rounded font-bold uppercase text-[11px] shrink-0 whitespace-nowrap" :class="reviewResult.summary.compliance_score == null ? 'bg-slate-100 text-slate-600' : reviewResult.summary.compliance_score < 60 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'">
+              {{ reviewResult.summary.risk_level }}<template v-if="reviewResult.summary.compliance_score != null"> ({{ reviewResult.summary.compliance_score }}分)</template>
+            </span>
+            <span class="text-slate-700 font-medium truncate" :title="reviewResult.summary.verdict">{{ reviewResult.summary.verdict }}</span>
+          </div>
+          <button @click="showReportModal = true" :disabled="!reviewResult || resultStale" class="text-blue-700 hover:text-blue-900 font-semibold underline shrink-0 cursor-pointer whitespace-nowrap">
+            查看意见书 →
+          </button>
+        </div>
+
+        <div v-if="workspace.historical" class="px-6 py-3 text-xs text-blue-700 bg-blue-50 border-b border-blue-200">正在查看历史审查版本，原文和结果保留不变。<a :href="'/workbench?task='+workspace.taskId" class="ml-2 underline">返回当前任务</a></div>
+        <div v-if="workspace.error" class="px-6 py-3 text-xs text-red-700 bg-red-50 border-b border-red-200" role="alert">{{ workspace.error }}</div>
+        <div v-if="resultStale || reviewError" class="px-6 py-3 text-xs text-amber-800 bg-amber-50 border-b border-amber-200" role="alert">{{ reviewError || '审查信息已变更，当前结果属于上次版本。请重新审查后处理修订或导出意见书。' }}</div>
+        <!-- 正文视窗：大字号 15px、清晰可读、纯正商务卷宗感 -->
+        <div v-if="viewMode==='original'" class="px-6 py-2 text-xs text-slate-500 bg-white border-b border-slate-200">上传原件，未应用正文编辑或采纳修订。Word 排版为近似预览；点击右侧意见可在原件中定位，保留排版。</div>
+        <iframe v-if="viewMode==='original' && workspace.conditions.source_id" :src="'/static/document-preview.html?source='+workspace.conditions.source_id" title="合同原件预览" sandbox="allow-scripts allow-same-origin allow-downloads" class="flex-1 w-full border-0" style="min-height:400px"></iframe>
+        <div v-else class="flex-1 overflow-y-auto p-8" id="contract-viewer">
+          
+          <!-- 模式一：原文排版（大字号 15px，行间距适中） -->
+          <div v-if="viewMode === 'raw'" class="max-w-4xl mx-auto bg-white border border-slate-200 rounded-xl p-10 shadow-sm">
+            
+            <div v-for="(line, idx) in formattedLines" :key="idx"
+                 :id="'line-' + (idx + 1)"
+                 :class="[
+                   line.highlightClass,
+                   focusedIssueId && line.issueId === focusedIssueId ? 'clause-active' : ''
+                 ]"
+                 @click="line.issueId && selectIssue(line.issueId)"
+                 class="py-1 px-3 text-[15px] leading-relaxed transition-all cursor-pointer flex items-start space-x-4 hover:bg-slate-50/80">
+              
+              <!-- 行号：清晰中性灰 -->
+              <span class="w-8 shrink-0 text-right text-xs font-mono text-slate-400 select-none pt-1">
+                {{ idx + 1 }}
+              </span>
+
+              <!-- 正文文本 -->
+              <div class="flex-1 text-slate-800 whitespace-pre-wrap font-normal">
+                {{ line.text }}
+              </div>
+
+              <!-- 风险标记 -->
+              <span v-if="line.severity" class="shrink-0 text-xs px-2 py-0.5 rounded font-semibold uppercase self-center"
+                    :class="line.severity === 'critical' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-amber-100 text-amber-700 border border-amber-200'">
+                {{ severityLabel(line.severity) }}
+              </span>
+            </div>
+
+            <!-- 空白状态直接粘贴输入 -->
+            <div v-if="!contractText.trim()" class="py-12 text-center text-slate-400">
+              <svg class="w-12 h-12 mx-auto mb-3 opacity-30 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+              </svg>
+              <p class="text-base font-medium text-slate-600">在此处粘贴需要审查的合同全文</p>
+              <p class="text-xs text-slate-400 mt-1">可返回首页上传文件，或使用示例合同熟悉流程</p>
+              <button @click="openEditor" :disabled="workspace.historical || workspace.loading" class="mt-4 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs">粘贴合同正文</button>
+            </div>
+          </div>
+
+          <div v-else-if="viewMode==='comparison'" class="max-w-4xl mx-auto space-y-4">
+            <div v-for="diff in reviewResult?.differences || []" class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm"><div class="flex justify-between mb-4 text-xs"><strong>{{ {replace:'条款修改',delete:'条款删除',insert:'条款新增'}[diff.change_type] }}</strong><button @click="selectIssue(diff.id)" class="text-blue-600">查看分析 →</button></div><div class="grid grid-cols-1 xl:grid-cols-2 gap-4"><div><h3 class="text-xs text-slate-500 mb-2">参考合同</h3><div class="p-4 bg-red-50 border border-red-200 rounded-lg text-sm leading-relaxed whitespace-pre-wrap text-red-800">{{ diff.original || '（无，此项为新增）' }}</div></div><div><h3 class="text-xs text-slate-500 mb-2">待审合同</h3><div class="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm leading-relaxed whitespace-pre-wrap text-blue-900">{{ diff.current || '（已删除）' }}</div></div></div></div>
+            <div v-if="!reviewResult?.differences?.length" class="bg-white border border-slate-200 rounded-xl p-12 text-center text-sm text-slate-500">两份合同未识别到文字差异</div>
+          </div>
+
+          <!-- 模式二：已修订后的最终合规文本展示 -->
+          <div v-else class="max-w-4xl mx-auto bg-white border border-slate-200 rounded-xl p-10 shadow-sm">
+            <div class="border-b border-slate-200 pb-4 mb-6">
+              <span class="px-2.5 py-1 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                已采纳修订稿
+              </span>
+              <h2 class="text-xl font-bold text-slate-900 mt-3">{{ contractTitle }}</h2>
+              <p class="text-xs text-slate-500 mt-1">仅包含你已采纳的修订（{{ appliedIssueIds.length }} 项）。{{ resultStale ? "此稿属于上次审查版本，请重新审查当前正文。" : "请复核后再使用；原文保留不变。" }}</p>
+            </div>
+            <div class="whitespace-pre-wrap text-[15px] leading-loose text-slate-800 font-normal">
+              {{ finalizedContractText }}
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 右栏：审查意见与条款修订单 (清晰大字号 14px、对比鲜明) -->
+      <aside class="w-[430px] bg-white border-l border-slate-200 flex flex-col shrink-0 overflow-hidden">
+        <!-- 头部 -->
+        <div class="border-b border-slate-200 px-4 py-3 flex flex-wrap gap-2 items-center justify-between shrink-0 bg-slate-50/50">
+          <div class="text-sm font-bold text-slate-800 flex items-center space-x-2">
+            <span>审查意见与修订清单</span>
+            <span class="text-xs bg-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded-full">{{ filteredIssues.length }}</span>
+          </div>
+
+          <div class="w-full text-[11px] text-slate-500">已采纳 {{ appliedIssueIds.length }} 项 · 待处理 {{ (reviewResult?.issues || []).filter(i => !appliedIssueIds.includes(i.id) && !['rejected'].includes(workspace.decisions[i.id])).length }} 项</div>
+          <!-- 筛选 -->
+          <div class="flex items-center space-x-1 text-xs">
+            <button @click="severityFilter = 'all'" :class="severityFilter === 'all' ? 'text-blue-600 font-bold' : 'text-slate-500'" class="px-2 py-0.5 cursor-pointer">全部</button>
+            <span class="text-slate-300">|</span>
+            <button @click="severityFilter = 'critical'" :class="severityFilter === 'critical' ? 'text-red-600 font-bold' : 'text-slate-500'" class="px-2 py-0.5 cursor-pointer">重大</button>
+            <span class="text-slate-300">|</span>
+            <button @click="severityFilter = 'warning'" :class="severityFilter === 'warning' ? 'text-amber-600 font-bold' : 'text-slate-500'" class="px-2 py-0.5 cursor-pointer">一般</button>
+          </div>
+        </div>
+
+        <div class="px-4 py-2 border-b border-slate-100 space-y-2">
+          <input v-model="issueSearch" placeholder="搜索条款、风险或审查意见" aria-label="搜索审查意见" class="w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-blue-500">
+          <div class="flex gap-2 text-xs">
+            <select v-model="handlingFilter" class="border border-slate-200 rounded p-1"><option value="all">全部处理状态</option><option value="pending">待处理</option><option value="applied">已采纳</option><option value="rejected">不采纳</option><option value="needs_review">待复核</option></select>
+            <button @click="severityFilter = 'info'" class="text-slate-600" :class="{'font-bold text-blue-600': severityFilter === 'info'}">优化建议</button>
+            <button @click="severityFilter = 'favorable'" class="text-slate-600" :class="{'font-bold text-blue-600': severityFilter === 'favorable'}">有利条款</button>
+          </div>
+        </div>
+        <!-- 问题卡片列表：清晰、整洁、大字号 -->
+        <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
+          
+          <div v-for="issue in filteredIssues" :key="issue.id"
+               :id="'card-' + issue.id"
+               @click="highlightInContract(issue)"
+               :class="focusedIssueId === issue.id ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md' : 'border-slate-200 hover:border-slate-300 shadow-sm'"
+               class="bg-white border rounded-xl p-5 transition cursor-pointer">
+            
+            <!-- 头部条款与标签 -->
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-slate-600 truncate max-w-[240px]">
+                {{ issue.clause_title }}
+              </span>
+              <span class="text-xs px-2 py-0.5 rounded font-bold uppercase shrink-0 whitespace-nowrap"
+                    :class="(issue.checklist_status === 'needs_review' || issue.diff && !issue.model_assessed) ? 'bg-amber-50 text-amber-700 border border-amber-200' : issue.severity === 'critical' ? 'bg-red-50 text-red-700 border border-red-200' : (issue.severity === 'warning' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200')">
+                {{ issue.checklist_status === "needs_review" ? "待人工确认" : issue.diff && !issue.model_assessed ? "变更待评估" : severityLabel(issue.severity) }}
+              </span>
+            </div>
+
+            <div class="mb-2 text-[11px] text-blue-700">处理状态：{{ workspace.decisionName(issue.id) }}</div>
+            <div v-if="issue.diff" class="text-xs space-y-2 mb-3"><div class="p-3 bg-red-50 text-red-800 border border-red-200 rounded-lg whitespace-pre-wrap"><strong>参考合同：</strong>{{ issue.diff.original || '（无，此项为新增）' }}</div><div class="p-3 bg-blue-50 text-blue-900 border border-blue-200 rounded-lg whitespace-pre-wrap"><strong>待审合同：</strong>{{ issue.diff.current || '（已删除）' }}</div></div>
+            <div v-else-if="issue.evidence" class="text-xs mb-3 p-3 bg-blue-50 border border-blue-100 text-blue-800 rounded-lg whitespace-pre-wrap"><strong>原文证据：</strong>{{ issue.evidence }}</div>
+            <!-- 问题标题 -->
+            <h4 class="text-sm font-bold text-slate-900 leading-snug">
+              {{ issue.issue_title }}
+            </h4>
+
+            <!-- 商业法律后果剖析 (大字号 13px) -->
+            <div class="text-[13px] text-slate-600 mt-2.5 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">
+              {{ issue.risk_analysis }}
+            </div>
+
+            <!-- 法律法规条文依据 -->
+            <div class="mt-2.5 text-xs text-slate-500 flex items-start space-x-1.5">
+              <svg class="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
+              </svg>
+              <span class="leading-relaxed">{{ issue.legal_basis }}</span>
+            </div>
+
+            <!-- 谈判抗辩策略 -->
+            <div class="mt-2 text-xs text-amber-800 bg-amber-50/80 border border-amber-200/60 p-2.5 rounded-lg leading-relaxed">
+              <strong>谈判策略：</strong>{{ issue.negotiation_strategy }}
+            </div>
+
+            <!-- Redline 修订对照 (原条款 vs 修正条款) -->
+            <div v-if="issue.redline" class="mt-3.5 pt-3 border-t border-slate-200">
+              <div class="text-xs font-semibold text-slate-500 mb-2">条款修订方案对照</div>
+
+              <div class="space-y-2 text-xs">
+                <!-- 原条款删除线 -->
+                <div class="bg-red-50/80 border border-red-200 text-red-800 line-through p-2.5 rounded leading-relaxed">
+                  {{ issue.redline.original_text }}
+                </div>
+                <!-- 建议修改版本 -->
+                <div class="bg-emerald-50 border border-emerald-200 text-emerald-900 font-medium p-2.5 rounded leading-relaxed">
+                  {{ issue.redline.suggested_text }}
+                </div>
+              </div>
+
+              <!-- 采纳与复制按钮 -->
+              <div class="mt-3 flex items-center space-x-2">
+                <button @click.stop="applyRedline(issue)" 
+                        :disabled="resultStale || workspace.historical"
+                        class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center space-x-1 cursor-pointer"
+                        :class="appliedIssueIds.includes(issue.id) ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm active:scale-95'">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  <span>{{ appliedIssueIds.includes(issue.id) ? '撤销采纳' : '采纳此项修订' }}</span>
+                </button>
+                <button @click.stop="copyText(issue.redline.suggested_text)" title="复制修订条款" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs cursor-pointer">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div v-if="workspace.run" class="mt-4 pt-3 border-t border-slate-100 space-y-3" @click.stop>
+              <div class="flex gap-2 text-xs"><button @click="workspace.setDecision(issue,'rejected')" :disabled="resultStale || workspace.historical" class="px-2 py-1 border border-slate-200 rounded text-slate-600">不采纳</button><button @click="workspace.setDecision(issue,'needs_review')" :disabled="resultStale || workspace.historical" class="px-2 py-1 border border-slate-200 rounded text-amber-700">待复核</button><button @click="workspace.setDecision(issue,'pending')" :disabled="resultStale || workspace.historical" class="px-2 py-1 text-slate-400">重置状态</button><button @click="openClauseEditor(issue)" :disabled="resultStale || workspace.historical" class="px-2 py-1 text-blue-600">编辑条款</button><button @click="workspace.followupIssue=workspace.followupIssue===issue.id ? null : issue.id" class="ml-auto px-2 py-1 text-blue-600">追问这项意见</button></div>
+              <textarea v-model="workspace.comments[issue.id]" :disabled="workspace.historical || resultStale" placeholder="添加人工备注或处理理由…" aria-label="条目处理备注" class="w-full border border-slate-200 rounded-lg p-2 text-xs leading-relaxed outline-none focus:border-blue-500" rows="2"></textarea>
+              <div v-if="workspace.followupIssue===issue.id" class="space-y-3">
+                <div v-for="answer in workspace.followups[issue.id] || []" class="p-3 border border-slate-200 bg-slate-50 rounded-lg text-xs leading-relaxed"><div class="font-semibold text-slate-700">{{ answer.question }}</div><p class="mt-2 whitespace-pre-wrap text-slate-600">{{ answer.answer }}</p><p v-if="answer.suggested_text" class="mt-2 whitespace-pre-wrap text-emerald-800">{{ answer.suggested_text }}</p><button v-if="answer.suggested_text" @click="workspace.previewFollowup(answer)" class="mt-2 text-blue-600">复制替代条款，核对后编辑正文</button></div>
+                <textarea v-model="workspace.question" placeholder="例如：解释这一风险，或提出更温和的修改方案…" class="w-full p-2 text-xs border border-slate-200 rounded-lg" rows="3"></textarea><button @click="workspace.ask(issue)" :disabled="workspace.followupBusy || !workspace.question.trim() || workspace.historical || resultStale" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs">{{ workspace.followupBusy ? '正在回答…' : '发送追问' }}</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 未审查时的操作引导状态 -->
+          <div v-if="!reviewResult && !isReviewing" class="text-center py-20 px-6 text-slate-400 text-sm flex flex-col items-center">
+            <div class="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 mb-3 shadow-sm">
+              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
+            <p class="font-bold text-slate-700 text-base">待发起合同审查</p>
+            <p class="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-xs">
+              核对正文与审查条件后，按所选模式发起审查。
+            </p>
+            <button @click="startReview" :disabled="workspace.loading || workspace.historical || workspace.task?.status === 'running' || !contractText.trim()" class="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 cursor-pointer">
+              立即开始审查
+            </button>
+          </div>
+
+          <!-- 审查中状态 -->
+          <div v-else-if="isReviewing" class="text-center py-24 text-slate-500 text-sm flex flex-col items-center">
+            <svg class="animate-spin w-8 h-8 text-blue-600 mb-3" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span class="font-semibold text-slate-700">正在进行法务深度研判...</span>
+            <span class="text-xs text-slate-400 mt-1">请查看中央浮动进度条</span>
+          </div>
+
+          <!-- 审查完成且确实 0 项该等级风险 -->
+          <div v-else-if="filteredIssues.length === 0" class="text-center py-24 text-slate-400 text-sm">
+            <svg class="w-10 h-10 mx-auto mb-2 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="font-semibold text-slate-700">当前没有匹配的条目</p>
+            <p class="text-xs text-slate-400 mt-1">可调整风险等级、处理状态或搜索条件；此状态不代表合同整体合规</p>
+          </div>
+
+        </div>
+      </aside>
+
+    </main>
+
+    <div v-if="clauseEdit" class="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-6"><div class="bg-white border border-slate-200 rounded-xl p-6 max-w-2xl w-full space-y-4 shadow-xl"><h3 class="font-semibold">编辑条款 · {{ clauseEdit.title }}</h3><p class="text-xs text-slate-500">保存将更新待审正文，旧审查结果及处理记录保留，请重新审查新版本。</p><textarea v-model="clauseEdit.text" class="w-full h-56 text-sm leading-relaxed p-4 border border-slate-200 rounded-lg"></textarea><div class="flex justify-end gap-3"><button @click="clauseEdit=null" class="px-3 py-2 text-xs text-slate-500">取消</button><button @click="saveClauseEditor" class="px-4 py-2 text-xs text-white bg-blue-600 rounded-lg">保存条款</button></div></div></div>
+    <div v-if="workspace.showConditions" class="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-6"><div class="bg-white rounded-xl p-6 w-full max-w-2xl space-y-4 shadow-xl max-h-[90vh] overflow-y-auto"><div class="flex justify-between"><h3 class="font-semibold">审查条件 · {{ workspace.modeName }}</h3><button @click="workspace.showConditions=false">✕</button></div><p class="text-xs text-slate-500">修改条件后需要重新审查，原结果保留为历史版本。</p><label class="block text-xs text-slate-600">审查尺度<select v-model="workspace.conditions.scale" :disabled="workspace.historical" class="block mt-2 w-full p-2 border rounded-lg"><option>中立</option><option>强势</option><option>弱势</option></select></label><label class="block text-xs text-slate-600">交易背景<textarea v-model="workspace.conditions.background" :disabled="workspace.historical" class="block mt-2 w-full p-3 h-24 border rounded-lg"></textarea></label><label class="block text-xs text-slate-600">重点要求<textarea v-model="workspace.conditions.focus" :disabled="workspace.historical" class="block mt-2 w-full p-3 h-20 border rounded-lg"></textarea></label><div v-if="workspace.conditions.checklist" class="text-xs text-slate-500">清单：{{ workspace.conditions.checklist.name }} · v{{ workspace.conditions.checklist.version }}（固定本次版本）</div><details v-for="material in workspace.conditions.references" class="text-xs text-slate-500"><summary class="cursor-pointer">参考资料：{{ material.name }}</summary><pre class="whitespace-pre-wrap mt-2">{{ material.text }}</pre></details><details v-if="workspace.conditions.reference_text" class="text-xs text-slate-500"><summary class="cursor-pointer">查看参考合同</summary><pre class="whitespace-pre-wrap mt-2">{{ workspace.conditions.reference_text }}</pre></details><button @click="workspace.showConditions=false; workspace.save()" :disabled="workspace.historical" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs">保存审查条件</button></div></div>
+    <div v-if="showEditor" class="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-6">
+      <div class="bg-white rounded-xl p-6 w-full max-w-3xl space-y-4 shadow-xl">
+        <h3 class="font-semibold text-slate-900">编辑审查原文</h3>
+        <p class="text-xs text-slate-500">保存正文后需要重新审查。已采纳的修改请通过“导出修订稿”保留。</p>
+        <div class="grid grid-cols-2 gap-3 text-xs"><label>合同名称<input v-model="editTitle" class="mt-1 w-full border rounded-lg p-2"></label><label>合同类型<input v-model="editType" class="mt-1 w-full border rounded-lg p-2"></label></div>
+        <textarea v-model="editText" aria-label="编辑合同正文" class="w-full h-80 border border-slate-200 rounded-lg p-4 text-sm leading-relaxed outline-none focus:border-blue-500"></textarea>
+        <div class="flex justify-end gap-3"><button @click="showEditor = false" class="text-xs text-slate-600 px-3 py-2">取消</button><button @click="saveEditor" :disabled="!editText.trim()" class="text-xs bg-blue-600 text-white rounded-lg px-4 py-2">保存正文</button></div>
+      </div>
+    </div>
+    <!-- 弹窗一：模型参数配置抽屉 -->
+    <div v-if="showModelModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-white border border-slate-200 rounded-xl w-full max-w-md shadow-xl p-6 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <h3 class="text-base font-bold text-slate-900">大模型端点动态配置</h3>
+          <button @click="showModelModal = false" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="space-y-3 text-xs">
+          <div>
+            <label class="block text-slate-700 font-semibold mb-1">模型标识 (Model Identifier)</label>
+            <input v-model="modelConfig.model_name" type="text" placeholder="deepseek-v4-flash 或 deepseek-chat" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono">
+            <p class="text-[11px] text-slate-400 mt-1">支持 DeepSeek 官方各版本、OpenAI、通义千问等</p>
+          </div>
+
+          <div>
+            <label class="block text-slate-700 font-semibold mb-1">API 基础端点 (Base URL)</label>
+            <input v-model="modelConfig.base_url" type="text" placeholder="https://api.deepseek.com/v1" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono">
+          </div>
+
+          <div>
+            <label class="block text-slate-700 font-semibold mb-1">API Key 授权凭据</label>
+            <input v-model="modelConfig.api_key" type="password" placeholder="sk-..." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono">
+            <p class="text-[11px] text-slate-500 mt-1">配置保存在当前浏览器。留空时使用服务端配置；服务端未配置时使用规则检查。</p>
+          </div>
+
+          <div v-if="testResult" class="p-3 rounded-lg text-xs" :class="testResult.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'">
+            {{ testResult.message }}
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+          <button @click="testModelConnection" :disabled="isTestingModel" class="px-3.5 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-xs text-slate-700 font-medium transition cursor-pointer">
+            {{ isTestingModel ? '连接测试中...' : '测试连通性' }}
+          </button>
+          <div class="flex items-center space-x-2">
+            <button @click="showModelModal = false" class="px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-700 cursor-pointer">取消</button>
+            <button @click="saveModelConfig" class="px-4 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 transition cursor-pointer">保存配置</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 弹窗二：法务审查意见书导出预览 -->
+    <div v-if="showReportModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-white border border-slate-200 rounded-xl w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden">
+        <div class="h-14 border-b border-slate-200 px-6 flex items-center justify-between shrink-0 bg-slate-50">
+          <h3 class="text-base font-bold text-slate-900">审查意见书预览</h3>
+          <div class="flex items-center space-x-3">
+            <button onclick="window.print()" class="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition flex items-center space-x-1.5 shadow-sm cursor-pointer">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect width="12" height="8" x="6" y="14"></rect>
+              </svg>
+              <span>打印 / 存为 PDF</span>
+            </button>
+            <button @click="showReportModal = false" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- 打印报告正文 -->
+        <div class="flex-1 overflow-y-auto p-12 text-slate-900 text-sm leading-relaxed" id="printable-report">
+          <div class="text-center border-b-2 border-slate-900 pb-6 mb-6">
+            <h1 class="text-2xl font-bold tracking-tight">合同审查意见书</h1>
+            <p class="text-slate-500 font-mono text-xs mt-1.5">LEXISGRAPH LEGAL REVIEW REPORT · 商业机密</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 mb-6 bg-slate-50 p-4 border border-slate-200 rounded-lg text-xs">
+            <div><strong>合同名称：</strong>{{ contractTitle }}</div>
+            <div><strong>审查立场：</strong>{{ partyRole }}</div>
+            <div><strong>合同类型：</strong>{{ contractType }}</div>
+            <div><strong>审查时间：</strong>{{ reviewedAt }}</div><div><strong>结果来源：</strong>{{ reviewSource }}</div><div><strong>修订处理：</strong>已采纳 {{ appliedIssueIds.length }} 项（评分基于审查原文）</div>
+            <div><strong>合规健康分：</strong><span class="font-bold text-red-600">{{ reviewResult?.summary?.compliance_score == null ? "不计算健康分" : reviewResult.summary.compliance_score + " / 100" }}</span></div>
+            <div><strong>风险评级：</strong><span class="font-bold text-red-600">{{ reviewResult?.summary?.risk_level }}</span></div>
+          </div>
+
+          <div class="mb-6">
+            <h3 class="text-sm font-bold border-l-4 border-blue-600 pl-2 mb-2">一、 法务终审结论与签署建议</h3>
+            <p class="text-slate-700 leading-relaxed">{{ reviewResult?.summary?.verdict }}</p>
+          </div>
+
+          <div class="mb-6">
+            <h3 class="text-sm font-bold border-l-4 border-blue-600 pl-2 mb-2">二、 财税与结算检查结果</h3>
+            <div v-if="currentTaxSettlement" class="space-y-1.5 text-xs text-slate-700 bg-slate-50 p-3 rounded border border-slate-200">
+              <div><strong>1. 增值税税额单列：</strong>{{ currentTaxSettlement.has_separate_vat_amount ? '已规范单列价税' : '未单列税额 (含税总价混淆)' }} - {{ currentTaxSettlement.vat_amount_detail }}</div>
+              <div><strong>2. 增值税税率核验：</strong>{{ currentTaxSettlement.vat_rate }} - {{ currentTaxSettlement.vat_rate_evaluation }}</div>
+              <div><strong>3. 增值税专用发票：</strong>{{ currentTaxSettlement.is_special_vat_invoice ? '明确限定专票' : '未锁定专用发票 (进项抵扣风险)' }} - {{ currentTaxSettlement.invoice_detail }}</div>
+              <div><strong>4. 结算方式与条件：</strong>{{ currentTaxSettlement.settlement_method }} - {{ currentTaxSettlement.settlement_condition_analysis }}</div>
+            </div>
+          </div>
+
+          <div class="mb-6">
+            <h3 class="text-sm font-bold border-l-4 border-red-600 pl-2 mb-2">三、 核心商业与合规否决项 (Dealbreakers)</h3>
+            <ul class="list-disc pl-5 space-y-1 text-red-700 text-xs">
+              <li v-for="(item, i) in reviewResult?.summary?.key_dealbreakers" :key="i">{{ item }}</li>
+            </ul>
+          </div>
+
+          <div class="mb-6">
+            <h3 class="text-sm font-bold border-l-4 border-blue-600 pl-2 mb-2">四、 关键条款风险清单与红线修改对照表</h3>
+            <div class="space-y-4">
+              <div v-for="issue in reviewResult?.issues" :key="issue.id" class="border border-slate-200 p-4 rounded-lg text-xs">
+                <div class="font-bold text-slate-800 text-sm flex justify-between">
+                  <span>{{ issue.clause_title }}：{{ issue.issue_title }}</span>
+                  <span class="font-bold text-red-600 uppercase">[{{ issue.checklist_status === "needs_review" ? "待人工确认" : issue.diff && !issue.model_assessed ? "变更待评估" : severityLabel(issue.severity) }}]</span>
+                </div>
+                <div class="mt-1 text-blue-700">处理状态：{{ appliedIssueIds.includes(issue.id) ? "已采纳" : "待处理" }}</div>
+                <div class="text-slate-600 mt-1.5"><strong>法律依据：</strong>{{ issue.legal_basis }}</div>
+                <div class="text-slate-600 mt-1"><strong>风险剖析：</strong>{{ issue.risk_analysis }}</div>
+                <div class="text-amber-800 mt-1"><strong>谈判策略：</strong>{{ issue.negotiation_strategy }}</div>
+                <div v-if="issue.redline" class="mt-2 bg-slate-50 p-3 rounded border border-slate-200">
+                  <div class="text-red-700 line-through">原：{{ issue.redline.original_text }}</div>
+                  <div class="text-emerald-700 font-bold mt-1">改：{{ issue.redline.suggested_text }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-10 pt-6 border-t border-slate-300 flex justify-between text-slate-500 text-xs">
+            <div>内部审查记录：LexisGraph</div>
+            <div>确认签字：________________________</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Vue 3 核心逻辑脚本 -->
+  <script>
+    const { createApp, ref, computed, onMounted, nextTick, watch, reactive } = Vue;
+
+    createApp({
+      setup() {
+        const contractTitle = ref("未命名合同");
+        const contractType = ref("商务合作协议");
+        const partyRole = ref("乙方(卖方/开发方/服务方)");
+        const contractText = ref("");
+        const selectedModel = ref(localStorage.getItem("LEXIS_MODEL_NAME") || "deepseek-chat");
+        const selectedSampleKey = ref("");
+        const reviewProgress = ref(0);
+        
+        const isReviewing = ref(false);
+        const viewMode = ref("raw");
+        const focusedClauseId = ref(null);
+        const focusedIssueId = ref(null);
+        const clauseEdit = ref(null);
+        const severityFilter = ref("all");
+        const appliedIssueIds = ref([]);
+        
+        const showModelModal = ref(false);
+        const showReportModal = ref(false);
+        const isTestingModel = ref(false);
+        const testResult = ref(null);
+        const toastMessage = ref("");
+
+        const latestLogMessage = ref("");
+
+        const modelConfig = ref({
+          model_name: localStorage.getItem("LEXIS_MODEL_NAME") || "deepseek-v4-flash",
+          base_url: localStorage.getItem("LEXIS_BASE_URL") || "https://api.deepseek.com/v1",
+          api_key: localStorage.getItem("LEXIS_API_KEY") || ""
+        });
+
+        const sampleContracts = ref({});
+
+        const pipelineNodes = ref([
+          { id: "segment_contract", name: "条款切片与解构", description: "识别条款编号与法律业务要素" },
+          { id: "compliance_check", name: "强制法规范排查", description: "民法典格式条款效力核验" },
+          { id: "balance_review", name: "商业权责对等审查", description: "排查单方无限责任与陷阱" },
+          { id: "aggregate_and_redline", name: "红线修订与Diff对照", description: "生成可替代的修正条款" },
+          { id: "synthesize_summary", name: "量化评分与总评意见", description: "生成综合评分与审查意见书" }
+        ]);
+
+        const nodeStates = ref({
+          segment_contract: "idle",
+          compliance_check: "idle",
+          balance_review: "idle",
+          aggregate_and_redline: "idle",
+          synthesize_summary: "idle"
+        });
+
+        const reviewResult = ref(null);
+        const issueSearch = ref('');
+        const handlingFilter = ref('all');
+        const reviewError = ref('');
+        const reviewedAt = ref('');
+        const reviewedInput = ref(null);
+        const saveStatus = ref('当前会话自动保存');
+        const showEditor = ref(false), editText = ref(''), editTitle = ref(''), editType = ref('');
+        const severityLabel = LexisSession.severityLabel;
+        let controller = null;
+        const resultStale = computed(() => !!reviewResult.value && (!reviewedInput.value ||
+          reviewedInput.value.text !== contractText.value || reviewedInput.value.role !== partyRole.value ||
+          reviewedInput.value.title !== contractTitle.value || reviewedInput.value.type !== contractType.value || workspace.isStale));
+        const persist = () => {
+          try {
+            LexisSession.write('LEXIS_WORK', {title: contractTitle.value, type: contractType.value, role: partyRole.value,
+              text: contractText.value, result: reviewResult.value, applied: appliedIssueIds.value,
+              reviewedAt: reviewedAt.value, reviewedInput: reviewedInput.value});
+            if (!workspace.taskId) saveStatus.value = '待保存到审查记录';
+          } catch { saveStatus.value = '保存失败，请导出备份'; }
+        };
+        watch([contractTitle, contractType, partyRole, contractText, reviewResult, appliedIssueIds, reviewedAt], persist, {deep: true});
+        const openEditor = () => { editText.value = contractText.value; editTitle.value = contractTitle.value; editType.value = contractType.value; showEditor.value = true; };
+        const saveEditor = () => {
+          if (editText.value.length > 200000) { showToast('正文超过 20 万字，请拆分后审查'); return; }
+
+          contractText.value = editText.value; contractTitle.value = editTitle.value; contractType.value = editType.value;
+          showEditor.value = false;
+        };
+        const openClauseEditor = (issue) => {
+          const original = issue.redline?.original_text || issue.evidence;
+          if (!original || contractText.value.split(original).length !== 2) { showToast('该项无法唯一定位，请通过编辑正文人工核对'); return; }
+          clauseEdit.value = {original, text: original, title: issue.clause_title};
+        };
+        const saveClauseEditor = () => {
+          if (!clauseEdit.value || contractText.value.split(clauseEdit.value.original).length !== 2) { showToast('原文已变更，请重新定位'); return; }
+          contractText.value = contractText.value.replace(clauseEdit.value.original, clauseEdit.value.text);
+          clauseEdit.value = null; showToast('已更新正文，请重新审查当前版本');
+        };
+        const cancelReview = () => { if (controller) controller.abort(); };
+        const exportContract = () => {
+          if (resultStale.value) { showToast('审查信息已变更，请重新审查后导出修订稿'); return; }
+          const url = URL.createObjectURL(new Blob([finalizedContractText.value], {type: 'text/plain;charset=utf-8'}));
+          const a = document.createElement('a'); a.href = url; a.download = (contractTitle.value || '合同') + '-修订稿.txt'; a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        };
+
+        const reviewSource = computed(() => {
+          const detail = reviewResult.value?.logs?.find(log => log.node === 'balance_review')?.detail || '';
+          return detail.match(/\[(.*?)\]/)?.[1] || '未记录';
+        });
+        const currentTaxSettlement = computed(() => {
+          if (!reviewResult.value) return null;
+          return reviewResult.value.tax_settlement || reviewResult.value.summary?.tax_settlement || null;
+        });
+
+        const showToast = (msg) => {
+          toastMessage.value = msg;
+          setTimeout(() => { toastMessage.value = ""; }, 2500);
+        };
+
+        const workspace = reactive(createWorkspaceWorkbench({contractTitle, contractType, contractText, partyRole,
+          reviewResult, appliedIssueIds, reviewedAt, reviewedInput, saveStatus, isReviewing, showToast,
+          copyText: (text) => copyText(text), getModel: () => ({...modelConfig.value, model_name: selectedModel.value === 'custom' ? modelConfig.value.model_name : selectedModel.value})}));
+
+        const defaultPipeline = pipelineNodes.value.map(node => ({...node}));
+        watch(() => workspace.conditions.mode, mode => {
+          const labels = mode === 'checklist' ? ['合同条款解析','载入企业清单','逐项核验要求','整理问题与证据','汇总清单结果'] : mode === 'compare' ? ['解析待审合同','载入参考合同','逐条比对差异','整理变更与证据','汇总对比结果'] : null;
+          pipelineNodes.value = defaultPipeline.map((node, index) => labels ? {...node, name: labels[index], description: ''} : {...node});
+        });
+
+        // 强健的正文行级高亮计算器
+        const formattedLines = computed(() => {
+          if (!contractText.value) return [];
+          const lines = contractText.value.split("\n");
+          const issues = reviewResult.value?.issues || [];
+
+          return lines.map((line, idx) => {
+            let highlightClass = "";
+            let severity = null;
+            let issueId = null;
+            let segmentId = null;
+            const trimmedLine = line.trim();
+
+            if (issues.length > 0 && trimmedLine.length > 0) {
+              for (const issue of issues) {
+                if (issue.evidence && trimmedLine.length >= 5 && issue.evidence.includes(trimmedLine)) {
+                  severity = issue.severity; issueId = issue.id; segmentId = issue.segment_id; break;
+                }
+                // 1. 红线原文字符串匹配
+                if (issue.redline && issue.redline.original_text) {
+                  const origClean = issue.redline.original_text.replace(/\s+/g, "");
+                  const lineClean = trimmedLine.replace(/\s+/g, "");
+                  
+                  if (lineClean.length >= 5 && origClean.includes(lineClean)) {
+                    severity = issue.severity;
+                    issueId = issue.id;
+                    segmentId = issue.segment_id;
+                    break;
+                  }
+                  if (trimmedLine.includes(issue.redline.original_text.slice(0, 14))) {
+                    severity = issue.severity;
+                    issueId = issue.id;
+                    segmentId = issue.segment_id;
+                    break;
+                  }
+                }
+
+                // 2. 条款标题行精准命中
+                if (issue.clause_title && trimmedLine.includes(issue.clause_title.trim())) {
+                  severity = issue.severity;
+                  issueId = issue.id;
+                  segmentId = issue.segment_id;
+                  break;
+                }
+              }
+            }
+
+            if (severity === 'critical') highlightClass = "clause-critical";
+            else if (severity === 'warning') highlightClass = "clause-warning";
+            else if (severity) highlightClass = "clause-info";
+
+            return {
+              text: line,
+              highlightClass,
+              severity,
+              issueId,
+              segmentId
+            };
+          });
+        });
+
+        const filteredIssues = computed(() => {
+          const rank = {critical: 0, warning: 1, info: 2, favorable: 3};
+          return (reviewResult.value?.issues || []).filter(issue =>
+            (severityFilter.value === 'all' || issue.severity === severityFilter.value) &&
+            (handlingFilter.value === 'all' || (handlingFilter.value === 'applied' ? appliedIssueIds.value.includes(issue.id) : !appliedIssueIds.value.includes(issue.id) && (workspace.decisions[issue.id] || 'pending') === handlingFilter.value)) &&
+            (!issueSearch.value.trim() || [issue.clause_title, issue.issue_title, issue.risk_analysis, issue.legal_basis].join(' ').toLowerCase().includes(issueSearch.value.trim().toLowerCase()))
+          ).sort((a, b) => (rank[a.severity] ?? 4) - (rank[b.severity] ?? 4));
+        });
+
+        const revisedText = (ids) => {
+          let text = reviewedInput.value?.text || contractText.value;
+          for (const id of ids) {
+            const issue = reviewResult.value?.issues.find(i => i.id === id);
+            const redline = issue?.redline;
+            if (!redline) continue;
+            if (redline.change_type === 'insert') text += '\n' + redline.suggested_text;
+            else text = text.replace(redline.original_text, redline.change_type === 'delete' ? '' : redline.suggested_text);
+          }
+          return text;
+        };
+        const finalizedContractText = computed(() => revisedText(appliedIssueIds.value));
+
+        const fetchSamples = async () => {
+          const pending = LexisSession.read('LEXIS_PENDING_CONTRACT');
+          const saved = pending || LexisSession.read('LEXIS_WORK');
+          if (saved) {
+            contractTitle.value = saved.title || '未命名合同'; contractType.value = saved.type || '商务合作协议';
+            partyRole.value = saved.role || partyRole.value; contractText.value = saved.text || '';
+            reviewResult.value = saved.result || null; appliedIssueIds.value = saved.applied || [];
+            reviewedAt.value = saved.reviewedAt || ''; reviewedInput.value = saved.reviewedInput || null;
+            if (saved.result) { reviewProgress.value = 100; Object.keys(nodeStates.value).forEach(key => nodeStates.value[key] = 'completed'); }
+            if (pending) sessionStorage.removeItem('LEXIS_PENDING_CONTRACT');
+          }
+          try {
+            const res = await fetch('/api/samples'); const data = await res.json();
+            if (data.success) sampleContracts.value = data.samples;
+          } catch { /* Existing work remains usable if examples are unavailable. */ }
+        };
+
+        const loadSample = (key) => {
+          selectedSampleKey.value = key;
+          const sample = sampleContracts.value[key];
+          if (!sample) return;
+          contractTitle.value = sample.title;
+          contractType.value = sample.type;
+          partyRole.value = sample.recommended_role;
+          contractText.value = sample.text;
+          reviewResult.value = null;
+          appliedIssueIds.value = [];
+          resetNodeStates();
+          showToast("已载入范本：" + sample.title);
+        };
+
+        const resetNodeStates = () => {
+          for (const key in nodeStates.value) {
+            nodeStates.value[key] = "idle";
+          }
+          reviewProgress.value = 0;
+          latestLogMessage.value = "";
+        };
+
+        const clearText = () => {
+          contractText.value = "";
+          appliedIssueIds.value = [];
+          reviewResult.value = null;
+          resetNodeStates();
+        };
+
+        // 核心审查执行函数：带专业蒙版遮罩、平滑进度流转与彻底去除原生弹窗
+        const startReview = async () => {
+          if (!contractText.value.trim() || isReviewing.value || workspace.loading || workspace.historical) return;
+          try { await workspace.flush(); } catch (error) { showToast(error.message); return; }
+          const previousResult = reviewResult.value, previousApplied = [...appliedIssueIds.value];
+          
+          isReviewing.value = true;
+          resetNodeStates();
+          appliedIssueIds.value = [];
+
+          reviewError.value = '';
+          reviewResult.value = null;
+          controller = new AbortController();
+          nodeStates.value.segment_contract = 'running';
+          latestLogMessage.value = '正在解析合同正文…';
+
+          const payload = {
+            contract_title: contractTitle.value,
+            contract_type: contractType.value,
+            party_role: partyRole.value,
+            contract_text: contractText.value,
+            model_config_data: {
+              model_name: selectedModel.value === 'custom' ? modelConfig.value.model_name : selectedModel.value,
+              api_key: modelConfig.value.api_key,
+              base_url: modelConfig.value.base_url,
+              temperature: 0.1
+            }
+          };
+
+          try {
+            const res = await fetch('/api/tasks/' + workspace.taskId + '/review/stream', {
+              method: 'POST', headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify(payload), signal: controller.signal
+            });
+            if (!res.ok) { const errorData = await res.json(); throw new Error(errorData.detail || '审查请求失败（' + res.status + '）'); }
+            const reader = res.body.getReader(), decoder = new TextDecoder();
+            let buffer = '', completed = false, completedRunId = null;
+            const consume = (block) => {
+              const event = block.split('\n').find(line => line.startsWith('event:'))?.slice(6).trim();
+              const json = block.split('\n').filter(line => line.startsWith('data:')).map(line => line.slice(5).trim()).join('\n');
+              if (!json) return;
+              const data = JSON.parse(json);
+              if (event === 'error') throw new Error(data.error || '审查失败');
+              if (event === 'node_update') {
+                nodeStates.value[data.node] = 'completed';
+                const idx = pipelineNodes.value.findIndex(node => node.id === data.node);
+                reviewProgress.value = Math.round((idx + 1) / pipelineNodes.value.length * 100);
+                if (idx + 1 < pipelineNodes.value.length) nodeStates.value[pipelineNodes.value[idx + 1].id] = 'running';
+                latestLogMessage.value = data.log?.detail || '正在执行下一步…';
+              }
+              if (event === 'complete') {
+                if (!data.success || !data.data?.summary) throw new Error('未返回有效审查结果');
+                reviewResult.value = data.data; completed = true; completedRunId = data.run_id;
+                reviewedAt.value = new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'});
+                reviewedInput.value = {text: payload.contract_text, title: payload.contract_title, type: payload.contract_type, role: payload.party_role};
+                reviewProgress.value = 100;
+                showToast('审查完成，共 ' + (data.data.issues || []).length + ' 项意见');
+              }
+            };
+            while (true) {
+              const {value, done} = await reader.read();
+              buffer += decoder.decode(value || new Uint8Array(), {stream: !done}).replace(/\r/g, '');
+              let boundary;
+              while ((boundary = buffer.indexOf('\n\n')) >= 0) { consume(buffer.slice(0, boundary)); buffer = buffer.slice(boundary + 2); }
+              if (done) break;
+            }
+            if (!completed) throw new Error('连接中断，未收到完整结果，请重试');
+            await workspace.refresh(completedRunId);
+          } catch (err) {
+            reviewResult.value = previousResult; appliedIssueIds.value = previousApplied;
+            reviewError.value = err.name === 'AbortError' ? '已取消本次审查，可重新开始。' : err.message;
+            latestLogMessage.value = reviewError.value;
+            try { await workspace.refresh(); } catch {}
+            for (const key in nodeStates.value) if (nodeStates.value[key] === 'running') nodeStates.value[key] = 'idle';
+            showToast(reviewError.value);
+          } finally {
+            isReviewing.value = false; controller = null; persist();
+          }
+        };
+
+        const reviewAcceptedDraft = async () => {
+          if (resultStale.value || workspace.historical || !appliedIssueIds.value.length) return;
+          contractText.value = finalizedContractText.value;
+          viewMode.value = 'raw';
+          await startReview();
+        };
+
+        const highlightInContract = (issue) => {
+          if (viewMode.value === 'original') {
+            focusedClauseId.value = issue.segment_id; focusedIssueId.value = issue.id;
+            const frame = document.querySelector('iframe[title="合同原件预览"]');
+            frame?.contentWindow?.postMessage({type:'lexis-locate', text:issue.redline?.original_text || issue.evidence || ''}, location.origin);
+            return;
+          }
+          viewMode.value = 'raw';
+          focusedClauseId.value = issue.segment_id; focusedIssueId.value = issue.id;
+          nextTick(() => {
+          const target = formattedLines.value.find(l => l.issueId === issue.id || (issue.segment_id && l.segmentId === issue.segment_id));
+          if (target) {
+            const lineIdx = formattedLines.value.indexOf(target);
+            const el = document.getElementById("line-" + (lineIdx + 1));
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+          });
+        };
+
+        const selectIssue = (issueId) => {
+          focusedIssueId.value = issueId; severityFilter.value = 'all'; handlingFilter.value = 'all'; issueSearch.value = '';
+          nextTick(() => {
+          const card = document.getElementById("card-" + issueId);
+          if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            card.classList.add("ring-2", "ring-blue-600");
+            setTimeout(() => card.classList.remove("ring-2", "ring-blue-600"), 2000);
+          }
+          });
+        };
+
+        // 采纳修订：直接替换原文对应内容
+        const applyRedline = (issue) => {
+          if (resultStale.value || workspace.historical || !issue.redline) return;
+          if (appliedIssueIds.value.includes(issue.id)) {
+            const remaining = appliedIssueIds.value.filter(id => id !== issue.id);
+            // Removing an earlier edit must not silently invalidate a later edit.
+            let text = contractText.value;
+            for (const id of remaining) {
+              const redline = reviewResult.value.issues.find(i => i.id === id)?.redline;
+              if (!redline) continue;
+              if (redline.change_type !== 'insert' && (!redline.original_text || !text.includes(redline.original_text))) {
+                showToast('后续修订依赖此项，请先撤销后续采纳项'); return;
+              }
+              text = redline.change_type === 'insert' ? text + '\n' + redline.suggested_text : text.replace(redline.original_text, redline.change_type === 'delete' ? '' : redline.suggested_text);
+            }
+            appliedIssueIds.value = remaining; showToast('已撤销采纳'); return;
+          }
+          const redline = issue.redline, text = finalizedContractText.value;
+          if (redline.change_type !== 'insert') {
+            const original = redline.original_text;
+            if (!original || !text.includes(original)) { showToast('无法匹配原文，可能与已采纳修订冲突，请人工核对'); return; }
+            if (text.indexOf(original) !== text.lastIndexOf(original)) { showToast('原文存在多处相同内容，请人工核对后编辑'); return; }
+          }
+          appliedIssueIds.value = [...appliedIssueIds.value, issue.id];
+          showToast('已采纳，可在修订稿中查看或撤销');
+        };
+
+        const copyText = async (txt) => {
+          try { await navigator.clipboard.writeText(txt); showToast('修订建议已复制'); }
+          catch { showToast('复制失败，请手动选中并复制文本'); }
+        };
+
+        const openModelModal = () => {
+          if (selectedModel.value !== 'custom') modelConfig.value.model_name = selectedModel.value;
+          showModelModal.value = true;
+          testResult.value = null;
+        };
+
+        const saveModelConfig = () => {
+          localStorage.setItem("LEXIS_API_KEY", modelConfig.value.api_key || "");
+          localStorage.setItem("LEXIS_BASE_URL", modelConfig.value.base_url || "https://api.deepseek.com/v1");
+          localStorage.setItem("LEXIS_MODEL_NAME", modelConfig.value.model_name || "deepseek-v4-flash");
+          selectedModel.value = modelConfig.value.model_name;
+          showModelModal.value = false;
+          showToast("模型与端点参数已成功保存！");
+        };
+
+        const testModelConnection = async () => {
+          isTestingModel.value = true;
+          testResult.value = null;
+          try {
+            const res = await fetch("/api/model/check", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model_name: modelConfig.value.model_name,
+                api_key: modelConfig.value.api_key,
+                base_url: modelConfig.value.base_url
+              })
+            });
+            testResult.value = await res.json();
+          } catch (e) {
+            testResult.value = { success: false, message: "请求失败: " + e.message };
+          } finally {
+            isTestingModel.value = false;
+          }
+        };
+
+        const getScoreColor = (score) => {
+          if (score == null) return "text-slate-400";
+          if (score < 60) return 'text-red-600';
+          if (score < 80) return 'text-amber-600';
+          return 'text-emerald-600';
+        };
+
+        const resetToDefault = () => {
+          loadSample("business_cooperation_contract");
+        };
+
+        onMounted(() => {
+          if (workspace.taskId) workspace.load().then(() => {
+            if (workspace.conditions.source_id) viewMode.value = 'original';
+            if (reviewResult.value) { reviewProgress.value = 100; Object.keys(nodeStates.value).forEach(key => nodeStates.value[key] = 'completed'); }
+          }); else { workspace.load().then(fetchSamples); }
+        });
+
+        return {
+          workspace, reviewAcceptedDraft, focusedIssueId, clauseEdit, openClauseEditor, saveClauseEditor, issueSearch, handlingFilter, reviewError, reviewedAt, resultStale, saveStatus, severityLabel,
+          showEditor, editText, editTitle, editType, openEditor, saveEditor, cancelReview, exportContract,
+          contractTitle,
+          contractType,
+          partyRole,
+          contractText,
+          selectedModel,
+          selectedSampleKey,
+          isReviewing,
+          viewMode,
+          focusedClauseId,
+          severityFilter,
+          appliedIssueIds,
+          showModelModal,
+          showReportModal,
+          isTestingModel,
+          testResult,
+          toastMessage,
+          latestLogMessage,
+          modelConfig,
+          sampleContracts,
+          pipelineNodes,
+          nodeStates,
+          reviewResult,
+          currentTaxSettlement, reviewSource,
+          formattedLines,
+          filteredIssues,
+          finalizedContractText,
+          loadSample,
+          clearText,
+          startReview,
+          highlightInContract,
+          selectIssue,
+          applyRedline,
+          copyText,
+          openModelModal,
+          saveModelConfig,
+          testModelConnection,
+          reviewProgress,
+          getScoreColor,
+          resetToDefault
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

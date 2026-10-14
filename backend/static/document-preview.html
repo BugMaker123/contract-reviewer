@@ -1,0 +1,38 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self'; frame-src blob:; base-uri 'none'; form-action 'none'"><meta name="viewport" content="width=device-width,initial-scale=1"><title>合同原件预览</title><style>body{margin:0;background:#f3f6fa;color:#334155;font:14px system-ui}body > header{position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid #dbe3ef;padding:10px 16px;display:flex;align-items:center;gap:12px}button,select,a{color:#2563eb;font:inherit}button,select{border:1px solid #dbe3ef;background:#fff;border-radius:6px;padding:4px 8px}#status{padding:24px;text-align:center}#viewport{overflow:auto}#pages{transform-origin:top left;width:max-content;min-width:100%}.docx-wrapper{background:transparent!important;padding:24px!important}section.docx{box-shadow:0 2px 8px #cbd5e1!important;margin-bottom:24px!important}.lexis-located{outline:2px solid #2563eb;outline-offset:3px;background:rgba(254,240,138,.45);scroll-margin-top:90px}#locate-status{color:#64748b;font-size:12px}iframe{width:100%;height:calc(100vh - 55px);border:0}</style></head><body><header><span id="name">原件预览</span><select id="zoom" aria-label="预览缩放"><option value="fit">适应宽度</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option></select><a id="download" download>下载原件</a><span id="locate-status" role="status"></span></header><div id="status" role="status">正在加载原件…</div><div id="viewport"><div id="pages"></div></div><script src="/static/vendor/jszip.min.js"></script><script src="/static/vendor/docx-preview.min.js"></script><script>
+(async()=>{
+ const id=new URLSearchParams(location.search).get('source');const status=document.querySelector('#status'),pages=document.querySelector('#pages'),zoom=document.querySelector('#zoom');
+ const resize=()=>{const page=pages.querySelector('section.docx');if(!page)return;const scale=zoom.value==='fit'?Math.min(1,(innerWidth-48)/page.offsetWidth):Number(zoom.value);pages.style.zoom=scale;};
+ const normalize=text=>(text||'').replace(/\s+/g,'');
+ window.addEventListener('message',event=>{
+   if(event.origin!==location.origin || event.source!==parent || event.data?.type!=='lexis-locate')return;
+   const target=normalize(event.data.text),hint=document.querySelector('#locate-status');
+   pages.querySelectorAll('.lexis-located').forEach(el=>el.classList.remove('lexis-located'));
+   if(!target){hint.textContent='该意见没有可定位的原文证据';return;}
+   const paragraphs=[...pages.querySelectorAll('article p')];
+   let matches=paragraphs.filter(p=>normalize(p.textContent).includes(target));
+   if(!matches.length){
+     matches=paragraphs.filter(p=>{const text=normalize(p.textContent);return text.length>=12 && target.includes(text);});
+   }
+   if(!matches.length){hint.textContent='未能在原件精确定位，可手动切换至审查文本';return;}
+   // Only a unique single-paragraph match or a contiguous multi-paragraph passage is safe to anchor.
+   if(matches.length>1 && (matches.some(p=>normalize(p.textContent).includes(target)) || matches.some((p,i)=>i && paragraphs.indexOf(p)!==paragraphs.indexOf(matches[i-1])+1))){hint.textContent='原文有多处匹配，请在审查文本中核对';return;}
+   matches.forEach(p=>p.classList.add('lexis-located'));
+   matches[0].scrollIntoView({behavior:'smooth',block:'center'});
+   hint.textContent='已定位原文';
+ });
+ zoom.onchange=resize;window.addEventListener('resize',resize);
+ try{
+ if(!/^[a-f0-9]{32}$/.test(id||''))throw Error('原件标识无效');
+ const response=await fetch('/api/sources/'+id);if(!response.ok)throw Error('原件记录不存在');const info=await response.json();document.querySelector('#name').textContent=info.name;
+ const url='/api/sources/'+id+'/file';const link=document.querySelector('#download');link.href=url;link.download=info.name;
+ const file=await fetch(url);if(!file.ok)throw Error('原件文件缺失，请重新上传');const blob=await file.blob();
+ if(info.extension==='.docx'){
+ await docx.renderAsync(blob,pages,null,{ignoreLastRenderedPageBreak:false,renderHeaders:true,renderFooters:true,renderAltChunks:false,useBase64URL:true});
+ // Original document links must never navigate or load resources outside the internal preview.
+ pages.querySelectorAll('a').forEach(a=>{a.removeAttribute('href');a.removeAttribute('target');});
+ resize();
+ }else if(info.extension==='.pdf'){zoom.hidden=true;const frame=document.createElement('iframe');frame.title='PDF 原件';frame.src=URL.createObjectURL(blob);pages.append(frame);}
+ else{zoom.hidden=true;status.textContent='TXT 没有 Word 排版，请使用审查文本视图，或下载原件。';return;}
+ status.hidden=true;
+ }catch(error){status.textContent='预览失败：'+error.message+'。可切换至审查文本继续核对。';}
+})();</script></body></html>
