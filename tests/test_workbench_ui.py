@@ -62,7 +62,7 @@ def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
 
             page.reload()
             open_opinions(page)
-            expect(page.get_by_test_id('original-document-pane')).to_have_count(0)
+            expect(page.get_by_test_id('original-document-pane')).to_be_visible()
             page.get_by_role('button', name='撤销采纳').click()
             expect(page.get_by_role('button', name='撤销采纳', exact=True)).to_have_count(0)
             page.get_by_role('button', name='编辑条款', exact=True).first.click()
@@ -261,6 +261,8 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             if kind == 'complete':
                 data['issues'][0]['evidence'] = 'Payment: 100 USD'
                 data['issues'][0]['redline'] = {'change_type':'replace', 'original_text':'Payment: 100 USD', 'suggested_text':'Payment: 200 USD'}
+                # Independent unrewritten clause, regardless of rule issues consolidated above.
+                data['issues'].append({**data['issues'][0], 'id':'delivery_risk', 'segment_id':None})
                 data['issues'][1]['evidence']='Section 20: delivery, payment, acceptance and contract obligations.'
                 data['issues'][1]['redline']=None
             yield kind, data
@@ -329,6 +331,17 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
                 record=page.request.get(base+'/api/tasks/'+task['id']).json()
                 assert record['text']==imported['text']
                 assert record['run']['applied']==[]
+            # Reload must reconstruct the original baseline and all-suggestions
+            # draft from the saved run, without launching another review.
+            page.reload()
+            expect(page.get_by_test_id('original-document-pane')).to_be_visible()
+            expect(left.locator('article p').first).to_have_text('Payment: 100 USD')
+            expect(right.locator('article p').first).to_have_text('Payment: 200 USD')
+            expect(page.locator('#review-summary-content')).to_be_visible()
+            expect(page.locator('#review-opinion-content')).to_be_visible()
+            for preview in [left,right]:
+                expect(preview.locator('#zoom-percent')).to_have_text('80%')
+            assert page.request.get(base+'/api/tasks/'+task['id']).json()['run']['id']==record['run']['id']
             expect(left.locator('.lexis-diff-original')).to_have_text('Payment: 100 USD')
             expect(right.locator('.lexis-diff-revised')).to_have_text('Payment: 200 USD')
             assert left.locator('html').evaluate('(el)=>getComputedStyle(el).scrollbarWidth') == 'none'
@@ -351,7 +364,7 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             assert revised_box['x']+revised_box['width'] <= panel_box['x']
             assert panel_box['x']+panel_box['width'] <= 1920
             assert page.get_by_test_id('review-summary').bounding_box()['width'] >= 320
-            assert page.locator('#opinion-drawer').bounding_box()['width'] >= 440
+            assert page.locator('#opinion-drawer').bounding_box()['width'] == 360
             for panel_name,button_name in [('review-summary-panel','收起审查概览'),('opinion-drawer','收起审查意见与修订清单')]:
                 panel=page.locator('#'+panel_name).bounding_box()
                 handle=page.get_by_role('button',name=button_name,exact=True).bounding_box()
@@ -359,6 +372,9 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             action_row=page.locator('.wb-issue-actions').first
             positions=[button.bounding_box()['y'] for button in action_row.get_by_role('button').all()]
             assert max(positions)-min(positions)<2
+            actions=action_row.get_by_role('button').all()
+            edit_box,ask_box=actions[-2].bounding_box(),actions[-1].bounding_box()
+            assert 0 <= ask_box['x']-edit_box['x']-edit_box['width'] <= 8
             page.screenshot(path='artifacts/workbench-docked-opinions.png')
             for width in [1366, 1920]:
                 page.set_viewport_size({'width':width,'height':1080})
@@ -369,18 +385,22 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
                 }""")
                 for preview in [left, right]:
                     expect(preview.locator('section.docx').first).to_be_visible()
-                    assert preview.locator('section.docx').first.evaluate('(el)=>el.getBoundingClientRect().right <= innerWidth + 1')
+                    expect(preview.locator('#zoom-percent')).to_have_text('80%')
             expect(page.get_by_role('button', name='审查概览', exact=True)).to_have_count(0)
             page.get_by_role('button', name='收起审查概览', exact=True).click()
             expect(page.locator('#review-summary-content')).to_be_hidden()
             assert page.get_by_test_id('review-summary').bounding_box()['width'] == 36
+            for preview in [left, right]:
+                expect(preview.locator('#zoom-percent')).to_have_text('100%')
             page.get_by_role('button', name='收起审查意见与修订清单', exact=True).click()
             expect(page.locator('#review-opinion-content')).to_be_hidden()
             assert page.locator('#opinion-drawer').bounding_box()['width'] == 36
-            expect(right.get_by_role('button', name='适应文档宽度')).to_have_attribute('aria-pressed','true')
+            expect(right.locator('#zoom-percent')).to_have_text('100%')
             page.get_by_role('button', name='展开审查概览', exact=True).click()
             expect(page.locator('#review-summary-content')).to_be_visible()
             expect(page.locator('#review-opinion-content')).to_be_hidden()
+            for preview in [left, right]:
+                expect(preview.locator('#zoom-percent')).to_have_text('100%')
             page.get_by_role('button', name='展开审查意见与修订清单', exact=True).click()
             expect(page.locator('#review-opinion-content')).to_be_visible()
             expect(page.locator('#review-summary-content')).to_be_visible()
@@ -396,12 +416,14 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             page.get_by_role('button', name='完成复核', exact=True).click()
             expect(page.get_by_role('button', name='已完成复核', exact=True)).to_be_visible()
             assert page.request.get(base+'/api/tasks/'+task['id']).json()['status'] == 'completed'
-            fit=right.get_by_role('button', name='适应文档宽度', exact=True)
-            expect(fit).to_have_attribute('aria-pressed', 'true')
-            right.get_by_role('button', name='放大文档', exact=True).click()
-            expect(fit).to_have_attribute('aria-pressed', 'false')
-            fit.click()
-            expect(fit).to_have_attribute('aria-pressed', 'true')
+            expect(right.locator('#zoom-percent')).to_have_text('80%')
+            right.get_by_role('button', name='选择文档缩放比例').click()
+            right.get_by_role('menuitemradio', name='125%', exact=True).click()
+            expect(right.locator('#zoom-percent')).to_have_text('125%')
+            expect(right.locator('#zoom-menu')).to_be_hidden()
+            right.get_by_role('button', name='选择文档缩放比例').click()
+            right.get_by_role('menuitemradio', name='适应宽度', exact=True).click()
+            expect(right.locator('#zoom-percent')).to_have_text('适应宽度')
             page.screenshot(path='artifacts/workbench-dual-document.png')
             close_opinions(page)
             page.get_by_role('button', name='编辑正文', exact=True).click()
@@ -447,7 +469,7 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             expect(right.locator('article p').nth(2)).to_have_text('Section 1: saved from toolbar')
             expect(right.locator('.lexis-diff-revised')).to_have_count(3)
             page.reload()
-            expect(page.get_by_test_id('original-document-pane')).to_have_count(0)
+            expect(page.get_by_test_id('original-document-pane')).to_be_visible()
             expect(right.locator('article p').first).to_have_text('Payment: 500 USD')
             expect(right.locator('article p').nth(2)).to_have_text('Section 1: saved from toolbar')
             expect(right.locator('article p').nth(1)).to_have_text('Section 0: body edit must survive')

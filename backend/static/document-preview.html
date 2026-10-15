@@ -9,8 +9,8 @@ button,a{font:inherit;color:#64748b}button{cursor:pointer;border:1px solid #e2e8
 #locate-status{color:#64748b;font-size:11px;flex-basis:100%;overflow-wrap:anywhere}#locate-status:empty{display:none}#locate-status.quiet{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 #status{padding:24px;text-align:center}#viewport{overflow:auto}#pages{transform-origin:top left;width:max-content;min-width:100%}.docx-wrapper{background:transparent!important;padding:16px!important}section.docx article p{overflow-wrap:anywhere}section.docx{box-shadow:0 1px 5px #dbe1e9!important;margin-bottom:24px!important}#pages .lexis-located{outline:none;box-shadow:inset 3px 0 #ef4444!important;background:rgba(254,202,202,.65)!important;border-radius:3px;scroll-margin-top:70px}iframe{width:100%;height:calc(100vh - 44px);border:0}
 @media(max-width:440px){#pane-badge{display:none}body>header{gap:4px;padding:7px 8px}.pane-actions{gap:4px}#zoom-controls button{padding:2px 4px}}
-html.shared-original{scrollbar-width:none}html.shared-original::-webkit-scrollbar{display:none}.lexis-diff-original{background:rgba(253,230,138,.65)!important;box-shadow:inset 3px 0 #e9a526;border-radius:2px}.lexis-diff-revised{background:rgba(167,243,208,.5)!important;box-shadow:inset 3px 0 #34b381;border-radius:2px}
-#pages .lexis-review-risk{background:rgba(254,202,202,.58)!important;box-shadow:inset 3px 0 #ef4444!important;border-radius:3px;scroll-margin-top:70px}</style></head><body><header><div class="pane-identity"><span id="pane-label">原始文档</span><span id="pane-badge" hidden></span><span id="name"></span></div><div class="pane-actions"><div id="zoom-controls" role="group" aria-label="文档缩放" hidden><button id="zoom-fit" aria-label="适应文档宽度" aria-pressed="true">↔ 适宽</button><span class="zoom-divider"></span><button id="zoom-out" aria-label="缩小文档">−</button><span id="zoom-percent" aria-live="polite">自动</span><button id="zoom-in" aria-label="放大文档">＋</button></div><a id="download" download aria-label="下载文档" title="下载此文档"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg>下载</a><button id="save-edit" hidden>保存正文</button><button id="cancel-edit" hidden>取消编辑</button></div><span id="locate-status" role="status"></span></header><div id="status" role="status">正在加载原件…</div><div id="viewport"><div id="pages"></div></div><script src="/static/vendor/jszip.min.js"></script><script src="/static/vendor/docx-preview.min.js"></script><script>
+html.shared-original{scrollbar-width:none}html.shared-original::-webkit-scrollbar{display:none}.lexis-diff-original{background:rgba(253,230,138,.65)!important;box-shadow:inset 3px 0 #e9a526;border-radius:2px}.lexis-diff-revised{background:rgba(254,202,202,.65)!important;box-shadow:inset 3px 0 #ef4444;border-radius:2px}
+#pages .lexis-review-risk{background:rgba(254,202,202,.58)!important;box-shadow:inset 3px 0 #ef4444!important;border-radius:3px;scroll-margin-top:70px}#zoom-controls{position:relative;background:transparent;padding:0}#zoom-percent{min-width:72px;padding:4px 10px!important;text-align:left;font-size:11px!important;border:1px solid #e2e8f0!important;background:#fff!important;color:#475569}#zoom-percent::after{content:"";display:inline-block;width:5px;height:5px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);margin:0 0 3px 10px}#zoom-menu{position:absolute;right:0;top:calc(100% + 6px);min-width:128px;padding:4px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 8px 24px #0f172a18;z-index:10}#zoom-menu button{display:block;width:100%;padding:6px 10px!important;text-align:left}#zoom-menu button[aria-checked="true"]{background:#eff6ff;color:#2563eb;font-weight:600}</style></head><body><header><div class="pane-identity"><span id="pane-label">原始文档</span><span id="pane-badge" hidden></span><span id="name"></span></div><div class="pane-actions"><div id="zoom-controls" role="group" aria-label="文档缩放" hidden><button id="zoom-percent" aria-label="选择文档缩放比例" aria-haspopup="true" aria-expanded="false">80%</button><div id="zoom-menu" role="menu" aria-label="缩放比例" hidden><button role="menuitemradio" data-zoom="fit">适应宽度</button><button role="menuitemradio" data-zoom="0.5">50%</button><button role="menuitemradio" data-zoom="0.8">80%</button><button role="menuitemradio" data-zoom="1">100%</button><button role="menuitemradio" data-zoom="1.25">125%</button><button role="menuitemradio" data-zoom="1.5">150%</button><button role="menuitemradio" data-zoom="2">200%</button></div></div><a id="download" download aria-label="下载文档" title="下载此文档"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg>下载</a><button id="save-edit" hidden>保存正文</button><button id="cancel-edit" hidden>取消编辑</button></div><span id="locate-status" role="status"></span></header><div id="status" role="status">正在加载原件…</div><div id="viewport"><div id="pages"></div></div><script src="/static/vendor/jszip.min.js"></script><script src="/static/vendor/docx-preview.min.js"></script><script>
 (async()=>{
  const params=new URLSearchParams(location.search),id=params.get('source'),run=params.get('run'),scope=params.get('scope')||'current',readOnly=params.get('readonly')==='1';const status=document.querySelector('#status'),pages=document.querySelector('#pages'),zoom={value:'fit'},zoomControls=document.querySelector('#zoom-controls');
  const resize=()=>{
@@ -20,8 +20,8 @@ html.shared-original{scrollbar-width:none}html.shared-original::-webkit-scrollba
    const fit=Math.min(1,Math.max(.1,(available-32)/(width+32)));
    const scale=zoom.value==='fit'?fit:Number(zoom.value);
    pages.style.zoom=scale;
-   document.querySelector('#zoom-percent').textContent=Math.round(scale*100)+'%';
-   document.querySelector('#zoom-fit').setAttribute('aria-pressed',String(zoom.value==='fit'));
+   document.querySelector('#zoom-percent').textContent=zoom.value==='fit'?'适应宽度':Math.round(scale*100)+'%';
+   document.querySelectorAll('[data-zoom]').forEach(button=>button.setAttribute('aria-checked',String(button.dataset.zoom===zoom.value)));
  };
  const pane=params.get('pane')==='revised'?'revised':'original';
  document.body.dataset.pane=pane;
@@ -95,6 +95,7 @@ html.shared-original{scrollbar-width:none}html.shared-original::-webkit-scrollba
  window.addEventListener('message',event=>{
    if(event.origin!==location.origin || event.source!==parent)return;
    if(event.data?.type==='lexis-fit-width'){zoom.value='fit';resize();return;}
+   if(event.data?.type==='lexis-set-zoom' && Number.isFinite(event.data.scale)){zoom.value=String(Math.max(.3,Math.min(2,event.data.scale)));resize();return;}
    if(event.data?.type==='lexis-sync-scroll'){
      const data=event.data,range=Math.max(0,document.documentElement.scrollHeight-innerHeight);
      let y=(data.ratio||0)*range;
@@ -151,11 +152,13 @@ html.shared-original{scrollbar-width:none}html.shared-original::-webkit-scrollba
    matches[0].scrollIntoView({behavior:'smooth',block:'center'});
    hint.textContent='已定位原文';
  });
- document.querySelector('#zoom-fit').onclick=()=>{zoom.value='fit';resize();};
- const stepZoom=delta=>{zoom.value=String(Math.max(.3,Math.min(2,Math.round((parseFloat(pages.style.zoom)||1)*100+delta*100)/100)));resize();};
- document.querySelector('#zoom-out').onclick=()=>stepZoom(-.1);
- document.querySelector('#zoom-in').onclick=()=>stepZoom(.1);
+ const zoomButton=document.querySelector('#zoom-percent'),zoomMenu=document.querySelector('#zoom-menu');
  window.addEventListener('resize',resize);
+ const closeZoom=()=>{zoomMenu.hidden=true;zoomButton.setAttribute('aria-expanded','false');};
+ zoomButton.onclick=()=>{zoomMenu.hidden=!zoomMenu.hidden;zoomButton.setAttribute('aria-expanded',String(!zoomMenu.hidden));};
+ zoomMenu.onclick=event=>{const option=event.target.closest('[data-zoom]');if(!option)return;zoom.value=option.dataset.zoom;resize();closeZoom();zoomButton.focus();};
+ document.addEventListener('click',event=>{if(!zoomControls.contains(event.target))closeZoom();});
+ document.addEventListener('keydown',event=>{if(event.key==='Escape'){closeZoom();zoomButton.focus();}});
  try{
  if(!/^[a-f0-9]{32}$/.test(id||''))throw Error('原件标识无效');
  const response=await fetch('/api/sources/'+id+'?include_text=true'+(run?'&run='+encodeURIComponent(run)+'&scope='+encodeURIComponent(scope):''));if(!response.ok)throw Error('原件记录不存在');info=await response.json();document.querySelector('#name').textContent=info.name;label.title=info.name;
@@ -186,7 +189,7 @@ html.shared-original{scrollbar-width:none}html.shared-original::-webkit-scrollba
  }else if(info.extension==='.pdf'){zoomControls.hidden=true;const frame=document.createElement('iframe');frame.title='PDF 原件';frame.src=URL.createObjectURL(blob);pages.append(frame);}
  else{zoomControls.hidden=true;pages.style.width='auto';pages.style.whiteSpace='pre-wrap';pages.style.padding='24px';(info.text||'').split('\n').forEach((text,index)=>{const p=document.createElement('p');p.textContent=text||' ';pages.append(p);anchors.push({index,end:index+1,element:p});});}
  status.hidden=true;
- if(info.preview_warnings?.length){hint.textContent=info.preview_warnings.length+' 项建议冲突，未合入预览，请在意见栏核对';hint.title=info.preview_warnings.join('；');}
+ if(info.preview_warnings?.length){hint.textContent=info.preview_warnings.length+' 处建议尚未完整应用，请在意见栏核对';hint.title=info.preview_warnings.join('；');}
  await document.fonts.ready;
  resize();
  documentRendered=true;

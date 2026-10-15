@@ -26,6 +26,8 @@ def revision_preview(run, scope):
     ids = list(run['applied']) if scope == 'current' else []
     if scope == 'all':
         for issue in run['result']['issues']:
+            if issue.get('rewrite_warning'):
+                warnings.append(issue['issue_title'] + '：' + issue['rewrite_warning'])
             if not issue.get('redline'):
                 continue
             try:

@@ -143,6 +143,84 @@ def compare_contracts(reference, current):
     return diffs
 
 
+async def consolidate_revisions(result, snapshot, config):
+    """One decision and one non-overlapping replacement per source clause."""
+    text = snapshot['text']
+    segments = result.get('segments', [])
+    groups = {}
+    for issue in result['issues']:
+        redline = issue.get('redline') or {}
+        original = redline.get('original_text', '')
+        # Prefer actual source evidence over an occasionally inaccurate model segment ID.
+        segment = next((s for s in segments if original and original in s['content']), None)
+        if segment is None:
+            segment = next((s for s in segments if s['id'] == issue.get('segment_id')), None)
+        anchor = (segment or {}).get('content', '') or issue.get('evidence', '') or original
+        if not anchor or text.count(anchor) != 1:
+            anchor = original if original and text.count(original) == 1 else ''
+        key = anchor or ('unlocated:' + issue['id'])
+        groups.setdefault(key, {'anchor': anchor, 'segment': segment, 'items': []})['items'].append(issue)
+
+    merged = []
+    rank = {'critical': 0, 'warning': 1, 'info': 2, 'favorable': 3}
+    for group in groups.values():
+        items, anchor = group['items'], group['anchor']
+        issue = dict(items[0])
+        issue['risk_points'] = [{'title': i['issue_title'], 'analysis': i['risk_analysis']} for i in items]
+        issue['source_issue_ids'] = [i['id'] for i in items]
+        issue['severity'] = min(items, key=lambda i: rank[i['severity']])['severity']
+        if len(items) > 1:
+            issue['issue_title'] = '本条款有 ' + str(len(items)) + ' 项问题需统一修订'
+            for field in ('risk_analysis', 'legal_basis', 'negotiation_strategy', 'category'):
+                issue[field] = '\n'.join(dict.fromkeys(i[field] for i in items))
+        issue['evidence'] = anchor
+        issue['redline'] = None
+        revised, used = anchor, []
+        # Retain compatible verified edits if a model is unavailable. Never take an
+        # overlapping edit silently: the combined rewrite must cover every concern.
+        for item in items:
+            edit = item.get('redline') or {}
+            before = edit.get('original_text', '')
+            if (before and edit.get('change_type') == 'replace' and
+                    anchor.count(before) == 1 and revised.count(before) == 1 and
+                    not any(before in old or old in before for old in used)):
+                revised = revised.replace(before, edit['suggested_text'], 1)
+                used.append(before)
+        if anchor and used and revised != anchor:
+            issue['redline'] = {'original_text': anchor, 'suggested_text': revised,
+                                'change_type': 'replace', 'diff_explanation': '应用本条款中已验证且不冲突的修订建议。'}
+            if len(used) < len(items):
+                issue['rewrite_warning'] = '右侧仅应用了可验证的部分建议，完整统一改写尚未生成，请复核剩余问题。'
+        merged.append(issue)
+
+    pending = [i for i in merged if i['evidence'] and i['severity'] != 'favorable']
+    if pending and graph.get_llm_client(config) is not None:
+        try:
+            payload = await model_json(config, '为合同生成可直接替换原条款的统一改写稿。每项必须同时解决列出的全部问题，保留无关内容、条款编号、原有交易事实与排版换行。'
+                                       '不得套用其他合同的金额、税率、主体或期限；无法确认的信息用【待确认】标注。不得将风险分析或操作指令写入合同。'
+                                       '返回 {"revisions":[{"id":"问题ID","suggested_text":"完整改写条款"}]}。'
+                                       + json.dumps({'role': snapshot.get('role'), 'background': snapshot.get('background'),
+                                                     'contract': text, 'clauses': [{'id': i['id'], 'original_text': i['evidence'],
+                                                                                   'problems': i['risk_points'], 'advice': i['negotiation_strategy']} for i in pending]}, ensure_ascii=False))
+            revisions = {r['id']: r['suggested_text'] for r in payload.get('revisions', [])
+                         if isinstance(r, dict) and isinstance(r.get('suggested_text'), str) and r.get('id')}
+            for issue in pending:
+                revised = revisions.get(issue['id'], '').strip()
+                if revised and revised != issue['evidence'].strip():
+                    issue.pop('rewrite_warning', None)
+                    issue['redline'] = {'original_text': issue['evidence'], 'suggested_text': revised,
+                                        'change_type': 'replace', 'diff_explanation': '按本条款全部问题统一自动改写；请复核后确认采纳。'}
+        except Exception:
+            # Review results remain usable when the rewrite service fails.
+            pass
+    for issue in merged:
+        if issue['severity'] != 'favorable' and not issue['redline']:
+            issue['rewrite_warning'] = '本条款未生成可应用的统一改写，右侧保留原文，请编辑条款或重新审查。'
+    result['issues'] = merged
+    for severity in ('critical', 'warning', 'info'):
+        result['summary'][severity + '_count'] = sum(i['severity'] == severity for i in merged)
+
+
 async def review_events(snapshot, config):
     """Yield actual finished stages, then one complete result."""
     mode = snapshot['mode']
@@ -227,4 +305,6 @@ async def review_events(snapshot, config):
         logs.append({'node': 'balance_review', 'detail': '[' + source + '] 已完成检查'})
         result['logs'] = logs
         yield 'node_update', event('synthesize_summary', '已汇总检查结果')
+    if mode in ('quick', 'deep'):
+        await consolidate_revisions(result, snapshot, config)
     yield 'complete', result

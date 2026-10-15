@@ -62,7 +62,7 @@
     @media (max-width: 1400px) {
       header { height: auto !important; min-height: 64px; flex-wrap: wrap; gap: 12px; padding: 12px 20px !important; }
       main > aside[data-testid="review-summary"] { width: 280px !important; }
-      main > aside.wb-opinion-drawer { width: 420px !important; }
+      main > aside.wb-opinion-drawer { width: 340px !important; }
       #contract-viewer { padding: 20px !important; }
       #contract-viewer > div { padding: 24px !important; }
     }
@@ -87,7 +87,8 @@
     .wb-popover .wb-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .wb-risk-area{margin-top:10px;padding:12px;border:1px solid #fecaca;border-left:3px solid #ef4444;border-radius:7px;background:#fff1f2;color:#9f1239}.wb-risk-area h4{color:#991b1b}.wb-risk-area .wb-risk-description{font-size:13px;line-height:1.8;margin-top:7px;color:#9f1239}.wb-risk-area.wb-risk-favorable{background:#f0fdf4;border-color:#bbf7d0;color:#166534}.wb-risk-favorable h4,.wb-risk-favorable .wb-risk-description{color:#166534}
     .wb-evidence{max-height:92px;overflow:auto;background:#f7f9fc;border-left:2px solid #b9c9dd;line-height:1.7}.wb-issue-actions{flex-wrap:nowrap;gap:4px}.wb-issue-actions button{white-space:nowrap;flex:0 0 auto;padding:4px 6px;font-size:11px}
-    .wb-opinion-drawer{position:relative;flex:0 0 auto;width:448px;max-width:38vw;min-width:300px;background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden}
+    .wb-opinion-drawer{position:relative;flex:0 0 auto;width:360px;max-width:38vw;min-width:300px;background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden}
+    .wb-issue-actions button:last-child{margin-left:0}
     .wb-document-grid{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden;background:#f4f6f9;gap:12px;padding:12px}
     .wb-document-pane{display:flex;flex-direction:column;min-width:0;flex:1;overflow:hidden;background:#fff;border:1px solid #e2e8f0;border-radius:10px}
     .wb-document-pane+.wb-document-pane{border-top:2px solid #86c6ae}
@@ -556,10 +557,15 @@
             </h4>
 
             <!-- 商业法律后果剖析 (大字号 13px) -->
-            <div class="wb-risk-description">
+            <div v-if="issue.risk_points?.length > 1" class="wb-risk-description space-y-3">
+              <div v-for="(point, index) in issue.risk_points" :key="index"><strong>{{ index + 1 }}. {{ point.title }}</strong><p class="mt-1">{{ point.analysis }}</p></div>
+            </div>
+            <div v-else class="wb-risk-description">
               {{ issue.risk_analysis }}
             </div>
             </div>
+            <p v-if="issue.rewrite_warning" class="mt-2 p-2 rounded bg-amber-50 text-amber-800 text-xs">{{ issue.rewrite_warning }}</p>
+            <p v-else-if="issue.redline" class="mt-2 text-xs text-red-700">统一改写已展示在右侧修订文档，采纳状态单独记录。</p>
 
             <details class="mt-3 text-xs" @click.stop><summary class="text-slate-500 cursor-pointer">依据与处理建议</summary>
             <!-- 法律法规条文依据 -->
@@ -612,7 +618,7 @@
             </div>
 
             <div v-if="workspace.run" class="mt-4 pt-3 border-t border-slate-100 space-y-3" @click.stop>
-              <div class="wb-issue-actions flex gap-2 text-xs"><button @click="workspace.setDecision(issue,'rejected')" :aria-pressed="workspace.decisionName(issue.id)==='不采纳'" :class="workspace.decisionName(issue.id)==='不采纳' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''" :disabled="workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 border border-slate-200 rounded text-slate-600">不采纳</button><button @click="workspace.setDecision(issue,'needs_review')" :aria-pressed="workspace.decisionName(issue.id)==='待复核'" :class="workspace.decisionName(issue.id)==='待复核' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''" :disabled="workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 border border-slate-200 rounded text-amber-700">待复核</button><button @click="workspace.setDecision(issue,'pending')" :aria-pressed="workspace.decisionName(issue.id)==='待处理'" :class="workspace.decisionName(issue.id)==='待处理' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''" :disabled="workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 text-slate-400">重置状态</button><button @click="openClauseEditor(issue)" :disabled="documentSaving || workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 text-blue-600">编辑条款</button><button @click="workspace.followupIssue=workspace.followupIssue===issue.id ? null : issue.id" class="ml-auto px-2 py-1 text-blue-600">追问这项意见</button></div>
+              <div class="wb-issue-actions flex gap-2 text-xs"><button @click="workspace.setDecision(issue,'rejected')" :aria-pressed="workspace.decisionName(issue.id)==='不采纳'" :class="workspace.decisionName(issue.id)==='不采纳' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''" :disabled="workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 border border-slate-200 rounded text-slate-600">不采纳</button><button @click="workspace.setDecision(issue,'needs_review')" :aria-pressed="workspace.decisionName(issue.id)==='待复核'" :class="workspace.decisionName(issue.id)==='待复核' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''" :disabled="workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 border border-slate-200 rounded text-amber-700">待复核</button><button @click="workspace.setDecision(issue,'pending')" :aria-pressed="workspace.decisionName(issue.id)==='待处理'" :class="workspace.decisionName(issue.id)==='待处理' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''" :disabled="workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 text-slate-400">重置状态</button><button @click="openClauseEditor(issue)" :disabled="documentSaving || workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 text-blue-600">编辑条款</button><button @click="workspace.followupIssue=workspace.followupIssue===issue.id ? null : issue.id" class="ml-auto px-2 py-1 text-blue-600">追问意见</button></div>
               <textarea v-model="workspace.comments[issue.id]" :disabled="workspace.historical || workspace.loading || isReviewing" placeholder="添加人工备注或处理理由…" aria-label="条目处理备注" class="w-full border border-slate-200 rounded-lg p-2 text-xs leading-relaxed outline-none focus:border-blue-500" rows="2"></textarea>
               <div v-if="workspace.followupIssue===issue.id" class="space-y-3">
                 <div v-for="answer in workspace.followups[issue.id] || []" class="p-3 border border-slate-200 bg-slate-50 rounded-lg text-xs leading-relaxed"><div class="font-semibold text-slate-700">{{ answer.question }}</div><p class="mt-2 whitespace-pre-wrap text-slate-600">{{ answer.answer }}</p><p v-if="answer.suggested_text" class="mt-2 whitespace-pre-wrap text-emerald-800">{{ answer.suggested_text }}</p><button v-if="answer.suggested_text" @click="workspace.previewFollowup(answer)" class="mt-2 text-blue-600">复制替代条款，核对后编辑正文</button></div>
@@ -831,7 +837,7 @@
         const opinionsOpen = ref(true);
         const summaryOpen = ref(true);
         const fitDocuments=()=>nextTick(()=>requestAnimationFrame(()=>{
-          for(const title of ['原始合同文档','合同原件预览']) document.querySelector(`iframe[title="${title}"]`)?.contentWindow?.postMessage({type:'lexis-fit-width'},location.origin);
+          for(const title of ['原始合同文档','合同原件预览']) document.querySelector(`iframe[title="${title}"]`)?.contentWindow?.postMessage(documentCompare.value ? {type:'lexis-set-zoom',scale:summaryOpen.value && opinionsOpen.value ? .8 : 1} : {type:'lexis-fit-width'},location.origin);
         }));
         const toggleSummary = () => { summaryOpen.value=!summaryOpen.value;fitDocuments(); };
         const toggleOpinions = () => { opinionsOpen.value=!opinionsOpen.value;fitDocuments(); };
@@ -974,6 +980,9 @@
         const openClauseEditor = async (issue) => {
           if (workspace.historical || workspace.loading || isReviewing.value) return;
           let original = issue.redline?.original_text || issue.evidence;
+          const suggested=issue.redline?.suggested_text;
+          if(!resultStale.value && suggested && currentDocumentText().split(suggested).length===2 &&
+             (!original || currentDocumentText().split(original).length!==2)) original=suggested;
           {
             // Resolve the current DOCX paragraphs even when old evidence is still a substring.
             // Appending text leaves the old quote intact but does not make it the current clause.
@@ -1428,6 +1437,7 @@
             return;
           }
           if(event.data?.type==='lexis-document-ready' && documentCompare.value){
+            event.source?.postMessage({type:'lexis-set-zoom',scale:summaryOpen.value && opinionsOpen.value ? .8 : 1},location.origin);
             if(isOriginal && event.data.source===reviewBaseline.value.sourceId)comparisonTexts.original=event.data.text;
             else if(!isOriginal && event.data.source===workspace.conditions.source_id)comparisonTexts.revised=event.data.text;
             comparisonSignature='';
@@ -1455,7 +1465,20 @@
           if (workspace.taskId) workspace.load().then(() => {
             if (resultStale.value && workspace.task?.source_matches) viewMode.value = 'original';
             else if (workspace.conditions.source_id && (workspace.historical || workspace.task?.source_matches !== false)) viewMode.value = 'original';
-            if (reviewResult.value) { reviewProgress.value = 100; Object.keys(nodeStates.value).forEach(key => nodeStates.value[key] = 'completed'); }
+            if (reviewResult.value) {
+              // Restore the comparison from the durable review snapshot, not the
+              // latest edited source or transient in-memory UI flags.
+              const snapshot=workspace.run?.input;
+              if(snapshot){
+                reviewBaseline.value={sourceId:snapshot.source_id||null,text:snapshot.text||''};
+                documentCompare.value=true;revisionScope.value='all';
+                summaryOpen.value=true;opinionsOpen.value=true;
+                comparisonTexts.original=reviewBaseline.value.text;comparisonTexts.revised=null;
+                comparisonData=null;comparisonSignature='';comparisonGeneration++;
+                previewText.value=null;pendingInitialRiskFocus=true;
+              }
+              reviewProgress.value = 100; Object.keys(nodeStates.value).forEach(key => nodeStates.value[key] = 'completed');
+            }
           }); else { workspace.load().then(fetchSamples); }
         });
 
