@@ -321,3 +321,66 @@ def test_formatted_source_edit_preserves_runs_tables_and_original(client):
     assert result.sections[0].header.paragraphs[0].text == 'Header'
     assert client.get('/api/sources/' + old + '/file').content == data.getvalue()
     assert client.post('/api/sources/' + old + '/edit', json={'text': 'Merged'}).status_code == 422
+
+
+def test_current_document_download_does_not_require_review(client):
+    task = create_task(client)
+    response = client.get('/api/tasks/'+task['id']+'/document')
+    assert response.status_code == 200
+    assert task['text'].split('\n')[-1] in [p.text for p in Document(BytesIO(response.content)).paragraphs]
+    review(client, task)
+    latest = client.get('/api/tasks/'+task['id']).json()
+    client.put('/api/tasks/'+task['id'], json={**latest, 'text': latest['text']+'\nNew manual edit'})
+    current = client.get('/api/tasks/'+task['id']+'/document')
+    assert 'New manual edit' in [p.text for p in Document(BytesIO(current.content)).paragraphs]
+    snapshot = client.get('/api/tasks/'+task['id']+'/document?run='+latest['active_run'])
+    assert 'New manual edit' not in [p.text for p in Document(BytesIO(snapshot.content)).paragraphs]
+
+
+def test_adopted_document_preview_uses_same_formatted_document(client):
+    document = Document()
+    paragraph = document.add_paragraph()
+    paragraph.add_run('Amount: 100').bold = True
+    buffer = BytesIO()
+    document.save(buffer)
+    imported = client.post('/api/contracts/import', files={'file': ('contract.docx', buffer.getvalue())}).json()
+    task = create_task(client, text=imported['text'], source_id=imported['source_id'])
+    review(client, task)
+    run = client.get('/api/tasks/'+task['id']).json()['run']
+    issue = run['result']['issues'][0]
+    issue['redline'] = {'change_type': 'replace', 'original_text': 'Amount: 100', 'suggested_text': 'Amount: 200'}
+    workspace_api.repo.update(run['id'], {'result': run['result'], 'applied': [issue['id']]})
+    info = client.get('/api/sources/'+imported['source_id']+'?include_text=true&run='+run['id']).json()
+    assert info['text'] == 'Amount: 200'
+    file = client.get('/api/runs/'+run['id']+'/export?scope=current')
+    preview = Document(BytesIO(file.content))
+    assert preview.paragraphs[0].text == info['text']
+    assert preview.paragraphs[0].runs[0].bold
+
+
+def test_all_suggestions_preview_handles_sample(client):
+    text = SAMPLE_CONTRACTS['business_cooperation_contract']['text']
+    imported = client.post('/api/contracts/import', files={'file':('sample.txt',text.encode())}).json()
+    task = create_task(client, text=text, source_id=imported['source_id'])
+    run = review(client, task)
+    info = client.get('/api/sources/'+imported['source_id']+'?include_text=true&run='+run['run_id']+'&scope=all')
+    assert info.status_code == 200, info.text
+    assert info.json()["preview_warnings"]
+    response = client.get('/api/runs/'+run['run_id']+'/preview-file?scope=all')
+    assert response.status_code == 200, response.text
+
+
+def test_document_comparison_marks_replacements_insertions_deletions(client):
+    response=client.post('/api/documents/compare',json={'original':'Title\nOld clause\nRemoved\nEnd','revised':'Title\nNew clause\nEnd\nAdded'})
+    assert response.status_code==200
+    data=response.json()
+    assert len(data['original_map'])==4
+    assert len(data['revised_map'])==4
+    assert data['original_map'][0]==0
+    assert data['original_map'][3]==2
+    assert data['revised_map'][2]==3
+    assert any(change['kind']=='insert' for change in data['changes'])
+    assert any(change['original_start']==1 and change['original_end']==3 for change in data['changes'])
+    same=client.post('/api/documents/compare',json={'original':'A\nB','revised':'A\nB'}).json()
+    assert same['changes']==[]
+    assert same['original_map']==[0,1]

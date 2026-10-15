@@ -19,9 +19,36 @@ router = APIRouter()
 STATIC = Path(__file__).parent / 'static'
 
 
+def revision_preview(run, scope):
+    if scope not in ('current', 'all'):
+        raise HTTPException(422, '无效预览范围')
+    warnings = []
+    ids = list(run['applied']) if scope == 'current' else []
+    if scope == 'all':
+        for issue in run['result']['issues']:
+            if not issue.get('redline'):
+                continue
+            try:
+                revised_text(run, ids + [issue['id']])
+            except HTTPException:
+                warnings.append(issue['issue_title'])
+            else:
+                ids.append(issue['id'])
+    document, layout = contract_document(run, revised_text(run, ids), repo, word_document)
+    return document, layout, warnings
+
+
 @router.get('/api/sources/{source_id}')
-def source_info(source_id: str, include_text: bool = False):
+def source_info(source_id: str, include_text: bool = False, run: str | None = None, scope: str = 'current'):
     source = repo.get(source_id, 'source')
+    if run:
+        version = repo.get(run, 'run')
+        if version['status'] != 'completed' or version['input'].get('source_id') != source_id:
+            raise HTTPException(422, '合同与审查版本不匹配')
+        from .word_export import paragraphs, visible_paragraph_text
+        document, layout, warnings = revision_preview(version, scope)
+        content = [visible_paragraph_text(p._p) for p in paragraphs(document)]
+        return {'id': source_id, 'name': Path(source['name']).stem + '.docx', 'extension': '.docx', 'text': '\n'.join(content), 'paragraphs': content, 'preview_warnings': warnings}
     keys = ('id', 'name', 'extension', 'text') if include_text else ('id', 'name', 'extension')
     info = {key: source.get(key) for key in keys}
     if include_text and source['extension'] == '.docx':
@@ -31,6 +58,27 @@ def source_info(source_id: str, include_text: bool = False):
         if path.is_file():
             info['paragraphs'] = [visible_paragraph_text(p._p) for p in paragraphs(Document(path))]
     return info
+
+
+class DocumentComparison(BaseModel):
+    original: str = Field(max_length=200000)
+    revised: str = Field(max_length=200000)
+
+
+@router.post('/api/documents/compare')
+def compare_documents(request: DocumentComparison):
+    from difflib import SequenceMatcher
+    before, after = request.original.split('\n'), request.revised.split('\n')
+    original_map, revised_map = [0] * len(before), [0] * len(after)
+    changes = []
+    for tag, a, b, c, d in SequenceMatcher(None, before, after, autojunk=len(before)>2000).get_opcodes():
+        for i in range(a, b):
+            original_map[i] = min(len(after)-1, c + int((i-a) * (d-c) / max(1, b-a)))
+        for i in range(c, d):
+            revised_map[i] = min(len(before)-1, a + int((i-c) * (b-a) / max(1, d-c)))
+        if tag != 'equal':
+            changes.append({'kind':tag, 'original_start':a, 'original_end':b, 'revised_start':c, 'revised_end':d})
+    return {'changes':changes, 'original_map':original_map, 'revised_map':revised_map}
 
 
 class SourceEdit(BaseModel):
@@ -427,6 +475,34 @@ def download_docx(document, filename, layout='reconstructed'):
     stream.seek(0)
     return StreamingResponse(stream, media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                              headers={'Content-Disposition': "attachment; filename*=UTF-8''" + quote(filename + '.docx'), 'X-Word-Layout': layout})
+
+
+@router.get('/api/tasks/{task_id}/document')
+def export_task_document(task_id: str, run: str | None = None):
+    """Download document content independently of review completion or freshness."""
+    from docx import Document
+    from .word_export import SOURCES
+    record = repo.get(task_id, 'task')
+    if run:
+        version = repo.get(run, 'run')
+        if version['task_id'] != task_id:
+            raise HTTPException(404, '审查版本不属于此合同')
+        record = version['input']
+    source = repo.get(record['source_id'], 'source') if record.get('source_id') else None
+    if source and source['extension'] == '.docx' and source['text'] == record['text']:
+        path = SOURCES / (source['id'] + '.docx')
+        if path.is_file():
+            return download_docx(Document(path), record['title'], 'preserved')
+    return download_docx(word_document(record['title'], record['text']), record['title'])
+
+
+@router.get('/api/runs/{run_id}/preview-file')
+def preview_revised_document(run_id: str, scope: str = 'all'):
+    run = repo.get(run_id, 'run')
+    if run['status'] != 'completed':
+        raise HTTPException(422, '当前版本无法生成修订预览')
+    document, layout, warnings = revision_preview(run, scope)
+    return download_docx(document, run['input']['title'] + '-修订预览', layout)
 
 
 @router.get('/api/runs/{run_id}/export')

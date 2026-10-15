@@ -110,9 +110,22 @@ window.createWorkspaceWorkbench = function (refs) {
     try { await flush(); } catch(err) { refs.showToast(err.message); }
   };
   const decisionName=id=>({pending:'待处理',applied:'已采纳',rejected:'不采纳',needs_review:'待复核'})[refs.appliedIssueIds.value.includes(id)?'applied':decisions.value[id]||'pending'];
+  const exportDocument=async()=>{
+    try {
+      await flush();
+      const suffix=historical.value ? '?run='+run.value.id : '';
+      const preview=refs.getPreviewExport?.();
+      const documentUrl=preview ? '/api/runs/'+preview.run+'/preview-file?scope='+preview.scope : '/api/tasks/'+taskId.value+'/document'+suffix;
+      const response=await fetch(documentUrl);
+      if(!response.ok){const data=await response.json();throw new Error(data.detail||'下载失败');}
+      const url=URL.createObjectURL(await response.blob()),anchor=document.createElement('a');
+      anchor.href=url;anchor.download=decodeURIComponent(response.headers.get('Content-Disposition')?.split("UTF-8''")[1]||'合同.docx');anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      if(response.headers.get('X-Word-Layout')==='reconstructed') refs.showToast('已下载当前正文，Word 使用统一版式');
+    } catch(err){refs.showToast(err.message);error.value=err.message;}
+  };
   const exportWord=async()=>{
     try {
-      await flush();if(!run.value||isStale.value) throw new Error('请先审查当前版本');
+      await flush();if(!run.value) throw new Error('请先选择审查版本');
       const response=await fetch('/api/runs/'+run.value.id+'/export?scope='+exportScope.value);
       if(!response.ok){const data=await response.json();throw new Error(data.detail||'导出失败');}
       const url=URL.createObjectURL(await response.blob()),anchor=document.createElement('a');anchor.href=url;
@@ -136,5 +149,5 @@ window.createWorkspaceWorkbench = function (refs) {
   };
   const previewFollowup=answer=>{if(answer.suggested_text) refs.copyText(answer.suggested_text);};
   return {taskId,task,run,loading,conditions,decisions,comments,followups,question,followupIssue,followupBusy,showConditions,
-    exportScope,versions,error,modeName,historical,isStale,saving,load,flush,refresh,save,leaveFor,setDecision,decisionName,exportWord,finish,ask,previewFollowup};
+    exportScope,versions,error,modeName,historical,isStale,saving,load,flush,refresh,save,leaveFor,setDecision,decisionName,exportDocument,exportWord,finish,ask,previewFollowup};
 };

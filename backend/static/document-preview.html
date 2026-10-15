@@ -1,15 +1,85 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self'; frame-src blob:; base-uri 'none'; form-action 'none'"><meta name="viewport" content="width=device-width,initial-scale=1"><title>合同原件预览</title><style>body{margin:0;background:#f3f6fa;color:#334155;font:14px system-ui}body > header{position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid #dbe3ef;padding:10px 16px;display:flex;align-items:center;gap:12px}button,select,a{color:#2563eb;font:inherit}button,select{border:1px solid #dbe3ef;background:#fff;border-radius:6px;padding:4px 8px}#status{padding:24px;text-align:center}#viewport{overflow:auto}#pages{transform-origin:top left;width:max-content;min-width:100%}.docx-wrapper{background:transparent!important;padding:24px!important}section.docx{box-shadow:0 2px 8px #cbd5e1!important;margin-bottom:24px!important}.lexis-located{outline:2px solid #2563eb;outline-offset:3px;background:rgba(254,240,138,.45);scroll-margin-top:90px}#locate-status{color:#64748b;font-size:12px}iframe{width:100%;height:calc(100vh - 55px);border:0}</style></head><body><header><span id="name">原件预览</span><select id="zoom" aria-label="预览缩放"><option value="fit">适应宽度</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option></select><a id="download" download>下载当前文档</a><button id="save-edit" hidden>保存正文</button><button id="cancel-edit" hidden>取消编辑</button><span id="locate-status" role="status"></span></header><div id="status" role="status">正在加载原件…</div><div id="viewport"><div id="pages"></div></div><script src="/static/vendor/jszip.min.js"></script><script src="/static/vendor/docx-preview.min.js"></script><script>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self'; frame-src blob:; base-uri 'none'; form-action 'none'"><meta name="viewport" content="width=device-width,initial-scale=1"><title>合同原件预览</title><style>
+*{box-sizing:border-box}body{margin:0;background:#f4f6f9;color:#334155;font:13px system-ui}[hidden]{display:none!important}
+body>header{position:sticky;top:0;z-index:2;min-height:44px;background:#fff;border-bottom:1px solid #edf0f5;padding:7px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pane-identity{display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap}#pane-label{font-size:12px;font-weight:600;color:#334155}#pane-badge{font-size:10px;font-weight:500;color:#64748b;background:#f1f5f9;border-radius:4px;padding:2px 5px}body[data-pane="revised"] #pane-badge{color:#397861;background:#eef7f2}
+#name{display:none}.pane-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+button,a{font:inherit;color:#64748b}button{cursor:pointer;border:1px solid #e2e8f0;background:#fff;border-radius:5px;padding:4px 8px}button:hover,a:hover{color:#1d4ed8;background:#f8fafc}button:focus-visible,a:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
+#download{display:flex;align-items:center;gap:4px;text-decoration:none;font-size:11px;padding:5px;border-radius:4px}#download svg{width:13px;height:13px}#save-edit{color:#fff;background:#2563eb;border-color:#2563eb;font-size:11px}#cancel-edit{font-size:11px}
+#zoom-controls{display:inline-flex;align-items:center;gap:1px;border-radius:6px;background:#f5f7fa;padding:2px;color:#64748b}#zoom-controls button{border:0;background:transparent;padding:2px 6px;font-size:11px;line-height:18px;border-radius:4px}#zoom-controls button:hover{background:#e8edf5}#zoom-fit[aria-pressed="true"]{background:#fff;color:#475569;box-shadow:0 1px 2px #0f172a0d}#zoom-percent{font-size:10px;min-width:32px;text-align:center;font-variant-numeric:tabular-nums}.zoom-divider{width:1px;height:12px;background:#e2e8f0;margin:0 2px}
+#locate-status{color:#64748b;font-size:11px;flex-basis:100%;overflow-wrap:anywhere}#locate-status:empty{display:none}#locate-status.quiet{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#status{padding:24px;text-align:center}#viewport{overflow:auto}#pages{transform-origin:top left;width:max-content;min-width:100%}.docx-wrapper{background:transparent!important;padding:16px!important}section.docx{box-shadow:0 1px 5px #dbe1e9!important;margin-bottom:24px!important}#pages .lexis-located{outline:none;box-shadow:inset 3px 0 #ef4444!important;background:rgba(254,202,202,.65)!important;border-radius:3px;scroll-margin-top:70px}iframe{width:100%;height:calc(100vh - 44px);border:0}
+@media(max-width:440px){#pane-badge{display:none}body>header{gap:4px;padding:7px 8px}.pane-actions{gap:4px}#zoom-controls button{padding:2px 4px}}
+html.shared-original{scrollbar-width:none}html.shared-original::-webkit-scrollbar{display:none}.lexis-diff-original{background:rgba(253,230,138,.65)!important;box-shadow:inset 3px 0 #e9a526;border-radius:2px}.lexis-diff-revised{background:rgba(167,243,208,.5)!important;box-shadow:inset 3px 0 #34b381;border-radius:2px}
+</style></head><body><header><div class="pane-identity"><span id="pane-label">原始文档</span><span id="pane-badge" hidden></span><span id="name"></span></div><div class="pane-actions"><div id="zoom-controls" role="group" aria-label="文档缩放" hidden><button id="zoom-fit" aria-label="适应文档宽度" aria-pressed="true">↔ 适宽</button><span class="zoom-divider"></span><button id="zoom-out" aria-label="缩小文档">−</button><span id="zoom-percent" aria-live="polite">自动</span><button id="zoom-in" aria-label="放大文档">＋</button></div><a id="download" download aria-label="下载文档" title="下载此文档"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg>下载</a><button id="save-edit" hidden>保存正文</button><button id="cancel-edit" hidden>取消编辑</button></div><span id="locate-status" role="status"></span></header><div id="status" role="status">正在加载原件…</div><div id="viewport"><div id="pages"></div></div><script src="/static/vendor/jszip.min.js"></script><script src="/static/vendor/docx-preview.min.js"></script><script>
 (async()=>{
- const id=new URLSearchParams(location.search).get('source');const status=document.querySelector('#status'),pages=document.querySelector('#pages'),zoom=document.querySelector('#zoom');
- const resize=()=>{const page=pages.querySelector('section.docx');if(!page)return;const scale=zoom.value==='fit'?Math.min(1,(innerWidth-48)/page.offsetWidth):Number(zoom.value);pages.style.zoom=scale;};
+ const params=new URLSearchParams(location.search),id=params.get('source'),run=params.get('run'),scope=params.get('scope')||'current',readOnly=params.get('readonly')==='1';const status=document.querySelector('#status'),pages=document.querySelector('#pages'),zoom={value:'fit'},zoomControls=document.querySelector('#zoom-controls');
+ const resize=()=>{const page=pages.querySelector('section.docx');if(!page)return;const scale=zoom.value==='fit'?Math.min(1,(innerWidth-48)/page.offsetWidth):Number(zoom.value);pages.style.zoom=scale;document.querySelector('#zoom-percent').textContent=Math.round(scale*100)+'%';document.querySelector('#zoom-fit').setAttribute('aria-pressed',String(zoom.value==='fit'));};
+ const pane=params.get('pane')==='revised'?'revised':'original';
+ document.body.dataset.pane=pane;
+ if(params.get('shared')==='1')document.documentElement.classList.add('shared-original');
+ const label=document.querySelector('#pane-label'),badge=document.querySelector('#pane-badge');
+ label.textContent=pane==='revised'?'修订文档':'原始文档';
+ if(readOnly){badge.hidden=false;badge.textContent='只读';}
+ if(pane==='revised'){badge.hidden=false;badge.textContent=params.get('edited')==='1'?'编辑稿':'全部建议';badge.title=params.get('edited')==='1'?'当前人工编辑稿':'全部修改建议，未自动采纳';}
  let info, editable=[], anchors=[];
  const hint=document.querySelector('#locate-status'),save=document.querySelector('#save-edit'),cancel=document.querySelector('#cancel-edit');
- const finish=()=>{editable.forEach(item=>{item.element.contentEditable='false';});save.hidden=cancel.hidden=true;};
- cancel.onclick=()=>{editable.forEach(item=>{item.element.innerHTML=item.originalHTML;});finish();hint.textContent='已取消编辑';};
- save.onclick=()=>{const lines=info.text.split('\n');editable.forEach(item=>{lines[item.index]=item.element.innerText.replace(/\r/g,'');});save.disabled=true;parent.postMessage({type:'lexis-save-document',text:lines.join('\n')},location.origin);};
+ new MutationObserver(()=>hint.classList.toggle('quiet',/^(已定位|已取消|直接点击)/.test(hint.textContent))).observe(hint,{childList:true,characterData:true,subtree:true});
+ let editing=false,draftFrame=0;
+ const composeText=()=>{
+   if(!info)return '';
+   if(!editing)return info.text;
+   const lines=info.text.split('\n');
+   editable.forEach(item=>{lines[item.index]=item.element.innerText.replace(/\r/g,'');});
+   return lines.join('\n');
+ };
+ window.getLexisDocumentSnapshot=()=>({source:id,run,editing,text:composeText(),baseText:info?.text});
+ const sendDraft=()=>parent.postMessage({type:'lexis-document-draft',...window.getLexisDocumentSnapshot()},location.origin);
+ window.setLexisDocumentSaving=busy=>{save.disabled=cancel.disabled=busy;editable.forEach(item=>{item.element.contentEditable=editing&&!busy?'plaintext-only':'false';});};
+ const finish=()=>{editing=false;editable.forEach(item=>{item.element.contentEditable='false';});save.hidden=cancel.hidden=true;};
+ cancel.onclick=()=>{editable.forEach(item=>{item.element.innerHTML=item.originalHTML;});finish();sendDraft();hint.textContent='已取消编辑';};
+ pages.addEventListener('input',()=>{
+   if(!editing||draftFrame)return;
+   draftFrame=requestAnimationFrame(()=>{draftFrame=0;sendDraft();});
+ });
+ save.onclick=()=>{const text=composeText();window.setLexisDocumentSaving(true);parent.postMessage({type:'lexis-save-document',source:id,text},location.origin);};
+ const fitObserver=new ResizeObserver(()=>resize());fitObserver.observe(document.documentElement);
+ let scrollLockUntil=0,scrollFrame=0;
+ const headerHeight=()=>document.querySelector('header').offsetHeight;
+ const anchorTop=item=>item.element.getBoundingClientRect().top+scrollY;
+ const anchorSpan=(item,i)=>Math.max(1,anchors[i+1]?anchorTop(anchors[i+1])-anchorTop(item):item.element.getBoundingClientRect().height);
+ window.addEventListener('scroll',()=>{
+   if(performance.now()<scrollLockUntil || scrollFrame)return;
+   scrollFrame=requestAnimationFrame(()=>{
+     scrollFrame=0;
+     const y=scrollY+headerHeight();let i=0;
+     for(let j=0;j<anchors.length;j++){if(anchorTop(anchors[j])<=y)i=j;else break;}
+     const anchor=anchors[i],range=document.documentElement.scrollHeight-innerHeight;
+     parent.postMessage({type:'lexis-document-scroll',ratio:range>0?scrollY/range:0,index:anchor?.index,fraction:anchor?Math.max(0,Math.min(1,(y-anchorTop(anchor))/anchorSpan(anchor,i))):0},location.origin);
+   });
+ },{passive:true});
+ for(const name of ['wheel','pointerdown','keydown'])window.addEventListener(name,()=>{scrollLockUntil=0;},{passive:true});
  const normalize=text=>(text||'').replace(/\s+/g,'');
  window.addEventListener('message',event=>{
    if(event.origin!==location.origin || event.source!==parent)return;
+   if(event.data?.type==='lexis-sync-scroll'){
+     const data=event.data,range=Math.max(0,document.documentElement.scrollHeight-innerHeight);
+     let y=(data.ratio||0)*range;
+     if(Number.isInteger(data.index) && data.ratio>0 && data.ratio<.999){
+       const i=anchors.findIndex(item=>data.index>=item.index && data.index<item.end);
+       if(i>=0)y=anchorTop(anchors[i])+(data.fraction||0)*anchorSpan(anchors[i],i)-headerHeight();
+     }
+     scrollLockUntil=performance.now()+100;
+     scrollTo({top:Math.max(0,Math.min(range,y)),behavior:'instant'});
+     return;
+   }
+   if(event.data?.type==='lexis-mark-differences'){
+     pages.querySelectorAll('.lexis-diff-original,.lexis-diff-revised').forEach(el=>el.classList.remove('lexis-diff-original','lexis-diff-revised'));
+     for(const change of event.data.changes||[]){
+       const start=change[event.data.side+'_start'],end=change[event.data.side+'_end'];
+       for(const item of anchors)if(start<end && item.index<end && item.end>start)item.element.classList.add('lexis-diff-'+event.data.side);
+     }
+     return;
+   }
    if(event.data?.type==='lexis-locate-edit'){
      const item=anchors.find(item=>event.data.index>=item.index && event.data.index<item.end);
      const matches=[...pages.querySelectorAll('article p')].filter(p=>normalize(p.textContent)===normalize(event.data.text));
@@ -23,11 +93,15 @@
      }else{scrollTo(0,event.data.scroll||0);hint.textContent='已恢复保存前的阅读位置';}
      return;
    }
-   if(event.data?.type==='lexis-save-error'){save.disabled=false;hint.textContent=event.data.message;return;}
+   if(event.data?.type==='lexis-save-error'){window.setLexisDocumentSaving(false);hint.textContent=event.data.message;return;}
    if(event.data?.type==='lexis-edit'){
+     if(readOnly){hint.textContent='左侧原始文档只读，请编辑右侧文档';return;}
      if(info?.extension!=='.docx'){hint.textContent='保留排版编辑仅支持 Word DOCX；PDF 请先转换为 Word';return;}
      if(!editable.length){hint.textContent='该文档段落无法安全映射，请在 Word 中编辑后重新上传';return;}
+     if(editing)return;
+     editing=true;
      editable.forEach(item=>{item.originalHTML=item.element.innerHTML;item.element.contentEditable='plaintext-only';});
+     sendDraft();
      save.hidden=cancel.hidden=false;hint.textContent='直接点击正文修改，完成后保存；暂不支持增删段落';editable[0].element.focus();return;
    }
    if(event.data?.type!=='lexis-locate')return;
@@ -46,13 +120,18 @@
    matches[0].scrollIntoView({behavior:'smooth',block:'center'});
    hint.textContent='已定位原文';
  });
- zoom.onchange=resize;window.addEventListener('resize',resize);
+ document.querySelector('#zoom-fit').onclick=()=>{zoom.value='fit';resize();};
+ const stepZoom=delta=>{zoom.value=String(Math.max(.3,Math.min(2,Math.round((parseFloat(pages.style.zoom)||1)*100+delta*100)/100)));resize();};
+ document.querySelector('#zoom-out').onclick=()=>stepZoom(-.1);
+ document.querySelector('#zoom-in').onclick=()=>stepZoom(.1);
+ window.addEventListener('resize',resize);
  try{
  if(!/^[a-f0-9]{32}$/.test(id||''))throw Error('原件标识无效');
- const response=await fetch('/api/sources/'+id+'?include_text=true');if(!response.ok)throw Error('原件记录不存在');info=await response.json();document.querySelector('#name').textContent=info.name;
- const url='/api/sources/'+id+'/file';const link=document.querySelector('#download');link.href=url;link.download=info.name;
+ const response=await fetch('/api/sources/'+id+'?include_text=true'+(run?'&run='+encodeURIComponent(run)+'&scope='+encodeURIComponent(scope):''));if(!response.ok)throw Error('原件记录不存在');info=await response.json();document.querySelector('#name').textContent=info.name;label.title=info.name;
+ const url=run?'/api/runs/'+encodeURIComponent(run)+'/preview-file?scope='+encodeURIComponent(scope):'/api/sources/'+id+'/file';const link=document.querySelector('#download');link.href=url;link.download=info.name;
  const file=await fetch(url);if(!file.ok)throw Error('原件文件缺失，请重新上传');const blob=await file.blob();
  if(info.extension==='.docx'){
+ zoomControls.hidden=false;
  await docx.renderAsync(blob,pages,null,{ignoreLastRenderedPageBreak:false,renderHeaders:true,renderFooters:true,renderAltChunks:false,useBase64URL:true});
  // Original document links must never navigate or load resources outside the internal preview.
  pages.querySelectorAll('a').forEach(a=>{a.removeAttribute('href');a.removeAttribute('target');});
@@ -73,11 +152,12 @@
    index=end;
  }
  resize();
- }else if(info.extension==='.pdf'){zoom.hidden=true;const frame=document.createElement('iframe');frame.title='PDF 原件';frame.src=URL.createObjectURL(blob);pages.append(frame);}
- else{zoom.hidden=true;status.textContent='TXT 没有 Word 排版，请使用审查文本视图，或下载原件。';return;}
+ }else if(info.extension==='.pdf'){zoomControls.hidden=true;const frame=document.createElement('iframe');frame.title='PDF 原件';frame.src=URL.createObjectURL(blob);pages.append(frame);}
+ else{zoomControls.hidden=true;pages.style.width='auto';pages.style.whiteSpace='pre-wrap';pages.style.padding='24px';(info.text||'').split('\n').forEach((text,index)=>{const p=document.createElement('p');p.textContent=text||' ';pages.append(p);anchors.push({index,end:index+1,element:p});});}
  status.hidden=true;
+ if(info.preview_warnings?.length){hint.textContent=info.preview_warnings.length+' 项建议冲突，未合入预览，请在意见栏核对';hint.title=info.preview_warnings.join('；');}
  await document.fonts.ready;
  resize();
- requestAnimationFrame(()=>requestAnimationFrame(()=>parent.postMessage({type:'lexis-document-ready',source:id},location.origin)));
+ requestAnimationFrame(()=>requestAnimationFrame(()=>parent.postMessage({type:'lexis-document-ready',source:id,run,text:info.text},location.origin)));
  }catch(error){status.textContent='预览失败：'+error.message+'。可切换至审查文本继续核对。';}
 })();</script></body></html>

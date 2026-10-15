@@ -9,6 +9,15 @@ from backend import workspace_api, graph
 from backend.sample_contracts import SAMPLE_CONTRACTS
 
 
+def open_opinions(page):
+    expect(page.locator('#opinion-drawer')).to_be_visible()
+
+
+def close_opinions(page):
+    # Opinion handling is now a permanent workspace region.
+    expect(page.locator('#opinion-drawer')).to_be_visible()
+
+
 def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
     monkeypatch.setattr(graph, 'get_llm_client', lambda config: None)
     sock = socket.socket()
@@ -26,22 +35,35 @@ def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
             base = f'http://127.0.0.1:{port}'
             page.goto(base)
             text = SAMPLE_CONTRACTS['business_cooperation_contract']['text']
-            source = workspace_api.repo.create('source', {'text': text, 'name': 'test.txt', 'extension': '.txt'})
+            imported = page.request.post(base+'/api/contracts/import', multipart={'file': {'name':'test.txt', 'mimeType':'text/plain', 'buffer':text.encode('utf-8')}}).json()
+            source = {'id': imported['source_id']}
             response = page.request.post(base + '/api/tasks', data={'title': '预览回归', 'type': '采购合同', 'text': text, 'mode': 'quick', 'source_id': source['id']})
             task = response.json()
             page.request.post(base + '/api/tasks/' + task['id'] + '/review/stream', data={})
             page.goto(base + '/workbench?task=' + task['id'])
             expect(page.locator('iframe[title="合同原件预览"]')).to_be_visible()
+            page.get_by_role('button', name='重新审查', exact=True).click()
+            expect(page.get_by_test_id('original-document-pane')).to_be_visible()
+            expect(page.frame_locator('iframe[title="合同原件预览"]').locator('article')).not_to_have_count(0, timeout=30000)
+            open_opinions(page)
             page.get_by_role('button', name='采纳此项修订').first.click()
-            expect(page.locator('iframe[title="合同原件预览"]')).to_have_count(0)
-            expect(page.locator('#contract-viewer')).to_contain_text('仅包含你已采纳的修订（1 项）')
-            page.get_by_role('button', name='保存', exact=True).click()
-            expect(page.get_by_text('工作内容已保存', exact=True)).to_be_visible()
+            expect(page.locator('iframe[title="合同原件预览"]')).to_be_visible()
+            expect(page.get_by_test_id('original-document-pane')).to_be_visible()
+            preview = page.frame_locator('iframe[title="合同原件预览"]')
+            expect(preview.locator('article')).not_to_have_count(0)
+            saved_run = page.request.get(base+'/api/tasks/'+task['id']).json()['run']
+            other = next(issue for issue in saved_run['result']['issues'] if issue['id'] not in saved_run['applied'])
+            preview.locator('body').evaluate("() => { window.previewInstance = 'unchanged'; }")
+            with page.expect_response(lambda response: '/handling' in response.url and response.request.method == 'PUT'):
+                page.locator('#card-'+other['id']).get_by_role('button', name='不采纳', exact=True).click()
+            expect(page.locator('#card-'+other['id']).get_by_text('处理状态：不采纳', exact=True)).to_be_visible()
+            assert preview.locator('body').evaluate('() => window.previewInstance') == 'unchanged'
+
             page.reload()
-            expect(page.locator('#contract-viewer')).to_contain_text('仅包含你已采纳的修订（1 项）')
+            open_opinions(page)
+            expect(page.get_by_test_id('original-document-pane')).to_have_count(0)
             page.get_by_role('button', name='撤销采纳').click()
-            expect(page.locator('#contract-viewer')).to_contain_text('仅包含你已采纳的修订（0 项）')
-            page.get_by_role('button', name='原件预览', exact=True).click()
+            expect(page.get_by_role('button', name='撤销采纳', exact=True)).to_have_count(0)
             page.get_by_role('button', name='编辑条款', exact=True).first.click()
             editor = page.locator('.fixed textarea').last
             original = editor.input_value()
@@ -51,23 +73,32 @@ def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
             expect(page.locator('#contract-viewer')).to_contain_text(updated)
             expect(page.locator('iframe[title="合同原件预览"]')).to_have_count(0)
             expect(page.locator('#contract-viewer .clause-active')).to_have_count(0)
+            close_opinions(page)
             page.get_by_role('button', name='保存', exact=True).click()
+            open_opinions(page)
             expect(page.get_by_text('工作内容已保存', exact=True)).to_be_visible()
             page.reload()
+            open_opinions(page)
             expect(page.locator('#contract-viewer')).to_contain_text(updated)
-            page.get_by_role('button', name='原件预览', exact=True).click()
+            close_opinions(page)
             page.get_by_role('button', name='编辑正文', exact=True).click()
             body_editor = page.get_by_role('textbox', name='编辑合同正文')
             body_editor.fill(body_editor.input_value() + '\n【整篇正文修改】')
             page.get_by_role('button', name='保存正文', exact=True).click()
             expect(page.locator('#contract-viewer')).to_contain_text('【整篇正文修改】')
+            close_opinions(page)
             page.get_by_role('button', name='保存', exact=True).click()
+            open_opinions(page)
             expect(page.get_by_text('工作内容已保存', exact=True)).to_be_visible()
             page.reload()
+            open_opinions(page)
             expect(page.locator('#contract-viewer')).to_contain_text('【整篇正文修改】')
             page.get_by_role('button', name='重新审查', exact=True).click()
-            expect(page.get_by_role('combobox', name='审查历史版本').locator('option')).to_have_count(2, timeout=30000)
+            close_opinions(page)
+            expect(page.get_by_role('button', name='重新审查', exact=True)).to_be_enabled(timeout=30000)
+            assert len(page.request.get(base+'/api/tasks/'+task['id']).json()['runs']) == 3
             page.reload()
+            open_opinions(page)
             expect(page.locator('#contract-viewer')).to_contain_text('【整篇正文修改】')
             assert not errors, errors
             browser.close()
@@ -100,7 +131,7 @@ def test_docx_inline_edit_stays_in_document(isolated_workspace, monkeypatch):
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()
-            page = browser.new_page()
+            page = browser.new_page(viewport={'width':1600,'height':1000})
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             base = f'http://127.0.0.1:{sock.getsockname()[1]}'
@@ -116,21 +147,25 @@ def test_docx_inline_edit_stays_in_document(isolated_workspace, monkeypatch):
             page.goto(base+'/workbench?task='+task['id'])
             frame = page.frame_locator('iframe[title="合同原件预览"]')
             expect(frame.locator('article p').first).to_contain_text('Payment: 100 USD')
+            close_opinions(page)
             page.get_by_role('button', name='编辑正文', exact=True).click()
             paragraph = frame.locator('[contenteditable="plaintext-only"]').first
             expect(paragraph).to_be_visible()
             paragraph.fill('Discard this edit')
             frame.get_by_role('button', name='取消编辑', exact=True).click()
             expect(frame.locator('article p').first).to_contain_text('Payment: 100 USD')
+            close_opinions(page)
             page.get_by_role('button', name='编辑正文', exact=True).click()
             paragraph.fill('Payment: 100 USD222')
             frame.get_by_role('button', name='保存正文', exact=True).click()
             expect(frame.locator('article p').first).to_contain_text('Payment: 100 USD222')
             expect(frame.locator('#save-edit')).to_be_hidden()
             page.reload()
+            open_opinions(page)
             expect(frame.locator('article p').first).to_contain_text('Payment: 100 USD222')
             expect(frame.locator('article table')).to_contain_text('Delivery terms')
             # Stale review results must not block repeated manual editing.
+            open_opinions(page)
             edit_clause = page.get_by_role('button', name='编辑条款', exact=True).first
             expect(edit_clause).to_be_enabled()
             for value in ['Payment: 100 USD222333', 'Payment: 100 USD222333444']:
@@ -142,8 +177,10 @@ def test_docx_inline_edit_stays_in_document(isolated_workspace, monkeypatch):
                 expect(frame.locator('article p').first).to_contain_text(value)
                 expect(frame.locator('.lexis-located')).to_have_text(value)
                 page.reload()
+                open_opinions(page)
                 expect(frame.locator('article p').first).to_contain_text(value)
             expect(edit_clause).to_be_enabled()
+            close_opinions(page)
             page.get_by_role('button', name='编辑正文', exact=True).click()
             frame.locator('[contenteditable="plaintext-only"]').last.fill('Delivery terms updated')
             frame.get_by_role('button', name='保存正文', exact=True).click()
@@ -151,6 +188,7 @@ def test_docx_inline_edit_stays_in_document(isolated_workspace, monkeypatch):
             expect(located).to_have_text('Delivery terms updated')
             expect(frame.locator('#locate-status')).to_have_text('已定位到刚修改的位置')
             assert located.evaluate('(el) => { const r=el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }')
+            open_opinions(page)
             held = []
             def delay_first_handling(route):
                 if not held:
@@ -163,7 +201,9 @@ def test_docx_inline_edit_stays_in_document(isolated_workspace, monkeypatch):
             page.get_by_role('button', name='待复核', exact=True).first.click()
             response = page.request.fetch(held[0].request)
             held[0].fulfill(response=response)
+            close_opinions(page)
             page.get_by_role('button', name='保存', exact=True).click()
+            open_opinions(page)
             expect(page.get_by_text('工作内容已保存', exact=True)).to_be_visible()
             card = page.locator('#card-'+result['issues'][0]['id'])
             expect(card.get_by_text('处理状态：待复核', exact=True)).to_be_visible()
@@ -179,12 +219,199 @@ def test_docx_inline_edit_stays_in_document(isolated_workspace, monkeypatch):
                 saved = page.request.get(base+'/api/tasks/'+task['id']).json()['run']
                 assert saved['decisions'][result['issues'][0]['id']] == state
                 page.reload()
+                open_opinions(page)
                 expect(page.get_by_role('button', name=label, exact=True).first).to_be_enabled()
 
 
+            close_opinions(page)
+            expect(page.get_by_role('button', name='导出', exact=True)).to_be_enabled()
+            with page.expect_download() as download:
+                page.get_by_role('button', name='导出', exact=True).click()
+            assert download.value.suggested_filename.endswith('.docx')
+            page.keyboard.press('Escape')
+            page.get_by_role('button', name='审查意见书', exact=True).click()
+            expect(page.locator('#printable-report')).to_contain_text('后续编辑尚未重新审查')
+            page.get_by_role('button', name='关闭意见书', exact=True).click()
+            page.locator('summary').filter(has_text='审查设置').click()
+            expect(page.get_by_role('button', name='修改审查条件', exact=True)).to_be_visible()
+            expect(page.get_by_role('combobox', name='审查立场', exact=True)).to_be_visible()
+            expect(page.get_by_role('button', name='合同正文', exact=True)).to_have_count(0)
+            expect(page.get_by_role('button', name='已采纳修订稿', exact=True)).to_have_count(0)
+            expect(page.get_by_role('link', name='新建审查', exact=True)).to_have_count(0)
+            page.keyboard.press('Escape')
+            page.screenshot(path='artifacts/workbench-redesign.png')
             assert not errors, errors
             browser.close()
     finally:
         server.should_exit = True
+        thread.join(timeout=10)
+        sock.close()
+
+
+def test_review_activates_original_and_all_suggestions_comparison(isolated_workspace, monkeypatch):
+    from io import BytesIO
+    from docx import Document
+    import asyncio
+    monkeypatch.setattr(graph, 'get_llm_client', lambda config: None)
+    original_events = workspace_api.review_events
+    async def events(inputs, config):
+        await asyncio.sleep(.2)
+        async for kind, data in original_events(inputs, config):
+            if kind == 'complete':
+                data['issues'][0]['evidence'] = 'Payment: 100 USD'
+                data['issues'][0]['redline'] = {'change_type':'replace', 'original_text':'Payment: 100 USD', 'suggested_text':'Payment: 200 USD'}
+            yield kind, data
+    monkeypatch.setattr(workspace_api, 'review_events', events)
+    document = Document()
+    document.add_paragraph().add_run('Payment: 100 USD').bold = True
+    for index in range(65):
+        document.add_paragraph(f'Section {index}: delivery, payment, acceptance and contract obligations.')
+    content = BytesIO()
+    document.save(content)
+    sock = socket.socket()
+    sock.bind(('127.0.0.1', 0))
+    server = uvicorn.Server(uvicorn.Config(app, log_level='error'))
+    thread = threading.Thread(target=server.run, kwargs={'sockets':[sock]}, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            page = browser.new_page(viewport={'width':1920,'height':1080})
+            errors=[]
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            base=f'http://127.0.0.1:{sock.getsockname()[1]}'
+            imported=page.request.post(base+'/api/contracts/import', multipart={'file':{'name':'compare.docx','mimeType':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','buffer':content.getvalue()}}).json()
+            task=page.request.post(base+'/api/tasks', data={'title':'Document comparison','text':imported['text'],'source_id':imported['source_id']}).json()
+            page.goto(base+'/workbench?task='+task['id'])
+            left=page.frame_locator('iframe[title="原始合同文档"]')
+            right=page.frame_locator('iframe[title="合同原件预览"]')
+            expect(page.get_by_test_id('review-summary')).to_be_hidden()
+            expect(page.locator('#opinion-drawer')).to_be_visible()
+            expect(page.get_by_role('button', name='审查意见面板', exact=True)).to_have_count(0)
+            assert page.locator('.wb-toolbar').bounding_box()['height'] <= 60
+            expect(page.get_by_test_id('original-document-pane')).to_have_count(0)
+            expect(right.locator('article p').first).to_have_text('Payment: 100 USD')
+            for label in ['开始审查', '重新审查']:
+                page.get_by_role('button', name=label, exact=True).click()
+                expect(page.get_by_test_id('original-document-pane')).to_be_visible()
+                expect(left.locator('article p').first).to_have_text('Payment: 100 USD')
+                expect(right.locator('article p').first).to_have_text('Payment: 200 USD', timeout=30000)
+                expect(right.locator('#pane-badge')).to_have_text('全部建议')
+                expect(right.locator('#pane-badge')).to_have_attribute('title', '全部修改建议，未自动采纳')
+                expect(left.locator('#pane-badge')).to_have_text('只读')
+                expect(page.locator('.wb-pane-heading')).to_have_count(0)
+                assert right.locator('header').bounding_box()['height'] <= 48
+                assert left.locator('header').bounding_box()['height'] <= 48
+                record=page.request.get(base+'/api/tasks/'+task['id']).json()
+                assert record['text']==imported['text']
+                assert record['run']['applied']==[]
+            expect(left.locator('.lexis-diff-original')).to_have_text('Payment: 100 USD')
+            expect(right.locator('.lexis-diff-revised')).to_have_text('Payment: 200 USD')
+            assert left.locator('html').evaluate('(el)=>getComputedStyle(el).scrollbarWidth') == 'none'
+            right.locator('body').evaluate('()=>{window.dispatchEvent(new Event("wheel"));window.scrollTo(0,(document.documentElement.scrollHeight-innerHeight)*.3);}')
+            left.locator('body').evaluate('()=>new Promise((resolve,reject)=>{setTimeout(()=>reject(new Error("Scroll synchronization timed out")),5000);const check=()=>scrollY/Math.max(1,document.documentElement.scrollHeight-innerHeight)>.2?resolve():requestAnimationFrame(check);check();})')
+            assert left.locator('body').evaluate('()=>scrollY/Math.max(1,document.documentElement.scrollHeight-innerHeight)') > .2
+            left.locator('body').evaluate('()=>{window.dispatchEvent(new Event("wheel"));window.scrollTo(0,document.documentElement.scrollHeight);}')
+            right.locator('body').evaluate('()=>new Promise((resolve,reject)=>{setTimeout(()=>reject(new Error("Scroll synchronization timed out")),5000);const check=()=>scrollY/Math.max(1,document.documentElement.scrollHeight-innerHeight)>.95?resolve():requestAnimationFrame(check);check();})')
+            assert right.locator('body').evaluate('()=>scrollY/Math.max(1,document.documentElement.scrollHeight-innerHeight)') > .95
+            right.locator('body').evaluate('()=>{window.dispatchEvent(new Event("wheel"));window.scrollTo(0,0);}')
+            expect(page.get_by_test_id('review-summary')).to_be_hidden()
+            close_opinions(page)
+            before = page.get_by_test_id('revised-document-pane').bounding_box()
+            open_opinions(page)
+            expect(page.locator('#opinion-drawer')).to_be_visible()
+            expect(page.get_by_test_id('review-summary')).to_be_hidden()
+            revised_box=page.get_by_test_id('revised-document-pane').bounding_box()
+            panel_box=page.locator('#opinion-drawer').bounding_box()
+            assert revised_box['width'] == before['width']
+            assert revised_box['x']+revised_box['width'] <= panel_box['x']
+            assert panel_box['x']+panel_box['width'] <= 1920
+            page.screenshot(path='artifacts/workbench-docked-opinions.png')
+            for width in [1366, 1920]:
+                page.set_viewport_size({'width':width,'height':1080})
+                page.wait_for_function("""() => {
+                    const doc=document.querySelector('[data-testid="revised-document-pane"]').getBoundingClientRect();
+                    const panel=document.querySelector('#opinion-drawer').getBoundingClientRect();
+                    return doc.right <= panel.left && panel.right <= innerWidth;
+                }""")
+                for preview in [left, right]:
+                    expect(preview.locator('section.docx').first).to_be_visible()
+                    assert preview.locator('section.docx').first.evaluate('(el)=>el.getBoundingClientRect().right <= innerWidth + 1')
+            page.get_by_role('button', name='审查概览', exact=True).click()
+            expect(page.get_by_test_id('review-summary')).to_be_visible()
+            expect(page.locator('#opinion-drawer')).to_be_visible()
+            page.get_by_role('button', name='审查概览', exact=True).click()
+            expect(page.get_by_test_id('review-summary')).to_be_hidden()
+            page.keyboard.press('Escape')
+            expect(page.locator('#opinion-drawer')).to_be_visible()
+            expect(page.get_by_role('button', name='收起审查意见面板', exact=True)).to_have_count(0)
+            expect(page.locator('summary').filter(has_text='更多操作')).to_have_count(0)
+            with page.expect_download() as download:
+                page.get_by_role('button', name='导出', exact=True).click()
+            assert Document(download.value.path()).paragraphs[0].text == 'Payment: 200 USD'
+            for button in page.get_by_role('button', name='不采纳', exact=True).all():
+                button.click()
+            page.get_by_role('button', name='完成复核', exact=True).click()
+            expect(page.get_by_role('button', name='已完成复核', exact=True)).to_be_visible()
+            assert page.request.get(base+'/api/tasks/'+task['id']).json()['status'] == 'completed'
+            fit=right.get_by_role('button', name='适应文档宽度', exact=True)
+            expect(fit).to_have_attribute('aria-pressed', 'true')
+            right.get_by_role('button', name='放大文档', exact=True).click()
+            expect(fit).to_have_attribute('aria-pressed', 'false')
+            fit.click()
+            expect(fit).to_have_attribute('aria-pressed', 'true')
+            page.screenshot(path='artifacts/workbench-dual-document.png')
+            close_opinions(page)
+            page.get_by_role('button', name='编辑正文', exact=True).click()
+            right.locator('[contenteditable="plaintext-only"]').first.fill('Payment: 300 USD')
+            right.get_by_role('button', name='保存正文', exact=True).click()
+            expect(right.locator('article p').first).to_have_text('Payment: 300 USD')
+            expect(left.locator('article p').first).to_have_text('Payment: 100 USD')
+            expect(right.locator('.lexis-located')).to_have_text('Payment: 300 USD')
+            expect(right.locator('.lexis-diff-revised')).to_have_text('Payment: 300 USD')
+            expect(left.locator('.lexis-diff-original')).to_have_text('Payment: 100 USD')
+            page.get_by_role('button', name='编辑正文', exact=True).click()
+            right.locator('[contenteditable="plaintext-only"]').first.fill('Payment: 350 USD')
+            right.locator('[contenteditable="plaintext-only"]').nth(1).fill('Section 0: body edit must survive')
+            expect(right.locator('.lexis-diff-revised')).to_have_count(2)
+            expect(left.locator('.lexis-diff-original')).to_have_count(2)
+            page.get_by_role('button', name='编辑条款', exact=True).first.click()
+            clause_editor=page.locator('.fixed textarea').last
+            expect(clause_editor).to_have_value('Payment: 350 USD')
+            clause_editor.fill('Payment: 400 USD')
+            page.get_by_role('button', name='保存条款', exact=True).click()
+            expect(right.locator('article p').first).to_have_text('Payment: 400 USD')
+            expect(right.locator('article p').nth(1)).to_have_text('Section 0: body edit must survive')
+            expect(right.locator('.lexis-diff-revised')).to_have_count(2)
+            expect(left.locator('.lexis-diff-original')).to_have_count(2)
+            page.get_by_role('button', name='编辑正文', exact=True).click()
+            right.locator('[contenteditable="plaintext-only"]').nth(2).fill('Temporary text to discard')
+            expect(right.locator('.lexis-diff-revised')).to_have_count(3)
+            right.get_by_role('button', name='取消编辑', exact=True).click()
+            expect(right.locator('.lexis-diff-revised')).to_have_count(2)
+            expect(right.locator('article p').nth(2)).not_to_have_text('Temporary text to discard')
+            page.get_by_role('button', name='编辑正文', exact=True).click()
+            right.locator('[contenteditable="plaintext-only"]').nth(2).fill('Section 1: saved from toolbar')
+            page.get_by_role('button', name='保存', exact=True).click()
+            expect(right.locator('#save-edit')).to_be_hidden()
+            expect(right.locator('article p').nth(2)).to_have_text('Section 1: saved from toolbar')
+            page.get_by_role('button', name='编辑条款', exact=True).first.click()
+            clause_editor=page.locator('.fixed textarea').last
+            expect(clause_editor).to_have_value('Payment: 400 USD')
+            clause_editor.fill('Payment: 500 USD')
+            page.get_by_role('button', name='保存条款', exact=True).click()
+            expect(right.locator('article p').first).to_have_text('Payment: 500 USD')
+            expect(right.locator('article p').nth(1)).to_have_text('Section 0: body edit must survive')
+            expect(right.locator('article p').nth(2)).to_have_text('Section 1: saved from toolbar')
+            expect(right.locator('.lexis-diff-revised')).to_have_count(3)
+            page.reload()
+            expect(page.get_by_test_id('original-document-pane')).to_have_count(0)
+            expect(right.locator('article p').first).to_have_text('Payment: 500 USD')
+            expect(right.locator('article p').nth(2)).to_have_text('Section 1: saved from toolbar')
+            expect(right.locator('article p').nth(1)).to_have_text('Section 0: body edit must survive')
+            assert not errors, errors
+            browser.close()
+    finally:
+        server.should_exit=True
         thread.join(timeout=10)
         sock.close()
