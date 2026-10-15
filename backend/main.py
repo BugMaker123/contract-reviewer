@@ -304,5 +304,5 @@ async def serve_workbench():
     wb_file = os.path.join(STATIC_DIR, "workbench.html")
     if os.path.exists(wb_file):
         with open(wb_file, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read(), media_type="text/html; charset=utf-8")
+            return HTMLResponse(content=f.read(), media_type="text/html; charset=utf-8", headers={'Cache-Control':'no-store'})
     return HTMLResponse("<h1>合同审查工作台未找到</h1>", media_type="text/html; charset=utf-8")

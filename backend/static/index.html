@@ -1,82 +1,494 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LexisGraph | 内部合同工作台</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LexisGraph</title>
   <script src="/static/vendor/vue.global.prod.js"></script>
-  <link rel="stylesheet" href="/static/vendor/tailwind.css"><link rel="stylesheet" href="/static/portal.css">
+  <link rel="stylesheet" href="/static/vendor/tailwind.css">
+  <link rel="stylesheet" href="/static/portal.css">
 </head>
+
 <body class="bg-slate-50 text-slate-800 antialiased">
-<div id="app" v-cloak class="h-screen flex flex-col overflow-hidden">
-  <header class="portal-header h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0">
-    <a href="/" class="flex items-center gap-3"><span class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">⚖</span><strong class="text-base text-slate-900">LexisGraph</strong><span class="pill">内部合同工作台</span></a>
-    <div class="flex gap-3 items-center"><span class="pill blue">内部使用</span><button @click="showModel = true" class="button">⚙ 模型配置</button><a href="/records" class="button soft">查看审查记录 →</a></div>
-  </header>
-  <div class="flex flex-1 overflow-hidden">
-    <aside class="portal-sidebar w-56 bg-white border-r border-slate-200 p-4 flex flex-col shrink-0">
-      <nav class="space-y-1"><a v-for="item in navigation" :href="item.href" class="nav-link" :class="{active: page === item.key}"><span class="w-5 text-center">{{ item.icon }}</span>{{ item.name }}</a></nav>
-      <div class="mt-6 card p-3 bg-slate-50" v-if="recentTasks.length"><div class="text-xs font-semibold mb-2 text-slate-700">最近工作</div><a :href="'/workbench?task='+recentTasks[0].id" class="text-xs text-slate-700 break-words leading-relaxed block">{{ recentTasks[0].title }}</a><div class="mt-2 text-[11px] text-slate-400">{{ statusName(recentTasks[0].status) }}</div><a :href="'/workbench?task='+recentTasks[0].id" class="block mt-3 text-xs font-semibold text-blue-600">继续处理 →</a></div>
-      <div class="mt-auto pt-6 text-[11px] text-slate-400 border-t border-slate-100"><button @click="showHelp=true" class="text-slate-500 mb-3">操作说明</button><div>合同与记录保存于本机服务</div></div>
-    </aside>
-    <main class="portal-main flex-1 overflow-y-auto p-8">
-      <div v-if="error" role="alert" class="max-w-6xl mx-auto mb-5 p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-700 flex justify-between gap-3"><span>{{ error }}</span><button @click="error=''" aria-label="关闭错误提示">✕</button></div>
-      <div v-if="loading" class="empty">正在加载工作记录…</div>
-      <template v-else>
-      <!-- Start: keep the existing centered contract card and restrained blue/white style. -->
-      <section v-if="page==='start'" class="max-w-4xl mx-auto space-y-5">
-        <div class="text-center mb-7"><h1 class="text-2xl font-bold text-slate-900">新建合同审查</h1><p class="text-xs text-slate-500 mt-3">准备合同与审查条件，进入工作台逐项核对</p></div>
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3"><button v-for="mode in modes" @click="form.mode=mode.id" class="mode-button" :class="{active:form.mode===mode.id}"><span class="block font-semibold text-xs" :class="form.mode===mode.id ? 'text-blue-700' : 'text-slate-800'">{{ mode.name }}</span><span class="block text-[11px] text-slate-500 mt-1.5">{{ mode.description }}</span></button></div>
-        <div class="card overflow-hidden">
-          <div class="px-6 pt-5 flex items-center gap-2"><button v-for="source in sources" @click="switchSource(source.id)" :disabled="importing" class="button" :class="{soft:inputMethod===source.id}">{{ source.name }}</button><span class="ml-auto text-xs text-slate-400">{{ form.text.length }} 字</span></div>
-          <div class="p-6">
-            <input type="file" ref="contractInput" class="hidden" accept=".docx,.pdf,.txt" @change="importDocument($event,'contract')">
-            <div v-if="inputMethod==='file' && !form.text" class="drop-area" :class="{dragging}" @dragover.prevent="dragging=true" @dragleave.prevent="dragging=false" @drop.prevent="dragging=false; importDocument($event,'contract',true)" @click="!importing && $refs.contractInput.click()"><div class="mx-auto w-12 h-12 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-center text-2xl text-blue-600 mb-4">↥</div><div class="text-sm font-semibold">{{ importing ? '正在提取合同正文…' : '拖拽合同文件至此处，或点击浏览文件' }}</div><div class="text-xs text-slate-400 mt-2">DOCX · 文字型 PDF · TXT，最大 10 MB</div></div>
-            <div v-else-if="inputMethod==='file'" class="space-y-3"><div class="flex justify-between items-center p-3 rounded-lg bg-blue-50 border border-blue-200"><div class="text-xs text-blue-800"><strong>{{ form.title }}</strong><div class="mt-1 text-slate-500">已提取正文，请核对内容</div></div><button @click="$refs.contractInput.click()" :disabled="importing" class="button">重新选择</button></div><details><summary class="text-xs text-blue-600 cursor-pointer">核对或修正提取正文</summary><textarea v-model="form.text" class="field mt-3 h-48 leading-relaxed" aria-label="提取合同正文"></textarea></details></div>
-            <textarea v-else-if="inputMethod==='paste'" v-model="form.text" class="field h-52 leading-relaxed" placeholder="在此粘贴合同正文…" aria-label="合同正文"></textarea>
-            <div v-else class="space-y-2"><p class="text-xs text-slate-500 mb-3">示例用于熟悉流程，请勿作为实际业务合同。</p><button v-for="(sample,key) in samples" @click="selectSample(key)" class="w-full p-4 border rounded-xl text-left" :class="sampleKey===key ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-slate-50'"><span class="text-xs font-semibold">{{ sample.title }}</span><span class="pill ml-2">示例</span><span class="text-[11px] text-slate-500 mt-2 block">{{ sample.type }} · {{ sample.text.length }} 字</span></button></div>
-          </div>
-          <div class="px-6 pb-5 grid grid-cols-1 md:grid-cols-2 gap-4"><label><span class="label">合同名称</span><input v-model="form.title" class="field" placeholder="填写便于识别的合同名称"></label><label><span class="label">合同类型</span><input v-model="form.type" class="field" placeholder="如：采购合同、服务协议"></label><label><span class="label">我方立场</span><select v-model="form.role" class="field"><option v-for="role in roles" :value="role.value">{{ role.label }}</option></select></label><label><span class="label">审查尺度</span><select v-model="form.scale" class="field"><option>中立</option><option>强势</option><option>弱势</option></select></label></div>
-          <div v-if="form.mode==='checklist'" class="px-6 pb-5"><label><span class="label">选用企业审查清单</span><select v-model="form.checklist_id" class="field"><option value="">请选择已发布的清单</option><option v-for="list in publishedLists" :value="list.id">{{ list.name }} · v{{ list.version }} · {{ list.items.length }} 项</option></select></label><div class="text-xs text-slate-500 mt-2">本次任务会固定清单版本。<a href="/checklists" class="text-blue-600">管理清单 →</a></div></div>
-          <div v-if="form.mode==='compare'" class="px-6 pb-5 space-y-3"><div class="flex justify-between items-center"><span class="label mb-0">参考合同</span><button @click="$refs.referenceInput.click()" :disabled="importing" class="button">上传参考合同</button><input ref="referenceInput" type="file" class="hidden" accept=".docx,.pdf,.txt" @change="importDocument($event,'reference')"></div><textarea v-model="form.reference_text" class="field h-40" placeholder="上传或粘贴用于对照的参考合同…" aria-label="参考合同正文"></textarea><p class="text-[11px] text-slate-500">先识别文本变更，再核验影响；参考合同本身不代表企业标准。</p></div>
-          <details class="border-t border-slate-200 px-6 py-4"><summary class="cursor-pointer text-xs font-semibold text-slate-600">补充交易背景、重点要求{{ form.mode==='deep' ? '与参考资料' : '' }}</summary><div class="mt-4 space-y-4"><label class="block"><span class="label">交易背景</span><textarea v-model="form.background" class="field h-24" placeholder="业务目的、交易安排、已沟通的条件…"></textarea></label><label class="block"><span class="label">重点要求</span><textarea v-model="form.focus" class="field h-20" placeholder="本次重点关注或不可接受的条件…"></textarea></label><div v-if="form.mode==='deep'"><div class="flex items-center justify-between mb-3"><span class="label mb-0">参考资料（最多 5 份，合计 5 万字）</span><button @click="$refs.materialInput.click()" :disabled="importing || form.references.length>=5" class="button">添加资料</button><input ref="materialInput" type="file" class="hidden" accept=".docx,.pdf,.txt" @change="importDocument($event,'material')"></div><div v-for="(material,index) in form.references" class="border border-slate-200 rounded-lg p-3 mt-2 text-xs"><div class="flex justify-between"><span>{{ material.name }} · {{ material.text.length }} 字</span><button @click="form.references.splice(index,1)" class="text-slate-400">移除</button></div><details class="mt-2"><summary class="text-blue-600 cursor-pointer">核对内容</summary><textarea v-model="material.text" class="field mt-2 h-28"></textarea></details></div></div></div></details>
+  <div id="app" v-cloak class="h-screen flex flex-col overflow-hidden">
+    <header
+      class="portal-header h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0">
+      <a href="/" class="flex items-center gap-3"><span
+          class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">⚖</span><strong
+          class="text-base text-slate-900">LexisGraph</strong>
+        <!-- <span class="pill">内部合同工作台</span> -->
+      </a>
+      <div class="flex gap-3 items-center">
+        <!-- <span class="pill blue">内部使用</span> -->
+        <button @click="showModel = true" class="button">⚙ 模型配置</button>
+        <!-- <a href="/records" class="button soft">查看审查记录 →</a></div> -->
+    </header>
+    <div class="flex flex-1 overflow-hidden">
+      <aside class="portal-sidebar w-56 bg-white border-r border-slate-200 p-4 flex flex-col shrink-0">
+        <nav class="space-y-1"><a v-for="item in navigation" :href="item.href" class="nav-link"
+            :class="{active: page === item.key}"><span class="w-5 text-center">{{ item.icon }}</span>{{ item.name }}</a>
+        </nav>
+        <div class="mt-6 card p-3 bg-slate-50" v-if="recentTasks.length">
+          <div class="text-xs font-semibold mb-2 text-slate-700">最近工作</div><a
+            :href="'/workbench?task='+recentTasks[0].id"
+            class="text-xs text-slate-700 break-words leading-relaxed block">{{ recentTasks[0].title }}</a>
+          <div class="mt-2 text-[11px] text-slate-400">{{ statusName(recentTasks[0].status) }}</div><a
+            :href="'/workbench?task='+recentTasks[0].id" class="block mt-3 text-xs font-semibold text-blue-600">继续处理
+            →</a>
         </div>
-        <div class="text-center"><button @click="createTask" :disabled="busy || importing || !form.text.trim() || !form.title.trim() || (form.mode==='checklist' && !form.checklist_id) || (form.mode==='compare' && !form.reference_text.trim())" class="button primary px-8 py-3">{{ busy ? '正在保存…' : '进入工作台核对合同' }}</button><p class="text-[11px] text-slate-400 mt-2">合同与任务保存后，在工作台发起审查</p></div>
-        <div v-if="recentTasks.length" class="pt-6"><div class="flex justify-between mb-3"><h2 class="text-sm font-semibold">最近审查</h2><a href="/records" class="text-xs text-blue-600">查看全部 →</a></div><div class="card overflow-hidden"><table class="data-table"><tbody><tr v-for="task in recentTasks.slice(0,3)"><td><a :href="'/workbench?task='+task.id" class="font-semibold text-slate-700">{{ task.title }}</a></td><td><span class="pill">{{ modeName(task.mode) }}</span></td><td>{{ statusName(task.status) }}</td><td class="text-right"><a :href="'/workbench?task='+task.id" class="text-blue-600">打开 →</a></td></tr></tbody></table></div></div>
-      </section>
+        <div class="mt-auto pt-6 text-[11px] text-slate-400 border-t border-slate-100"><button @click="showHelp=true"
+            class="text-slate-500 mb-3">操作说明</button>
+          <!-- <div>合同与记录保存于本机服务</div> -->
+        </div>
+      </aside>
+      <main class="portal-main flex-1 overflow-y-auto p-8">
+        <div v-if="error" role="alert"
+          class="max-w-6xl mx-auto mb-5 p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-700 flex justify-between gap-3">
+          <span>{{ error }}</span><button @click="error=''" aria-label="关闭错误提示">✕</button></div>
+        <div v-if="loading" class="empty">正在加载工作记录…</div>
+        <template v-else>
+          <!-- Start: keep the existing centered contract card and restrained blue/white style. -->
+          <section v-if="page==='start'" class="max-w-4xl mx-auto space-y-5">
+            <div class="text-center mb-7">
+              <h1 class="text-2xl font-bold text-slate-900">新建合同审查</h1>
+              <p class="text-xs text-slate-500 mt-3">准备合同与审查条件，进入工作台逐项核对</p>
+            </div>
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3"><button v-for="mode in modes" @click="form.mode=mode.id"
+                class="mode-button" :class="{active:form.mode===mode.id}"><span class="block font-semibold text-xs"
+                  :class="form.mode===mode.id ? 'text-blue-700' : 'text-slate-800'">{{ mode.name }}</span><span
+                  class="block text-[11px] text-slate-500 mt-1.5">{{ mode.description }}</span></button></div>
+            <div class="card overflow-hidden">
+              <div class="px-6 pt-5 flex items-center gap-2"><button v-for="source in sources"
+                  @click="switchSource(source.id)" :disabled="importing" class="button"
+                  :class="{soft:inputMethod===source.id}">{{ source.name }}</button><span
+                  class="ml-auto text-xs text-slate-400">{{ form.text.length }} 字</span></div>
+              <div class="p-6">
+                <input type="file" ref="contractInput" class="hidden" accept=".docx,.pdf,.txt"
+                  @change="importDocument($event,'contract')">
+                <div v-if="inputMethod==='file' && !form.text" class="drop-area" :class="{dragging}"
+                  @dragover.prevent="dragging=true" @dragleave.prevent="dragging=false"
+                  @drop.prevent="dragging=false; importDocument($event,'contract',true)"
+                  @click="!importing && $refs.contractInput.click()">
+                  <div
+                    class="mx-auto w-12 h-12 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-center text-2xl text-blue-600 mb-4">
+                    ↥</div>
+                  <div class="text-sm font-semibold">{{ importing ? '正在提取合同正文…' : '拖拽合同文件至此处，或点击浏览文件' }}</div>
+                  <div class="text-xs text-slate-400 mt-2">DOCX · 文字型 PDF · TXT，最大 10 MB</div>
+                </div>
+                <div v-else-if="inputMethod==='file'" class="space-y-3">
+                  <div class="flex justify-between items-center p-3 rounded-lg bg-blue-50 border border-blue-200">
+                    <div class="text-xs text-blue-800"><strong>{{ form.title }}</strong>
+                      <div class="mt-1 text-slate-500">已提取正文，请核对内容</div>
+                    </div><button @click="$refs.contractInput.click()" :disabled="importing"
+                      class="button">重新选择</button>
+                  </div>
+                  <details>
+                    <summary class="text-xs text-blue-600 cursor-pointer">核对或修正提取正文</summary><textarea
+                      v-model="form.text" class="field mt-3 h-48 leading-relaxed" aria-label="提取合同正文"></textarea>
+                  </details>
+                </div>
+                <textarea v-else-if="inputMethod==='paste'" v-model="form.text" class="field h-52 leading-relaxed"
+                  placeholder="在此粘贴合同正文…" aria-label="合同正文"></textarea>
+                <div v-else class="space-y-2">
+                  <p class="text-xs text-slate-500 mb-3">示例用于熟悉流程，请勿作为实际业务合同。</p><button v-for="(sample,key) in samples"
+                    @click="selectSample(key)" class="w-full p-4 border rounded-xl text-left"
+                    :class="sampleKey===key ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-slate-50'"><span
+                      class="text-xs font-semibold">{{ sample.title }}</span><span class="pill ml-2">示例</span><span
+                      class="text-[11px] text-slate-500 mt-2 block">{{ sample.type }} · {{ sample.text.length }}
+                      字</span></button>
+                </div>
+              </div>
+              <div class="px-6 pb-5 grid grid-cols-1 md:grid-cols-2 gap-4"><label><span class="label">合同名称</span><input
+                    v-model="form.title" class="field" placeholder="填写便于识别的合同名称"></label><label><span
+                    class="label">合同类型</span><input v-model="form.type" class="field"
+                    placeholder="如：采购合同、服务协议"></label><label><span class="label">我方立场</span><select v-model="form.role"
+                    class="field">
+                    <option v-for="role in roles" :value="role.value">{{ role.label }}</option>
+                  </select></label><label><span class="label">审查尺度</span><select v-model="form.scale" class="field">
+                    <option>中立</option>
+                    <option>强势</option>
+                    <option>弱势</option>
+                  </select></label></div>
+              <div v-if="form.mode==='checklist'" class="px-6 pb-5"><label><span class="label">选用企业审查清单</span><select
+                    v-model="form.checklist_id" class="field">
+                    <option value="">请选择已发布的清单</option>
+                    <option v-for="list in publishedLists" :value="list.id">{{ list.name }} · v{{ list.version }} · {{
+                      list.items.length }} 项</option>
+                  </select></label>
+                <div class="text-xs text-slate-500 mt-2">本次任务会固定清单版本。<a href="/checklists" class="text-blue-600">管理清单
+                    →</a></div>
+              </div>
+              <div v-if="form.mode==='compare'" class="px-6 pb-5 space-y-3">
+                <div class="flex justify-between items-center"><span class="label mb-0">参考合同</span><button
+                    @click="$refs.referenceInput.click()" :disabled="importing" class="button">上传参考合同</button><input
+                    ref="referenceInput" type="file" class="hidden" accept=".docx,.pdf,.txt"
+                    @change="importDocument($event,'reference')"></div><textarea v-model="form.reference_text"
+                  class="field h-40" placeholder="上传或粘贴用于对照的参考合同…" aria-label="参考合同正文"></textarea>
+                <p class="text-[11px] text-slate-500">先识别文本变更，再核验影响；参考合同本身不代表企业标准。</p>
+              </div>
+              <details class="border-t border-slate-200 px-6 py-4">
+                <summary class="cursor-pointer text-xs font-semibold text-slate-600">补充交易背景、重点要求{{ form.mode==='deep' ?
+                  '与参考资料' : '' }}</summary>
+                <div class="mt-4 space-y-4"><label class="block"><span class="label">交易背景</span><textarea
+                      v-model="form.background" class="field h-24"
+                      placeholder="业务目的、交易安排、已沟通的条件…"></textarea></label><label class="block"><span
+                      class="label">重点要求</span><textarea v-model="form.focus" class="field h-20"
+                      placeholder="本次重点关注或不可接受的条件…"></textarea></label>
+                  <div v-if="form.mode==='deep'">
+                    <div class="flex items-center justify-between mb-3"><span class="label mb-0">参考资料（最多 5 份，合计 5
+                        万字）</span><button @click="$refs.materialInput.click()"
+                        :disabled="importing || form.references.length>=5" class="button">添加资料</button><input
+                        ref="materialInput" type="file" class="hidden" accept=".docx,.pdf,.txt"
+                        @change="importDocument($event,'material')"></div>
+                    <div v-for="(material,index) in form.references"
+                      class="border border-slate-200 rounded-lg p-3 mt-2 text-xs">
+                      <div class="flex justify-between"><span>{{ material.name }} · {{ material.text.length }}
+                          字</span><button @click="form.references.splice(index,1)" class="text-slate-400">移除</button>
+                      </div>
+                      <details class="mt-2">
+                        <summary class="text-blue-600 cursor-pointer">核对内容</summary><textarea v-model="material.text"
+                          class="field mt-2 h-28"></textarea>
+                      </details>
+                    </div>
+                  </div>
+                </div>
+              </details>
+            </div>
+            <div class="text-center"><button @click="createTask"
+                :disabled="busy || importing || !form.text.trim() || !form.title.trim() || (form.mode==='checklist' && !form.checklist_id) || (form.mode==='compare' && !form.reference_text.trim())"
+                class="button primary px-8 py-3">{{ busy ? '正在保存…' : '进入工作台核对合同' }}</button>
+              <!-- <p class="text-[11px] text-slate-400 mt-2">合同与任务保存后，在工作台发起审查</p> -->
+            </div>
+            <!-- <div v-if="recentTasks.length" class="pt-6"><div class="flex justify-between mb-3">
+          <h2 class="text-sm font-semibold">最近审查</h2>
+          <a href="/records" class="text-xs text-blue-600">查看全部 →</a>
+        </div><div class="card overflow-hidden">
+          <table class="data-table">
+            <tbody><tr v-for="task in recentTasks.slice(0,3)">
+              <td><a :href="'/workbench?task='+task.id" class="font-semibold text-slate-700">{{ task.title }}
+              </a></td><td><span class="pill">{{ modeName(task.mode) }}</span></td>
+              <td>{{ statusName(task.status) }}</td><td class="text-right"><a :href="'/workbench?task='+task.id" class="text-blue-600">打开 →</a></td></tr>
+            
+            </tbody></table>
+          </div>
+          </div> -->
+          </section>
 
-      <!-- Durable review records. -->
-      <section v-if="page==='records'" class="max-w-6xl mx-auto space-y-5"><div class="flex justify-between items-center"><div><h1 class="text-xl font-bold">审查记录</h1><p class="text-xs text-slate-500 mt-2">每次审查独立留档，可继续处理或查看历史版本</p></div><a href="/" class="button primary">＋ 新建审查</a></div>
-        <div class="card p-4 flex flex-wrap items-center gap-3"><input v-model="search" class="field max-w-xs" placeholder="搜索合同名称" aria-label="搜索审查记录"><select v-model="modeFilter" class="field w-auto"><option value="all">全部审查模式</option><option v-for="mode in modes" :value="mode.id">{{ mode.name }}</option></select><select v-model="statusFilter" class="field w-auto"><option value="all">全部状态</option><option v-for="(name,id) in taskStatuses" :value="id">{{ name }}</option></select><label class="text-xs text-slate-500">开始日期<input type="date" v-model="fromDate" class="field mt-1"></label><label class="text-xs text-slate-500">结束日期<input type="date" v-model="toDate" class="field mt-1"></label><label class="flex gap-2 items-center text-xs text-slate-500"><input type="checkbox" v-model="showArchived">已归档</label></div>
-        <div class="card overflow-x-auto"><table class="data-table"><thead><tr><th>合同名称</th><th>任务类型</th><th>更新时间</th><th>状态</th><th>采纳修订</th><th>操作</th></tr></thead><tbody><tr v-for="task in filteredTasks"><td><a :href="'/workbench?task='+task.id" class="font-semibold text-slate-800">{{ task.title }}</a><div class="text-slate-400 text-[11px] mt-1">{{ task.type }}</div></td><td>{{ modeName(task.mode) }}</td><td class="whitespace-nowrap">{{ dateTime(task.updated_at) }}</td><td><span class="pill" :class="statusColor(task.status)">{{ statusName(task.status) }}</span></td><td>{{ task.applied_count || 0 }} 项</td><td><div class="flex gap-3"><a :href="'/workbench?task='+task.id" class="text-blue-600">打开</a><button @click="archive('tasks',task)" :disabled="task.status==='running' || busy" class="text-slate-400">{{ task.archived ? '恢复' : '归档' }}</button></div></td></tr></tbody></table><div v-if="!filteredTasks.length" class="empty">{{ tasks.length ? '没有匹配的审查记录，请调整筛选条件' : '暂无审查记录，先创建一个审查任务' }}</div></div>
-      </section>
+          <!-- Durable review records. -->
+          <section v-if="page==='records'" class="max-w-6xl mx-auto space-y-5">
+            <div class="flex justify-between items-center">
+              <div>
+                <h1 class="text-xl font-bold">审查记录</h1>
+                <p class="text-xs text-slate-500 mt-2">每次审查独立留档，可继续处理或查看历史版本</p>
+              </div><a href="/" class="button primary">＋ 新建审查</a>
+            </div>
+            <div class="card p-4 flex flex-wrap items-center gap-3"><input v-model="search" class="field max-w-xs"
+                placeholder="搜索合同名称" aria-label="搜索审查记录"><select v-model="modeFilter" class="field w-auto">
+                <option value="all">全部审查模式</option>
+                <option v-for="mode in modes" :value="mode.id">{{ mode.name }}</option>
+              </select><select v-model="statusFilter" class="field w-auto">
+                <option value="all">全部状态</option>
+                <option v-for="(name,id) in taskStatuses" :value="id">{{ name }}</option>
+              </select><label class="text-xs text-slate-500">开始日期<input type="date" v-model="fromDate"
+                  class="field mt-1"></label><label class="text-xs text-slate-500">结束日期<input type="date"
+                  v-model="toDate" class="field mt-1"></label><label
+                class="flex gap-2 items-center text-xs text-slate-500"><input type="checkbox"
+                  v-model="showArchived">已归档</label></div>
+            <div class="card overflow-x-auto">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>合同名称</th>
+                    <th>任务类型</th>
+                    <th>更新时间</th>
+                    <th>状态</th>
+                    <th>采纳修订</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="task in filteredTasks">
+                    <td><a :href="'/workbench?task='+task.id" class="font-semibold text-slate-800">{{ task.title }}</a>
+                      <div class="text-slate-400 text-[11px] mt-1">{{ task.type }}</div>
+                    </td>
+                    <td>{{ modeName(task.mode) }}</td>
+                    <td class="whitespace-nowrap">{{ dateTime(task.updated_at) }}</td>
+                    <td><span class="pill" :class="statusColor(task.status)">{{ statusName(task.status) }}</span></td>
+                    <td>{{ task.applied_count || 0 }} 项</td>
+                    <td>
+                      <div class="flex gap-3"><a :href="'/workbench?task='+task.id" class="text-blue-600">打开</a><button
+                          @click="archive('tasks',task)" :disabled="task.status==='running' || busy"
+                          class="text-slate-400">{{ task.archived ? '恢复' : '归档' }}</button></div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div v-if="!filteredTasks.length" class="empty">{{ tasks.length ? '没有匹配的审查记录，请调整筛选条件' : '暂无审查记录，先创建一个审查任务'
+                }}</div>
+            </div>
+          </section>
 
-      <!-- Enterprise checklist editor: every item has an actual evaluation rule. -->
-      <section v-if="page==='checklists'" class="max-w-6xl mx-auto space-y-5"><div class="flex justify-between items-center"><div><h1 class="text-xl font-bold">企业审查清单</h1><p class="text-xs text-slate-500 mt-2">维护适用范围与检查要求，发布后用于逐项审查</p></div><button @click="editChecklist()" class="button primary">＋ 创建审查清单</button></div><div class="card p-4 flex gap-3 items-center"><input v-model="search" class="field max-w-xs" placeholder="搜索清单名称"><label class="flex items-center gap-2 text-xs text-slate-500"><input type="checkbox" v-model="showArchived">已归档</label></div><div class="grid grid-cols-1 lg:grid-cols-2 gap-4"><article v-for="list in filteredLists" class="card p-5"><div class="flex justify-between items-start gap-3"><h2 class="font-semibold text-sm">{{ list.name }}</h2><span class="pill" :class="list.published ? 'green' : ''">{{ list.published ? '已发布' : '草稿' }} · v{{ list.version }}</span></div><p class="text-xs text-slate-500 mt-2">{{ list.contract_type }} · {{ list.items.length }} 项检查</p><p class="text-xs text-slate-500 mt-3 leading-relaxed">{{ list.description || '尚未填写清单说明' }}</p><div class="flex gap-3 mt-5 pt-4 border-t border-slate-100"><button @click="editChecklist(list)" class="text-xs text-blue-600">编辑清单</button><a v-if="list.published && !list.archived" :href="'/?checklist='+list.id" class="text-xs text-blue-600">使用清单审查 →</a><button @click="archive('checklists',list)" :disabled="busy" class="ml-auto text-xs text-slate-400">{{ list.archived ? '恢复' : '归档' }}</button></div></article></div><div v-if="!filteredLists.length" class="card empty">暂无{{ showArchived ? '已归档' : '可用' }}清单，创建或导入你们的企业检查要求</div></section>
+          <!-- Enterprise checklist editor: every item has an actual evaluation rule. -->
+          <section v-if="page==='checklists'" class="max-w-6xl mx-auto space-y-5">
+            <div class="flex justify-between items-center">
+              <div>
+                <h1 class="text-xl font-bold">企业审查清单</h1>
+                <p class="text-xs text-slate-500 mt-2">维护适用范围与检查要求，发布后用于逐项审查</p>
+              </div><button @click="editChecklist()" class="button primary">＋ 创建审查清单</button>
+            </div>
+            <div class="card p-4 flex gap-3 items-center"><input v-model="search" class="field max-w-xs"
+                placeholder="搜索清单名称"><label class="flex items-center gap-2 text-xs text-slate-500"><input
+                  type="checkbox" v-model="showArchived">已归档</label></div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <article v-for="list in filteredLists" class="card p-5">
+                <div class="flex justify-between items-start gap-3">
+                  <h2 class="font-semibold text-sm">{{ list.name }}</h2><span class="pill"
+                    :class="list.published ? 'green' : ''">{{ list.published ? '已发布' : '草稿' }} · v{{ list.version
+                    }}</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-2">{{ list.contract_type }} · {{ list.items.length }} 项检查</p>
+                <p class="text-xs text-slate-500 mt-3 leading-relaxed">{{ list.description || '尚未填写清单说明' }}</p>
+                <div class="flex gap-3 mt-5 pt-4 border-t border-slate-100"><button @click="editChecklist(list)"
+                    class="text-xs text-blue-600">编辑清单</button><a v-if="list.published && !list.archived"
+                    :href="'/?checklist='+list.id" class="text-xs text-blue-600">使用清单审查 →</a><button
+                    @click="archive('checklists',list)" :disabled="busy" class="ml-auto text-xs text-slate-400">{{
+                    list.archived ? '恢复' : '归档' }}</button></div>
+              </article>
+            </div>
+            <div v-if="!filteredLists.length" class="card empty">暂无{{ showArchived ? '已归档' : '可用' }}清单，创建或导入你们的企业检查要求
+            </div>
+          </section>
 
-      <!-- Drafting is an explicit background → outline → editable text workflow. -->
-      <section v-if="page==='draft'" class="max-w-5xl mx-auto space-y-5"><div class="flex justify-between items-center gap-3"><div><h1 class="text-xl font-bold">合同起草</h1><p class="text-xs text-slate-500 mt-2">确认交易信息和条款大纲，再生成可编辑的合同草稿</p></div><div class="flex gap-2"><button @click="saveDraft" :disabled="busy || !draft.title.trim() || !draft.background.trim()" class="button">保存草稿</button><a v-if="draft.id && draft.text.trim()" :href="'/api/drafts/'+draft.id+'/export'" class="button soft">导出 Word</a><button v-if="draft.text.trim()" @click="sendDraftToReview" :disabled="busy" class="button primary">送入审查 →</button></div></div>
-        <div class="flex flex-wrap gap-2"><button v-for="(step,index) in draftSteps" @click="draftStep=index" class="button" :class="{soft:draftStep===index}">{{ index+1 }}. {{ step }}</button><span class="ml-auto self-center text-xs text-slate-400">{{ draft.id ? '已有存档，修改后请保存' : '尚未保存' }}</span></div>
-        <fieldset :disabled="busy" class="card p-6 space-y-5"><label class="block"><span class="label">合同名称</span><input v-model="draft.title" class="field" placeholder="填写草稿名称"></label>
-          <template v-if="draftStep===0"><label class="block"><span class="label">起草背景与要求</span><textarea v-model="draft.background" class="field h-36" placeholder="描述合同类型、交易目的、合作安排和我方要求…"></textarea></label><div class="flex justify-between items-center"><span class="label mb-0">参考模板（可选）</span><button @click="$refs.templateInput.click()" class="button" :disabled="importing">导入模板</button><input type="file" ref="templateInput" class="hidden" accept=".docx,.pdf,.txt" @change="importDocument($event,'template')"></div><details v-if="draft.template_text"><summary class="text-xs text-blue-600 cursor-pointer">查看参考模板（{{ draft.template_text.length }} 字）</summary><textarea v-model="draft.template_text" class="field h-36 mt-3"></textarea></details><div class="flex justify-between items-center"><span class="label mb-0">起草参考资料</span><button @click="$refs.draftMaterialInput.click()" class="button" :disabled="importing || draft.references.length>=5">添加参考资料</button><input type="file" ref="draftMaterialInput" class="hidden" accept=".docx,.pdf,.txt" @change="importDocument($event,'draft_material')"></div><div v-for="(material,index) in draft.references" class="text-xs border border-slate-200 rounded-lg p-3"><div class="flex justify-between"><span>{{ material.name }} · {{ material.text.length }} 字</span><button @click="draft.references.splice(index,1)" class="text-slate-400">移除</button></div><details class="mt-2"><summary class="text-blue-600 cursor-pointer">核对内容</summary><textarea v-model="material.text" class="field h-24 mt-2"></textarea></details></div><button @click="generateDraft('details')" :disabled="busy || !draft.background.trim() || !draft.title.trim()" class="button primary">{{ busy ? '正在分析…' : '分析待确认交易信息' }}</button><p class="text-[11px] text-slate-500">需配置可用模型。未知的交易信息会保留为待确认，不自动编造。</p></template>
-          <template v-if="draftStep===1"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><label v-for="(value,key) in draft.details"><span class="label">{{ key }}</span><input v-model="draft.details[key]" class="field" placeholder="待确认"></label></div><div class="flex justify-between gap-3"><p class="text-xs text-slate-500">请核对交易信息。可手动填写，无需先调用模型。</p><button @click="generateDraft('outline')" :disabled="busy" class="button primary">{{ busy ? '正在生成…' : '确认信息并生成大纲' }}</button></div></template>
-          <template v-if="draftStep===2"><label class="block"><span class="label">条款大纲</span><textarea v-model="draft.outline" class="field h-80 leading-relaxed" placeholder="生成或手动填写条款大纲，一行一条…"></textarea></label><button @click="generateDraft('text')" :disabled="busy || !draft.outline.trim()" class="button primary">{{ busy ? '正在生成…' : '确认大纲并生成正文' }}</button></template>
-          <template v-if="draftStep===3"><label class="block"><span class="label">合同正文</span><textarea v-model="draft.text" @mouseup="captureSelection" @keyup="captureSelection" class="field h-[500px] leading-loose" placeholder="生成后在此核对并编辑合同正文…"></textarea></label><p class="text-xs text-slate-500">保存后可导出 Word，或送入审查工作台。仍含【待填写】的内容请先补充。</p><details class="border-t border-slate-200 pt-4"><summary class="cursor-pointer text-xs font-semibold text-blue-600">定向改写选中条款</summary><div class="mt-4 space-y-3"><p class="text-xs text-slate-500">在正文中选中条款，或在下方粘贴需要改写的完整原文。生成后先核对，再确认替换。</p><label class="block"><span class="label">需要改写的原文</span><textarea v-model="rewriteSelection.original" class="field h-24"></textarea></label><label class="block"><span class="label">改写要求</span><input v-model="rewriteSelection.instruction" class="field" placeholder="如：保持金额与期限不变，改为更温和的表达"></label><button @click="requestRewrite" :disabled="busy || !rewriteSelection.original.trim() || !rewriteSelection.instruction.trim()" class="button primary">生成改写建议</button><div v-if="rewriteSelection.proposal" class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 space-y-3"><p class="text-sm whitespace-pre-wrap leading-relaxed text-emerald-900">{{ rewriteSelection.proposal }}</p><button @click="applyRewrite" :disabled="busy" class="button primary">确认替换并保存</button><button @click="rewriteSelection.proposal=''" class="button">放弃建议</button></div></div></details></template>
-        </fieldset>
-        <details v-if="draftVersions.length" class="card p-4"><summary class="text-xs font-semibold text-slate-600 cursor-pointer">历史草稿版本（{{ draftVersions.length }}）</summary><div v-for="version in draftVersions" class="flex justify-between py-3 border-b border-slate-100 text-xs"><span>{{ dateTime(version.created_at) }} · {{ statusName(version.status) }}</span><button @click="previewDraftVersion=version" class="text-blue-600">查看</button></div></details>
-      </section>
+          <!-- Drafting is an explicit background → outline → editable text workflow. -->
+          <section v-if="page==='draft'" class="max-w-5xl mx-auto space-y-5">
+            <div class="flex justify-between items-center gap-3">
+              <div>
+                <h1 class="text-xl font-bold">合同起草</h1>
+                <p class="text-xs text-slate-500 mt-2">确认交易信息和条款大纲，再生成可编辑的合同草稿</p>
+              </div>
+              <div class="flex gap-2"><button @click="saveDraft"
+                  :disabled="busy || !draft.title.trim() || !draft.background.trim()" class="button">保存草稿</button><a
+                  v-if="draft.id && draft.text.trim()" :href="'/api/drafts/'+draft.id+'/export'" class="button soft">导出
+                  Word</a><button v-if="draft.text.trim()" @click="sendDraftToReview" :disabled="busy"
+                  class="button primary">送入审查 →</button></div>
+            </div>
+            <div class="flex flex-wrap gap-2"><button v-for="(step,index) in draftSteps" @click="draftStep=index"
+                class="button" :class="{soft:draftStep===index}">{{ index+1 }}. {{ step }}</button><span
+                class="ml-auto self-center text-xs text-slate-400">{{ draft.id ? '已有存档，修改后请保存' : '尚未保存' }}</span></div>
+            <fieldset :disabled="busy" class="card p-6 space-y-5"><label class="block"><span
+                  class="label">合同名称</span><input v-model="draft.title" class="field" placeholder="填写草稿名称"></label>
+              <template v-if="draftStep===0"><label class="block"><span class="label">起草背景与要求</span><textarea
+                    v-model="draft.background" class="field h-36"
+                    placeholder="描述合同类型、交易目的、合作安排和我方要求…"></textarea></label>
+                <div class="flex justify-between items-center"><span class="label mb-0">参考模板（可选）</span><button
+                    @click="$refs.templateInput.click()" class="button" :disabled="importing">导入模板</button><input
+                    type="file" ref="templateInput" class="hidden" accept=".docx,.pdf,.txt"
+                    @change="importDocument($event,'template')"></div>
+                <details v-if="draft.template_text">
+                  <summary class="text-xs text-blue-600 cursor-pointer">查看参考模板（{{ draft.template_text.length }} 字）
+                  </summary><textarea v-model="draft.template_text" class="field h-36 mt-3"></textarea>
+                </details>
+                <div class="flex justify-between items-center"><span class="label mb-0">起草参考资料</span><button
+                    @click="$refs.draftMaterialInput.click()" class="button"
+                    :disabled="importing || draft.references.length>=5">添加参考资料</button><input type="file"
+                    ref="draftMaterialInput" class="hidden" accept=".docx,.pdf,.txt"
+                    @change="importDocument($event,'draft_material')"></div>
+                <div v-for="(material,index) in draft.references"
+                  class="text-xs border border-slate-200 rounded-lg p-3">
+                  <div class="flex justify-between"><span>{{ material.name }} · {{ material.text.length }}
+                      字</span><button @click="draft.references.splice(index,1)" class="text-slate-400">移除</button></div>
+                  <details class="mt-2">
+                    <summary class="text-blue-600 cursor-pointer">核对内容</summary><textarea v-model="material.text"
+                      class="field h-24 mt-2"></textarea>
+                  </details>
+                </div><button @click="generateDraft('details')"
+                  :disabled="busy || !draft.background.trim() || !draft.title.trim()" class="button primary">{{ busy ?
+                  '正在分析…' : '分析待确认交易信息' }}</button>
+                <p class="text-[11px] text-slate-500">需配置可用模型。未知的交易信息会保留为待确认，不自动编造。</p>
+              </template>
+              <template v-if="draftStep===1">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4"><label v-for="(value,key) in draft.details"><span
+                      class="label">{{ key }}</span><input v-model="draft.details[key]" class="field"
+                      placeholder="待确认"></label></div>
+                <div class="flex justify-between gap-3">
+                  <p class="text-xs text-slate-500">请核对交易信息。可手动填写，无需先调用模型。</p><button @click="generateDraft('outline')"
+                    :disabled="busy" class="button primary">{{ busy ? '正在生成…' : '确认信息并生成大纲' }}</button>
+                </div>
+              </template>
+              <template v-if="draftStep===2"><label class="block"><span class="label">条款大纲</span><textarea
+                    v-model="draft.outline" class="field h-80 leading-relaxed"
+                    placeholder="生成或手动填写条款大纲，一行一条…"></textarea></label><button @click="generateDraft('text')"
+                  :disabled="busy || !draft.outline.trim()" class="button primary">{{ busy ? '正在生成…' : '确认大纲并生成正文'
+                  }}</button></template>
+              <template v-if="draftStep===3"><label class="block"><span class="label">合同正文</span><textarea
+                    v-model="draft.text" @mouseup="captureSelection" @keyup="captureSelection"
+                    class="field h-[500px] leading-loose" placeholder="生成后在此核对并编辑合同正文…"></textarea></label>
+                <p class="text-xs text-slate-500">保存后可导出 Word，或送入审查工作台。仍含【待填写】的内容请先补充。</p>
+                <details class="border-t border-slate-200 pt-4">
+                  <summary class="cursor-pointer text-xs font-semibold text-blue-600">定向改写选中条款</summary>
+                  <div class="mt-4 space-y-3">
+                    <p class="text-xs text-slate-500">在正文中选中条款，或在下方粘贴需要改写的完整原文。生成后先核对，再确认替换。</p><label
+                      class="block"><span class="label">需要改写的原文</span><textarea v-model="rewriteSelection.original"
+                        class="field h-24"></textarea></label><label class="block"><span class="label">改写要求</span><input
+                        v-model="rewriteSelection.instruction" class="field"
+                        placeholder="如：保持金额与期限不变，改为更温和的表达"></label><button @click="requestRewrite"
+                      :disabled="busy || !rewriteSelection.original.trim() || !rewriteSelection.instruction.trim()"
+                      class="button primary">生成改写建议</button>
+                    <div v-if="rewriteSelection.proposal"
+                      class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 space-y-3">
+                      <p class="text-sm whitespace-pre-wrap leading-relaxed text-emerald-900">{{
+                        rewriteSelection.proposal }}</p><button @click="applyRewrite" :disabled="busy"
+                        class="button primary">确认替换并保存</button><button @click="rewriteSelection.proposal=''"
+                        class="button">放弃建议</button>
+                    </div>
+                  </div>
+                </details>
+              </template>
+            </fieldset>
+            <details v-if="draftVersions.length" class="card p-4">
+              <summary class="text-xs font-semibold text-slate-600 cursor-pointer">历史草稿版本（{{ draftVersions.length }}）
+              </summary>
+              <div v-for="version in draftVersions" class="flex justify-between py-3 border-b border-slate-100 text-xs">
+                <span>{{ dateTime(version.created_at) }} · {{ statusName(version.status) }}</span><button
+                  @click="previewDraftVersion=version" class="text-blue-600">查看</button></div>
+            </details>
+          </section>
 
-      <section v-if="page==='drafts'" class="max-w-6xl mx-auto space-y-5"><div class="flex justify-between items-center"><div><h1 class="text-xl font-bold">起草记录</h1><p class="text-xs text-slate-500 mt-2">保留背景、交易信息、大纲与正文，随时继续起草</p></div><a href="/draft" class="button primary">＋ 新建起草</a></div><div class="card p-4 flex items-center gap-3"><input v-model="search" class="field max-w-xs" placeholder="搜索草稿名称"><label class="flex gap-2 text-xs text-slate-500"><input type="checkbox" v-model="showArchived">已归档</label></div><div class="card overflow-x-auto"><table class="data-table"><thead><tr><th>合同名称</th><th>更新时间</th><th>当前阶段</th><th>操作</th></tr></thead><tbody><tr v-for="item in filteredDrafts"><td class="font-semibold">{{ item.title }}</td><td>{{ dateTime(item.updated_at) }}</td><td><span class="pill">{{ statusName(item.status) }}</span></td><td><div class="flex gap-3"><a :href="'/draft?id='+item.id" class="text-blue-600">继续起草</a><button @click="archive('drafts',item)" :disabled="busy || item.status==='running'" class="text-slate-400">{{ item.archived ? '恢复' : '归档' }}</button></div></td></tr></tbody></table><div v-if="!filteredDrafts.length" class="empty">暂无匹配的起草记录</div></div></section>
-      </template>
-    </main>
+          <section v-if="page==='drafts'" class="max-w-6xl mx-auto space-y-5">
+            <div class="flex justify-between items-center">
+              <div>
+                <h1 class="text-xl font-bold">起草记录</h1>
+                <p class="text-xs text-slate-500 mt-2">保留背景、交易信息、大纲与正文，随时继续起草</p>
+              </div><a href="/draft" class="button primary">＋ 新建起草</a>
+            </div>
+            <div class="card p-4 flex items-center gap-3"><input v-model="search" class="field max-w-xs"
+                placeholder="搜索草稿名称"><label class="flex gap-2 text-xs text-slate-500"><input type="checkbox"
+                  v-model="showArchived">已归档</label></div>
+            <div class="card overflow-x-auto">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>合同名称</th>
+                    <th>更新时间</th>
+                    <th>当前阶段</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in filteredDrafts">
+                    <td class="font-semibold">{{ item.title }}</td>
+                    <td>{{ dateTime(item.updated_at) }}</td>
+                    <td><span class="pill">{{ statusName(item.status) }}</span></td>
+                    <td>
+                      <div class="flex gap-3"><a :href="'/draft?id='+item.id" class="text-blue-600">继续起草</a><button
+                          @click="archive('drafts',item)" :disabled="busy || item.status==='running'"
+                          class="text-slate-400">{{ item.archived ? '恢复' : '归档' }}</button></div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div v-if="!filteredDrafts.length" class="empty">暂无匹配的起草记录</div>
+            </div>
+          </section>
+        </template>
+      </main>
+    </div>
+
+    <div v-if="checklistEditor" class="modal">
+      <div class="modal-panel max-w-4xl">
+        <div class="sticky top-0 bg-white z-10 p-5 border-b border-slate-200 flex justify-between">
+          <h2 class="text-base font-bold">{{ checklistEditor.id ? '编辑审查清单' : '创建审查清单' }}</h2><button
+            @click="checklistEditor=null" aria-label="关闭清单编辑器">✕</button>
+        </div>
+        <div class="p-6 space-y-5">
+          <div v-if="modalError" role="alert" class="p-3 text-xs text-red-700 bg-red-50 rounded-lg">{{ modalError }}
+          </div>
+          <div class="grid grid-cols-2 gap-4"><label><span class="label">清单名称</span><input
+                v-model="checklistEditor.name" class="field" placeholder="如：采购合同企业标准"></label><label><span
+                class="label">适用合同类型</span><input v-model="checklistEditor.contract_type" class="field"></label></div>
+          <label class="block"><span class="label">说明</span><input v-model="checklistEditor.description" class="field"
+              placeholder="适用范围、业务部门或特殊要求"></label>
+          <div class="flex justify-between items-center">
+            <h3 class="text-sm font-semibold">检查要求</h3>
+            <div class="flex gap-2"><button @click="$refs.checklistInput.click()" class="button"
+                :disabled="importing">从文件提取草稿</button><input type="file" ref="checklistInput" class="hidden"
+                accept=".docx,.pdf,.txt" @change="importDocument($event,'checklist')"><button @click="addChecklistItem"
+                class="button soft">＋ 添加检查项</button></div>
+          </div>
+          <p class="text-xs text-slate-500">文字规则按明确词语匹配；语义核验需要模型，无法判定时进入待人工确认。</p>
+          <article v-for="(item,index) in checklistEditor.items" :key="item.id"
+            class="border border-slate-200 rounded-xl p-4 space-y-3">
+            <div class="flex gap-3 items-center"><span class="pill">{{ index+1 }}</span><input v-model="item.title"
+                class="field" placeholder="检查项标题" aria-label="检查项标题"><button
+                @click="checklistEditor.items.splice(index,1)" class="text-xs text-slate-400">移除</button></div><textarea
+              v-model="item.requirement" class="field h-20" placeholder="描述具体判断要求，避免只写一个关键词…"
+              aria-label="检查项要求"></textarea>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3"><label><span class="label">核验方式</span><select
+                  v-model="item.operator" class="field">
+                  <option value="semantic">语义核验</option>
+                  <option value="contains_all">必须包含全部文字</option>
+                  <option value="contains_any">至少包含一项文字</option>
+                  <option value="forbidden">不得包含这些文字</option>
+                </select></label><label><span class="label">未通过风险等级</span><select v-model="item.severity" class="field">
+                  <option value="critical">重大风险</option>
+                  <option value="warning">一般风险</option>
+                  <option value="info">优化建议</option>
+                </select></label><label v-if="item.operator!=='semantic'"><span class="label">匹配文字（逗号分隔）</span><input
+                  v-model="item.keywordText" class="field" placeholder="如：付款,验收"></label></div><input
+              v-model="item.suggestion" class="field" placeholder="未通过时的处理建议（可选）">
+          </article>
+          <div class="flex justify-end gap-3"><button @click="saveChecklist(false)" :disabled="busy || importing"
+              class="button">保存草稿</button><button @click="saveChecklist(true)" :disabled="busy || importing"
+              class="button primary">发布清单</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showModel" class="modal">
+      <div class="modal-panel max-w-md p-6 space-y-4">
+        <div class="flex justify-between">
+          <h2 class="font-bold">模型配置</h2><button @click="showModel=false" aria-label="关闭模型配置">✕</button>
+        </div><label class="block"><span class="label">模型名称</span><input v-model="model.model_name"
+            class="field"></label><label class="block"><span class="label">API 端点</span><input v-model="model.base_url"
+            class="field"></label><label class="block"><span class="label">API Key</span><input type="password"
+            v-model="model.api_key" class="field" autocomplete="off"></label>
+        <p class="text-xs text-slate-500">配置保存在当前浏览器。留空时使用服务端配置；无模型时可使用快速规则检查。</p>
+        <p v-if="modelTest" class="text-xs" :class="modelTest.success ? 'text-emerald-700' : 'text-red-700'">{{
+          modelTest.message }}</p>
+        <div class="flex justify-between"><button @click="testModel" :disabled="busy"
+            class="button">测试连接</button><button @click="saveModel" class="button primary">保存配置</button></div>
+      </div>
+    </div>
+    <div v-if="showHelp" class="modal">
+      <div class="modal-panel max-w-lg p-6 space-y-4">
+        <div class="flex justify-between">
+          <h2 class="font-bold">内部操作说明</h2><button @click="showHelp=false" aria-label="关闭操作说明">✕</button>
+        </div>
+        <ol class="text-xs text-slate-600 leading-loose list-decimal pl-5">
+          <li>导入真实合同，核对正文和审查条件，再进入工作台发起审查。</li>
+          <li>企业清单需核对并发布后才能使用；任务会保留选用的清单版本。</li>
+          <li>逐项采纳、撤销、不采纳或标为待复核。重新审查形成独立版本。</li>
+          <li>起草先确认交易信息和大纲，缺失信息请补全后交付。</li>
+          <li>合同与记录保存在本机服务。归档可恢复；Word 导出请核对内容与排版。</li>
+        </ol>
+      </div>
+    </div>
+    <div v-if="previewDraftVersion" class="modal">
+      <div class="modal-panel max-w-3xl p-6 space-y-4">
+        <div class="flex justify-between">
+          <h2 class="font-bold">历史草稿 · {{ dateTime(previewDraftVersion.created_at) }}</h2><button
+            @click="previewDraftVersion=null">✕</button>
+        </div>
+        <pre
+          class="whitespace-pre-wrap text-sm leading-relaxed">{{ previewDraftVersion.text || previewDraftVersion.outline || previewDraftVersion.background }}</pre>
+      </div>
+    </div>
+    <div v-if="toast" role="status"
+      class="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white rounded-lg px-4 py-2 text-xs shadow-lg">
+      {{ toast }}</div>
   </div>
+  <script src="/static/portal.js"></script>
+</body>
 
-  <div v-if="checklistEditor" class="modal"><div class="modal-panel max-w-4xl"><div class="sticky top-0 bg-white z-10 p-5 border-b border-slate-200 flex justify-between"><h2 class="text-base font-bold">{{ checklistEditor.id ? '编辑审查清单' : '创建审查清单' }}</h2><button @click="checklistEditor=null" aria-label="关闭清单编辑器">✕</button></div><div class="p-6 space-y-5"><div v-if="modalError" role="alert" class="p-3 text-xs text-red-700 bg-red-50 rounded-lg">{{ modalError }}</div><div class="grid grid-cols-2 gap-4"><label><span class="label">清单名称</span><input v-model="checklistEditor.name" class="field" placeholder="如：采购合同企业标准"></label><label><span class="label">适用合同类型</span><input v-model="checklistEditor.contract_type" class="field"></label></div><label class="block"><span class="label">说明</span><input v-model="checklistEditor.description" class="field" placeholder="适用范围、业务部门或特殊要求"></label><div class="flex justify-between items-center"><h3 class="text-sm font-semibold">检查要求</h3><div class="flex gap-2"><button @click="$refs.checklistInput.click()" class="button" :disabled="importing">从文件提取草稿</button><input type="file" ref="checklistInput" class="hidden" accept=".docx,.pdf,.txt" @change="importDocument($event,'checklist')"><button @click="addChecklistItem" class="button soft">＋ 添加检查项</button></div></div><p class="text-xs text-slate-500">文字规则按明确词语匹配；语义核验需要模型，无法判定时进入待人工确认。</p>
-    <article v-for="(item,index) in checklistEditor.items" :key="item.id" class="border border-slate-200 rounded-xl p-4 space-y-3"><div class="flex gap-3 items-center"><span class="pill">{{ index+1 }}</span><input v-model="item.title" class="field" placeholder="检查项标题" aria-label="检查项标题"><button @click="checklistEditor.items.splice(index,1)" class="text-xs text-slate-400">移除</button></div><textarea v-model="item.requirement" class="field h-20" placeholder="描述具体判断要求，避免只写一个关键词…" aria-label="检查项要求"></textarea><div class="grid grid-cols-2 md:grid-cols-3 gap-3"><label><span class="label">核验方式</span><select v-model="item.operator" class="field"><option value="semantic">语义核验</option><option value="contains_all">必须包含全部文字</option><option value="contains_any">至少包含一项文字</option><option value="forbidden">不得包含这些文字</option></select></label><label><span class="label">未通过风险等级</span><select v-model="item.severity" class="field"><option value="critical">重大风险</option><option value="warning">一般风险</option><option value="info">优化建议</option></select></label><label v-if="item.operator!=='semantic'"><span class="label">匹配文字（逗号分隔）</span><input v-model="item.keywordText" class="field" placeholder="如：付款,验收"></label></div><input v-model="item.suggestion" class="field" placeholder="未通过时的处理建议（可选）"></article><div class="flex justify-end gap-3"><button @click="saveChecklist(false)" :disabled="busy || importing" class="button">保存草稿</button><button @click="saveChecklist(true)" :disabled="busy || importing" class="button primary">发布清单</button></div></div></div></div>
-
-  <div v-if="showModel" class="modal"><div class="modal-panel max-w-md p-6 space-y-4"><div class="flex justify-between"><h2 class="font-bold">模型配置</h2><button @click="showModel=false" aria-label="关闭模型配置">✕</button></div><label class="block"><span class="label">模型名称</span><input v-model="model.model_name" class="field"></label><label class="block"><span class="label">API 端点</span><input v-model="model.base_url" class="field"></label><label class="block"><span class="label">API Key</span><input type="password" v-model="model.api_key" class="field" autocomplete="off"></label><p class="text-xs text-slate-500">配置保存在当前浏览器。留空时使用服务端配置；无模型时可使用快速规则检查。</p><p v-if="modelTest" class="text-xs" :class="modelTest.success ? 'text-emerald-700' : 'text-red-700'">{{ modelTest.message }}</p><div class="flex justify-between"><button @click="testModel" :disabled="busy" class="button">测试连接</button><button @click="saveModel" class="button primary">保存配置</button></div></div></div>
-  <div v-if="showHelp" class="modal"><div class="modal-panel max-w-lg p-6 space-y-4"><div class="flex justify-between"><h2 class="font-bold">内部操作说明</h2><button @click="showHelp=false" aria-label="关闭操作说明">✕</button></div><ol class="text-xs text-slate-600 leading-loose list-decimal pl-5"><li>导入真实合同，核对正文和审查条件，再进入工作台发起审查。</li><li>企业清单需核对并发布后才能使用；任务会保留选用的清单版本。</li><li>逐项采纳、撤销、不采纳或标为待复核。重新审查形成独立版本。</li><li>起草先确认交易信息和大纲，缺失信息请补全后交付。</li><li>合同与记录保存在本机服务。归档可恢复；Word 导出请核对内容与排版。</li></ol></div></div>
-  <div v-if="previewDraftVersion" class="modal"><div class="modal-panel max-w-3xl p-6 space-y-4"><div class="flex justify-between"><h2 class="font-bold">历史草稿 · {{ dateTime(previewDraftVersion.created_at) }}</h2><button @click="previewDraftVersion=null">✕</button></div><pre class="whitespace-pre-wrap text-sm leading-relaxed">{{ previewDraftVersion.text || previewDraftVersion.outline || previewDraftVersion.background }}</pre></div></div>
-  <div v-if="toast" role="status" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white rounded-lg px-4 py-2 text-xs shadow-lg">{{ toast }}</div>
-</div>
-<script src="/static/portal.js"></script>
-</body></html>
+</html>

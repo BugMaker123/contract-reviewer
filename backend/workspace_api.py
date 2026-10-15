@@ -13,6 +13,8 @@ from .store import repository as repo, now
 from .workspace_models import (TaskInput, ChecklistInput, RunRequest, HandlingInput, ArchiveInput,
                                DraftInput, DraftGenerate, DraftRewrite, FollowupInput)
 from .workspace_review import review_events, model_json
+from .graph import ModelCallError
+from .review_progress import observable_events
 from .word_export import contract_document
 
 router = APIRouter()
@@ -73,6 +75,12 @@ def compare_documents(request: DocumentComparison):
     before, after = request.original.split('\n'), request.revised.split('\n')
     original_map, revised_map = [0] * len(before), [0] * len(after)
     changes = []
+    original_chars, revised_chars = [], []
+    before_offsets, after_offsets = [0], [0]
+    for line in before:
+        before_offsets.append(before_offsets[-1] + len(line) + 1)
+    for line in after:
+        after_offsets.append(after_offsets[-1] + len(line) + 1)
     for tag, a, b, c, d in SequenceMatcher(None, before, after, autojunk=len(before)>2000).get_opcodes():
         for i in range(a, b):
             original_map[i] = min(len(after)-1, c + int((i-a) * (d-c) / max(1, b-a)))
@@ -80,7 +88,17 @@ def compare_documents(request: DocumentComparison):
             revised_map[i] = min(len(before)-1, a + int((i-c) * (b-a) / max(1, d-c)))
         if tag != 'equal':
             changes.append({'kind':tag, 'original_start':a, 'original_end':b, 'revised_start':c, 'revised_end':d})
-    return {'changes':changes, 'original_map':original_map, 'revised_map':revised_map}
+            left, right = '\n'.join(before[a:b]), '\n'.join(after[c:d])
+            # Character-level edits preserve unchanged words within a revised paragraph.
+            for kind, x, y, u, v in SequenceMatcher(None, left, right, autojunk=len(left)+len(right)>24000).get_opcodes():
+                if kind == 'equal':
+                    continue
+                if x < y:
+                    original_chars.append([before_offsets[a]+x, before_offsets[a]+y])
+                if u < v:
+                    revised_chars.append([after_offsets[c]+u, after_offsets[c]+v])
+    return {'changes':changes, 'original_map':original_map, 'revised_map':revised_map,
+            'original_chars':original_chars, 'revised_chars':revised_chars}
 
 
 class SourceEdit(BaseModel):
@@ -185,13 +203,19 @@ async def start_review(task_id: str, request: RunRequest):
     async def stream():
         finished = False
         progress = []
+        trace = []
         try:
             yield 'event: init\ndata: ' + json.dumps({'run_id': run['id'], 'number': run['number']}) + '\n\n'
-            async for kind, data in review_events(run['input'], request.model_config_data.model_dump()):
+            async for kind, data in observable_events(review_events, run['input'], request.model_config_data.model_dump()):
+                if kind == 'progress':
+                    trace.append(data)
+                    repo.update(run['id'], {'audit_trace': trace})
                 if kind == 'node_update':
                     progress.append(data['log'])
-                    repo.update(run['id'], {'progress_log': progress, 'last_node': data['node']})
+                    trace.append({'stage':data['node'], 'detail':data['log']['detail'], 'time':now()})
+                    repo.update(run['id'], {'progress_log': progress, 'last_node': data['node'], 'audit_trace':trace})
                 if kind == 'complete':
+                    data['audit_trace'] = trace
                     repo.update(run['id'], {'status': 'completed', 'result': data, 'completed_at': now()})
                     repo.update(task_id, {'status': 'pending_review', 'active_run': run['id'], 'error': None})
                     data = {'success': True, 'data': data, 'run_id': run['id'], 'number': run['number']}
@@ -199,10 +223,14 @@ async def start_review(task_id: str, request: RunRequest):
                 yield 'event: ' + kind + '\ndata: ' + json.dumps(data, ensure_ascii=False) + '\n\n'
         except asyncio.CancelledError:
             raise
-        except Exception:
-            repo.update(run['id'], {'status': 'failed', 'error': '审查执行失败，请检查模型连接后重试'})
+        except Exception as error:
+            message = str(error) if isinstance(error, (ModelCallError, TimeoutError)) else '审查执行失败，请检查模型连接后重试'
+            failure = {'stage':'failed', 'detail':message, 'time':now()}
+            trace.append(failure)
+            repo.update(run['id'], {'status': 'failed', 'error': message, 'audit_trace':trace})
             repo.update(task_id, {'status': 'failed', 'error': '审查执行失败，上次完成的结果已保留'})
-            yield 'event: error\ndata: ' + json.dumps({'error': '审查执行失败，上次结果已保留，请重试'}, ensure_ascii=False) + '\n\n'
+            yield 'event: progress\ndata: ' + json.dumps(failure, ensure_ascii=False) + '\n\n'
+            yield 'event: error\ndata: ' + json.dumps({'error': message + '；上次完成的结果已保留'}, ensure_ascii=False) + '\n\n'
         finally:
             if not finished and repo.get(run['id'], 'run')['status'] == 'running':
                 repo.update(run['id'], {'status': 'interrupted', 'error': '审查连接已中断'})

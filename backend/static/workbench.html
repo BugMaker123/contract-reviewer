@@ -1,24 +1,38 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LexisGraph | 智能合同审查系统</title>
-  
+
   <!-- 离线本地核心库：100% 稳定秒开，杜绝 CDN 挂掉导致网页点不动 -->
   <script src="/static/vendor/vue.global.prod.js"></script>
-  
+
   <script src="/static/session.js"></script>
   <script src="/static/workbench-workspace.js?v=20261015-workspace-3"></script>
   <link rel="stylesheet" href="/static/vendor/tailwind.css">
 
   <style>
     /* 清爽极简商务滚动条 */
-    ::-webkit-scrollbar { width: 7px; height: 7px; }
-    ::-webkit-scrollbar-track { background: #f8fafc; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f8fafc;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
     /* 商务条款风险高亮（温和内敛护眼、大字号清晰） */
     .clause-critical {
       background-color: #FEF2F2 !important;
@@ -26,12 +40,14 @@
       border-radius: 0 4px 4px 0;
       padding-left: 12px;
     }
+
     .clause-warning {
       background-color: #FFFBEB !important;
       border-left: 4px solid #D97706 !important;
       border-radius: 0 4px 4px 0;
       padding-left: 12px;
     }
+
     .clause-info {
       background-color: #F0FDF4 !important;
       border-left: 4px solid #059669 !important;
@@ -46,179 +62,602 @@
 
     /* 打印报告 */
     @media print {
-      body * { visibility: hidden; }
-      #printable-report, #printable-report * { visibility: visible; }
-      #printable-report { position: absolute; left: 0; top: 0; width: 100%; }
-      .no-print { display: none !important; }
+      body * {
+        visibility: hidden;
+      }
+
+      #printable-report,
+      #printable-report * {
+        visibility: visible;
+      }
+
+      #printable-report {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+
+      .no-print {
+        display: none !important;
+      }
     }
-    [v-cloak] { display: none; }
-    button:disabled { opacity: .45; cursor: not-allowed; }
-    button:focus-visible, a:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+
+    [v-cloak] {
+      display: none;
+    }
+
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    button:focus-visible,
+    a:focus-visible {
+      outline: 2px solid #2563eb;
+      outline-offset: 3px;
+    }
+
     @media (max-width: 1100px) {
-      header { height: auto !important; min-height: 64px; flex-wrap: wrap; gap: 12px; padding: 12px 20px !important; }
+      header {
+        height: auto !important;
+        min-height: 64px;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 12px 20px !important;
+      }
     }
-    header { white-space: nowrap; }
-    header > div { flex-shrink: 0; }
+
+    header {
+      white-space: nowrap;
+    }
+
+    header>div {
+      flex-shrink: 0;
+    }
+
     @media (max-width: 1400px) {
-      header { height: auto !important; min-height: 64px; flex-wrap: wrap; gap: 12px; padding: 12px 20px !important; }
-      main > aside[data-testid="review-summary"] { width: 280px !important; }
-      main > aside.wb-opinion-drawer { width: 340px !important; }
-      #contract-viewer { padding: 20px !important; }
-      #contract-viewer > div { padding: 24px !important; }
+      header {
+        height: auto !important;
+        min-height: 64px;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 12px 20px !important;
+      }
+
+      main>aside[data-testid="review-summary"] {
+        width: 280px !important;
+      }
+
+      main>aside.wb-opinion-drawer {
+        width: 340px !important;
+      }
+
+      #contract-viewer {
+        padding: 20px !important;
+      }
+
+      #contract-viewer>div {
+        padding: 24px !important;
+      }
     }
-    @media (max-width: 1050px) { main > section { min-width: 0; } .wb-document-grid.is-comparing { overflow-x:auto; } .wb-document-grid.is-comparing > .wb-document-pane { min-width:300px; } }
+
+    @media (max-width: 1050px) {
+      main>section {
+        min-width: 0;
+      }
+
+      .wb-document-grid.is-comparing {
+        overflow-x: auto;
+      }
+
+      .wb-document-grid.is-comparing>.wb-document-pane {
+        min-width: 300px;
+      }
+    }
+
     @media print {
-      html, body, #app { height: auto !important; overflow: visible !important; }
-      #app > :not(:has(#printable-report)) { display: none !important; }
-      #app > :has(#printable-report), #app > :has(#printable-report) > div { position: static !important; display: block !important; height: auto !important; max-height: none !important; overflow: visible !important; background: white !important; border: 0 !important; padding: 0 !important; box-shadow: none !important; }
-      #app > :has(#printable-report) > div > :not(#printable-report) { display: none !important; }
-      #printable-report { position: static !important; overflow: visible !important; padding: 0 !important; }
+
+      html,
+      body,
+      #app {
+        height: auto !important;
+        overflow: visible !important;
+      }
+
+      #app> :not(:has(#printable-report)) {
+        display: none !important;
+      }
+
+      #app> :has(#printable-report),
+      #app> :has(#printable-report)>div {
+        position: static !important;
+        display: block !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        background: white !important;
+        border: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+      }
+
+      #app> :has(#printable-report)>div> :not(#printable-report) {
+        display: none !important;
+      }
+
+      #printable-report {
+        position: static !important;
+        overflow: visible !important;
+        padding: 0 !important;
+      }
     }
 
-    .wb-menu{position:relative;font-size:12px;color:#475569}
-    .wb-menu>summary{list-style:none;cursor:pointer;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;white-space:nowrap}
-    .wb-menu>summary::-webkit-details-marker{display:none}
-    .wb-menu[open]>summary{background:#eff6ff;color:#1d4ed8}
-    .wb-popover{position:absolute;right:0;top:calc(100% + 8px);width:340px;padding:18px;background:white;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 14px 40px #0f172a20;z-index:45;display:flex;flex-direction:column;gap:14px;white-space:normal}
-    .wb-popover section{display:flex;flex-direction:column;gap:10px}
-    .wb-popover section+section{border-top:1px solid #f1f5f9;padding-top:14px}
-    .wb-popover h3{font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:.04em}
-    .wb-popover button,.wb-popover select{max-width:100%}
-    .wb-popover .wb-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .wb-risk-area{margin-top:10px;padding:12px;border:1px solid #fecaca;border-left:3px solid #ef4444;border-radius:7px;background:#fff1f2;color:#9f1239}.wb-risk-area h4{color:#991b1b}.wb-risk-area .wb-risk-description{font-size:13px;line-height:1.8;margin-top:7px;color:#9f1239}.wb-risk-area.wb-risk-favorable{background:#f0fdf4;border-color:#bbf7d0;color:#166534}.wb-risk-favorable h4,.wb-risk-favorable .wb-risk-description{color:#166534}
-    .wb-evidence{max-height:92px;overflow:auto;background:#f7f9fc;border-left:2px solid #b9c9dd;line-height:1.7}.wb-issue-actions{flex-wrap:nowrap;gap:4px}.wb-issue-actions button{white-space:nowrap;flex:0 0 auto;padding:4px 6px;font-size:11px}
-    .wb-opinion-drawer{position:relative;flex:0 0 auto;width:360px;max-width:38vw;min-width:300px;background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden}
-    .wb-issue-actions button:last-child{margin-left:0}
-    .wb-document-grid{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden;background:#f4f6f9;gap:12px;padding:12px}
-    .wb-document-pane{display:flex;flex-direction:column;min-width:0;flex:1;overflow:hidden;background:#fff;border:1px solid #e2e8f0;border-radius:10px}
-    .wb-document-pane+.wb-document-pane{border-top:2px solid #86c6ae}
-    .wb-pane-heading{padding:12px 16px;background:#fff;border-bottom:1px solid #edf0f5;font-size:13px;font-weight:600;color:#334155;flex-shrink:0}
-    .wb-pane-heading small{font-size:11px;font-weight:400;color:#94a3b8;margin-left:10px}
-    .wb-document-pane iframe{min-height:0!important;flex:1;width:100%}
-    .wb-original-text{overflow:auto;white-space:pre-wrap;padding:32px;line-height:1.9;background:#fff;flex:1}
-    .wb-review-placeholder{flex:1;display:grid;place-content:center;text-align:center;color:#64748b;font-size:13px;gap:10px}
-    .wb-toolbar{background:white;border-bottom:1px solid #e2e8f0;padding:8px 16px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:48px}
-    .wb-title{min-width:0;flex:1}.wb-title h1{font-size:13px}.wb-title p{font-size:11px;margin-top:2px}
-    .wb-tools{display:flex;align-items:center;flex-shrink:0}
+    .wb-menu {
+      position: relative;
+      font-size: 12px;
+      color: #475569
+    }
 
-    .wb-sidebar{position:relative;display:flex;flex-direction:column;flex-shrink:0;min-height:0;overflow:hidden;background:#fff}
-    .wb-summary-panel{width:320px;border-right:1px solid #e2e8f0}
-    .wb-sidebar-heading{height:44px;min-height:44px;display:flex;align-items:center;gap:6px;padding:0 10px;border-bottom:1px solid #edf0f5;white-space:nowrap;color:#334155;font-size:12px}
-    .wb-sidebar-toggle{position:absolute;top:50%;transform:translateY(-50%);z-index:3;display:grid;place-items:center;width:18px;height:54px;color:#64748b;background:#f8fafc;border:1px solid #dbe3ee;border-radius:6px;font-size:14px;cursor:pointer}.wb-summary-panel .wb-sidebar-toggle{right:0}.wb-opinion-drawer .wb-sidebar-toggle{left:0}.wb-sidebar.is-collapsed .wb-sidebar-toggle{left:8px;right:auto}
-    .wb-sidebar-toggle svg{width:15px;height:15px;transition:transform .16s ease}.wb-summary-panel.is-collapsed .wb-sidebar-toggle svg,.wb-opinion-drawer:not(.is-collapsed) .wb-sidebar-toggle svg{transform:rotate(180deg)}.wb-sidebar-toggle{box-shadow:0 1px 4px #0f172a0a;border-color:#d3deeb;background:#fff}.wb-sidebar-toggle:hover{background:#f1f5f9;color:#2563eb}
-    .wb-sidebar-toggle:focus-visible{outline:2px solid #93c5fd;outline-offset:1px}
-    .wb-sidebar-count{font-size:10px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:1px 5px;margin-left:4px}
-    .wb-summary-content{flex:1;overflow:auto;min-height:0;padding:14px 24px 14px 14px}
-    .wb-opinion-content{margin-left:14px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
-    main>aside.wb-sidebar.is-collapsed{width:36px!important;min-width:36px!important;max-width:36px!important}
-    .wb-sidebar.is-collapsed .wb-sidebar-heading{padding:0 5px}
+    .wb-menu>summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #fff;
+      white-space: nowrap
+    }
+
+    .wb-menu>summary::-webkit-details-marker {
+      display: none
+    }
+
+    .wb-menu[open]>summary {
+      background: #eff6ff;
+      color: #1d4ed8
+    }
+
+    .wb-popover {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 8px);
+      width: 340px;
+      padding: 18px;
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      box-shadow: 0 14px 40px #0f172a20;
+      z-index: 45;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      white-space: normal
+    }
+
+    .wb-popover section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px
+    }
+
+    .wb-popover section+section {
+      border-top: 1px solid #f1f5f9;
+      padding-top: 14px
+    }
+
+    .wb-popover h3 {
+      font-size: 11px;
+      color: #94a3b8;
+      font-weight: 600;
+      letter-spacing: .04em
+    }
+
+    .wb-popover button,
+    .wb-popover select {
+      max-width: 100%
+    }
+
+    .wb-popover .wb-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap
+    }
+
+    .wb-risk-area {
+      margin-top: 10px;
+      padding: 12px;
+      border: 1px solid #fecaca;
+      border-left: 3px solid #ef4444;
+      border-radius: 7px;
+      background: #fff1f2;
+      color: #9f1239
+    }
+
+    .wb-risk-area h4 {
+      color: #991b1b
+    }
+
+    .wb-risk-area .wb-risk-description {
+      font-size: 13px;
+      line-height: 1.8;
+      margin-top: 7px;
+      color: #9f1239
+    }
+
+    .wb-risk-area.wb-risk-favorable {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+      color: #166534
+    }
+
+    .wb-risk-favorable h4,
+    .wb-risk-favorable .wb-risk-description {
+      color: #166534
+    }
+
+    .wb-evidence {
+      max-height: 92px;
+      overflow: auto;
+      background: #f7f9fc;
+      border-left: 2px solid #b9c9dd;
+      line-height: 1.7
+    }
+
+    .wb-issue-actions {
+      flex-wrap: nowrap;
+      gap: 4px
+    }
+
+    .wb-issue-actions button {
+      white-space: nowrap;
+      flex: 0 0 auto;
+      padding: 4px 6px;
+      font-size: 11px
+    }
+
+    .wb-opinion-drawer {
+      position: relative;
+      flex: 0 0 auto;
+      width: 360px;
+      max-width: 38vw;
+      min-width: 300px;
+      background: #fff;
+      border-left: 1px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden
+    }
+
+    .wb-issue-actions button:last-child {
+      margin-left: 0
+    }
+
+    .wb-document-grid {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+      background: #f4f6f9;
+      gap: 12px;
+      padding: 12px
+    }
+
+    .wb-document-pane {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      flex: 1;
+      overflow: hidden;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px
+    }
+
+    .wb-document-pane+.wb-document-pane {
+      border-top: 2px solid #86c6ae
+    }
+
+    .wb-pane-heading {
+      padding: 12px 16px;
+      background: #fff;
+      border-bottom: 1px solid #edf0f5;
+      font-size: 13px;
+      font-weight: 600;
+      color: #334155;
+      flex-shrink: 0
+    }
+
+    .wb-pane-heading small {
+      font-size: 11px;
+      font-weight: 400;
+      color: #94a3b8;
+      margin-left: 10px
+    }
+
+    .wb-document-pane iframe {
+      min-height: 0 !important;
+      flex: 1;
+      width: 100%
+    }
+
+    .wb-original-text {
+      overflow: auto;
+      white-space: pre-wrap;
+      padding: 32px;
+      line-height: 1.9;
+      background: #fff;
+      flex: 1
+    }
+
+    .wb-review-placeholder {
+      flex: 1;
+      display: grid;
+      place-content: center;
+      text-align: center;
+      color: #64748b;
+      font-size: 13px;
+      gap: 10px
+    }
+
+    .wb-toolbar {
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 8px 16px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 48px
+    }
+
+    .wb-title {
+      min-width: 0;
+      flex: 1
+    }
+
+    .wb-title h1 {
+      font-size: 13px
+    }
+
+    .wb-title p {
+      font-size: 11px;
+      margin-top: 2px
+    }
+
+    .wb-tools {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0
+    }
+
+    .wb-sidebar {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      min-height: 0;
+      overflow: hidden;
+      background: #fff
+    }
+
+    .wb-summary-panel {
+      width: 320px;
+      border-right: 1px solid #e2e8f0
+    }
+
+    .wb-sidebar-heading {
+      height: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 10px;
+      border-bottom: 1px solid #edf0f5;
+      white-space: nowrap;
+      color: #334155;
+      font-size: 12px
+    }
+
+    .wb-sidebar-toggle {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 3;
+      display: grid;
+      place-items: center;
+      width: 18px;
+      height: 54px;
+      color: #64748b;
+      background: #f8fafc;
+      border: 1px solid #dbe3ee;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer
+    }
+
+    .wb-summary-panel .wb-sidebar-toggle {
+      right: 0
+    }
+
+    .wb-opinion-drawer .wb-sidebar-toggle {
+      left: 0
+    }
+
+    .wb-sidebar.is-collapsed .wb-sidebar-toggle {
+      left: 8px;
+      right: auto
+    }
+
+    .wb-sidebar-toggle svg {
+      width: 15px;
+      height: 15px;
+      transition: transform .16s ease
+    }
+
+    .wb-summary-panel.is-collapsed .wb-sidebar-toggle svg,
+    .wb-opinion-drawer:not(.is-collapsed) .wb-sidebar-toggle svg {
+      transform: rotate(180deg)
+    }
+
+    .wb-sidebar-toggle {
+      box-shadow: 0 1px 4px #0f172a0a;
+      border-color: #d3deeb;
+      background: #fff
+    }
+
+    .wb-sidebar-toggle:hover {
+      background: #f1f5f9;
+      color: #2563eb
+    }
+
+    .wb-sidebar-toggle:focus-visible {
+      outline: 2px solid #93c5fd;
+      outline-offset: 1px
+    }
+
+    .wb-sidebar-count {
+      font-size: 10px;
+      color: #64748b;
+      background: #f1f5f9;
+      border-radius: 8px;
+      padding: 1px 5px;
+      margin-left: 4px
+    }
+
+    .wb-summary-content {
+      flex: 1;
+      overflow: auto;
+      min-height: 0;
+      padding: 14px 24px 14px 14px
+    }
+
+    .wb-opinion-content {
+      margin-left: 14px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden
+    }
+
+    main>aside.wb-sidebar.is-collapsed {
+      width: 36px !important;
+      min-width: 36px !important;
+      max-width: 36px !important
+    }
+
+    .wb-sidebar.is-collapsed .wb-sidebar-heading {
+      padding: 0 5px
+    }
+
+    .review-overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,.28)}
+    .review-dialog{display:flex;flex-direction:column;width:680px;max-width:100%;height:680px;max-height:calc(100dvh - 48px);min-height:0;background:white;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 24px 80px #0f172a26;overflow:hidden}
+    .review-dialog-header{display:flex;align-items:center;justify-content:space-between;flex:none;height:auto!important;min-height:0!important;padding:22px 24px!important;border:0;background:#fff;white-space:normal;gap:16px!important}.review-dialog-eyebrow{font-size:11px;color:#8492a6;letter-spacing:.04em}.review-dialog-header h3{margin-top:5px;font-size:18px;font-weight:600;color:#1e293b}.review-cancel{flex:none;border:1px solid #e2e8f0;border-radius:7px;background:#fff;padding:7px 12px;font-size:12px;color:#64748b}.review-cancel:hover{color:#b91c1c;border-color:#fecaca;background:#fff7f7}
+    .review-dialog-progress{height:3px;background:#f1f5f9;flex:none}.review-dialog-progress i{display:block;height:100%;background:#3978f6;transition:width .3s}.review-dialog-status{display:flex;align-items:flex-start;gap:9px;flex:none;padding:12px 24px;background:#f8faff;border-bottom:1px solid #edf2f7;font-size:11px;line-height:1.6;color:#64748b}.review-dialog-status>i{width:7px;height:7px;margin-top:5px;flex:none;border-radius:50%;background:#6592f2;animation:review-pulse 1.4s infinite}.review-dialog-status>span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .review-dialog-body{flex:1;min-height:0;overflow:auto;padding:22px 24px;overscroll-behavior:contain}.review-analysis-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.review-analysis-heading h4{font-size:12px;font-weight:600;color:#334155}.review-analysis-heading>span{font-size:10px;color:#94a3b8}.review-analysis-item{display:flex;gap:12px;padding:18px 0;border-bottom:1px solid #edf2f7}.review-analysis-item:first-child{padding-top:0}.review-analysis-index{flex:none;width:22px;height:22px;line-height:22px;text-align:center;border-radius:6px;background:#edf4ff;font-size:11px;color:#3978f6}.review-analysis-copy{min-width:0;flex:1;font-size:12px;line-height:1.9;color:#64748b;overflow-wrap:anywhere}.review-analysis-clause{font-size:10px;color:#94a3b8;max-height:38px;overflow:hidden}.review-analysis-copy h5{font-size:13px;font-weight:600;color:#334155;margin-bottom:8px}.review-proposal{margin-top:12px;padding-left:11px;border-left:2px solid #bdd1ff}.review-proposal strong{font-size:10px;color:#6c88b7;font-weight:500}.review-analysis-copy summary{cursor:pointer;font-size:10px;color:#94a3b8;margin-top:10px}.review-analysis-copy blockquote{margin-top:6px;padding:10px;background:#f8fafc;color:#8491a3;font-size:11px;white-space:pre-wrap}
+    .review-execution{margin-top:20px;font-size:11px;color:#94a3b8}.review-execution>summary{cursor:pointer}.review-execution>summary>span{float:right;font-size:10px}.review-execution ol{max-height:160px;overflow:auto;margin-top:12px}.review-execution li{display:flex;gap:12px;margin-bottom:9px;line-height:1.7;overflow-wrap:anywhere}.review-execution time{font-size:10px;flex:none;color:#a5b1c3}.review-execution li>span{min-width:0}.review-dialog-footer{display:flex;justify-content:space-between;padding:14px 24px;border-top:1px solid #edf2f7;flex:none;font-size:10px;color:#94a3b8;background:#fff}.review-waiting{padding:30px 12px 40px;text-align:center;color:#64748b}.review-waiting h4{font-size:13px;font-weight:500;margin-top:18px}.review-waiting p{font-size:11px;line-height:1.8;margin-top:7px}.review-waiting-note{color:#a0aec0}.review-waiting-line{width:38px;height:3px;margin:auto;border-radius:4px;background:#82aafa;animation:review-pulse 1.4s infinite}@keyframes review-pulse{50%{opacity:.35}}@media(max-height:600px){.review-overlay{padding:12px}.review-dialog{max-height:calc(100dvh - 24px)}.review-dialog-header{padding:14px 20px!important}}
   </style>
 </head>
 
-<body class="bg-slate-50 text-slate-800 min-h-screen font-sans antialiased flex flex-col selection:bg-blue-100 selection:text-blue-900">
+<body
+  class="bg-slate-50 text-slate-800 min-h-screen font-sans antialiased flex flex-col selection:bg-blue-100 selection:text-blue-900">
   <div id="app" v-cloak class="flex flex-col h-screen overflow-hidden">
 
     <!-- 顶部全局提示条（采纳成功/网络提示） -->
-    <div v-if="toastMessage" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-slate-900 text-white text-xs px-4 py-2 rounded-lg shadow-xl flex items-center space-x-2 transition-all">
-      <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <div v-if="toastMessage"
+      class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-slate-900 text-white text-xs px-4 py-2 rounded-lg shadow-xl flex items-center space-x-2 transition-all">
+      <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
       <span>{{ toastMessage }}</span>
     </div>
 
-    <!-- 审查中沉浸式专业商务遮罩（阻止误操作，流畅呈现 LangGraph 状态流） -->
-    <div v-if="isReviewing" class="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all">
-      <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl p-8 max-w-lg w-full flex flex-col space-y-6">
-        
-        <!-- 头部图标与标题 -->
-        <div class="flex items-center space-x-4 border-b border-slate-100 pb-5">
-          <div class="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
-            <svg class="animate-spin w-6 h-6 text-blue-600" viewBox="0 0 24 24" fill="none">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-            </svg>
-          </div>
-          <div class="flex-1">
-            <div class="flex items-center justify-between">
-              <h3 class="text-base font-bold text-slate-900">正在审查合同</h3>
-              <span class="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">{{ reviewProgress }}%</span>
-            </div>
-            <p class="text-xs text-slate-500 mt-1">完成的步骤由服务端实时返回，可随时取消本次审查。</p>
-          </div>
+    <div v-if="isReviewing" class="review-overlay">
+      <section class="review-dialog" role="dialog" aria-modal="true" aria-labelledby="review-dialog-title">
+        <header class="review-dialog-header"><div><div class="review-dialog-eyebrow">合同审查 · {{ reviewProgress }}%</div><h3 id="review-dialog-title">正在分析合同</h3></div><button @click="cancelReview" class="review-cancel">取消审查</button></header>
+        <div class="review-dialog-progress"><i :style="{width:reviewProgress+'%'}"></i></div>
+        <div class="review-dialog-status"><i></i><span>{{ latestLogMessage || '正在连接模型服务…' }}</span></div>
+        <div class="review-dialog-body">
+          <div class="review-analysis-heading"><h4>分析摘要</h4><span>初步发现，待校验</span></div>
+          <div v-if="!publicAnalysis.length" class="review-waiting"><div class="review-waiting-line"></div><h4>正在核对合同条款</h4><p>收到模型的完整意见后，会逐条展示依据和修改方向。</p><p class="review-waiting-note">等待期间可随时取消，已保存的文档不会被覆盖。</p></div>
+          <div v-else data-public-analysis class="review-analysis-list" aria-live="polite"><article v-for="(item,index) in publicAnalysis" :key="index" class="review-analysis-item"><div class="review-analysis-index">{{ index+1 }}</div><div class="review-analysis-copy"><p class="review-analysis-clause">{{ item.clause }}</p><h5>{{ item.title }}</h5><p>{{ item.analysis }}</p><div v-if="item.proposal" class="review-proposal"><strong>修改方向</strong><p>{{ item.proposal }}</p></div><details v-if="item.evidence"><summary>原文依据</summary><blockquote>{{ item.evidence }}</blockquote></details></div></article></div>
+          <details class="review-execution"><summary>执行记录 <span>{{ reviewTrace.length }} 条</span></summary><ol data-review-trace><li v-for="(item,index) in reviewTrace" :key="index"><time>{{ new Date(item.time).toLocaleTimeString('zh-CN',{hour12:false}) }}</time><span>{{ item.detail }}</span></li></ol></details>
         </div>
-
-        <button @click="cancelReview" class="text-xs text-slate-500 hover:text-red-600 self-end">取消本次审查</button>
-        <!-- 流畅进度条 -->
-        <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-          <div class="bg-blue-600 h-full rounded-full transition-all duration-300 ease-out" :style="{ width: reviewProgress + '%' }"></div>
-        </div>
-
-        <!-- 5 个节点实时推进流水线 -->
-        <div class="space-y-2.5 text-xs">
-          <div v-for="(node, idx) in pipelineNodes" :key="node.id" 
-               class="flex items-center justify-between p-2.5 rounded-lg transition-all"
-               :class="nodeStates[node.id] === 'running' ? 'bg-blue-50/80 border border-blue-200 text-blue-900 font-semibold' : (nodeStates[node.id] === 'completed' ? 'bg-slate-50 text-slate-700' : 'text-slate-400')">
-            <div class="flex items-center space-x-3">
-              <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-                    :class="nodeStates[node.id] === 'completed' ? 'bg-emerald-500 text-white' : (nodeStates[node.id] === 'running' ? 'bg-blue-600 text-white animate-pulse' : 'bg-slate-200 text-slate-500')">
-                <svg v-if="nodeStates[node.id] === 'completed'" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-                <span v-else>{{ idx + 1 }}</span>
-              </span>
-              <span>{{ node.name }}</span>
-            </div>
-
-            <div class="text-[11px] font-mono">
-              <span v-if="nodeStates[node.id] === 'completed'" class="text-emerald-600 font-bold">已完成</span>
-              <span v-else-if="nodeStates[node.id] === 'running'" class="text-blue-600 font-bold animate-pulse">审查中...</span>
-              <span v-else class="text-slate-300">等待中</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 底部当前实时日志 -->
-        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600 flex items-center space-x-2">
-          <span class="w-2 h-2 rounded-full bg-blue-600 animate-ping"></span>
-          <span class="truncate">{{ latestLogMessage || '正在初始化法律分析引擎...' }}</span>
-        </div>
-
-      </div>
+        <footer class="review-dialog-footer"><span>完整校验后生成修订文档</span><span>{{ publicAnalysis.length }} 条初步意见</span></footer>
+      </section>
     </div>
 
     <!-- 顶部导航条：纯净白底、极简商务、一目了然 -->
     <header class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 z-20">
-      
+
       <div class="flex items-center space-x-3">
-        <a href="/" @click.prevent="workspace.leaveFor('/')" class="flex items-center space-x-2" title="返回首页"><span class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">⚖</span><strong class="text-slate-900">LexisGraph</strong></a>
-        <details class="wb-menu"><summary>工作台 ▾</summary><div class="wb-popover" style="left:0;right:auto;width:180px"><a href="/" @click.prevent="workspace.leaveFor('/')">返回首页</a><a href="/records" @click.prevent="workspace.leaveFor('/records')">审查记录</a></div></details>
+        <a href="/" @click.prevent="workspace.leaveFor('/')" class="flex items-center space-x-2" title="返回首页"><span
+            class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">⚖</span><strong
+            class="text-slate-900">LexisGraph</strong></a>
+        <details class="wb-menu">
+          <summary>工作台 ▾</summary>
+          <div class="wb-popover" style="left:0;right:auto;width:180px"><a href="/"
+              @click.prevent="workspace.leaveFor('/')">返回首页</a><a href="/records"
+              @click.prevent="workspace.leaveFor('/records')">审查记录</a></div>
+        </details>
       </div>
 
       <!-- 右侧：动态模型切换、导出意见书与审查主按钮 -->
       <div class="flex items-center space-x-3">
-        <details class="wb-menu"><summary>审查设置 ▾</summary><div class="wb-popover"><section><h3>本次审查立场</h3><select v-model="partyRole" aria-label="审查立场" :disabled="workspace.historical || workspace.loading" class="border border-slate-200 rounded-lg px-3 py-2"><option value="乙方(卖方/开发方/服务方)">乙方 · 供应商 / 服务方</option><option value="甲方(买方/采购方/委托方)">甲方 · 买方 / 委托方</option><option value="中立审慎">中立审查</option></select></section><section><h3>审查方式与条件</h3><span>{{ workspace.modeName }} · {{ workspace.conditions.scale }}</span><button @click="workspace.showConditions=true">修改审查条件</button></section><section><h3>审查模型</h3>        <!-- 动态模型选择 -->
-        <div class="flex items-center space-x-1.5 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5">
-          <span class="text-slate-500 text-xs">模型:</span>
-          <select v-model="selectedModel" class="bg-transparent text-xs text-slate-800 font-semibold outline-none cursor-pointer">
-            <option v-if="!['deepseek-v4-flash', 'deepseek-chat', 'deepseek-reasoner', 'gpt-4o', 'qwen-plus', 'custom'].includes(selectedModel)" :value="selectedModel">{{ selectedModel }}</option>
-            <option value="deepseek-v4-flash">DeepSeek-V4 Flash</option>
-            <option value="deepseek-chat">DeepSeek-V3</option>
-            <option value="deepseek-reasoner">DeepSeek-R1 (深度推理)</option>
-            <option value="gpt-4o">GPT-4o (OpenAI)</option>
-            <option value="qwen-plus">通义千问 Qwen-Plus</option>
-            <option value="custom">自定义端点...</option>
-          </select>
-          <button @click="openModelModal" title="设置 API Key 与 Base URL" class="text-slate-400 hover:text-blue-600 transition ml-1 cursor-pointer">
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-          </button>
-        </div>
+        <details class="wb-menu">
+          <summary>审查设置 ▾</summary>
+          <div class="wb-popover">
+            <section>
+              <h3>本次审查立场</h3><select v-model="partyRole" aria-label="审查立场"
+                :disabled="workspace.historical || workspace.loading"
+                class="border border-slate-200 rounded-lg px-3 py-2">
+                <option value="乙方(卖方/开发方/服务方)">乙方 · 供应商 / 服务方</option>
+                <option value="甲方(买方/采购方/委托方)">甲方 · 买方 / 委托方</option>
+                <option value="中立审慎">中立审查</option>
+              </select>
+            </section>
+            <section>
+              <h3>审查方式与条件</h3><span>{{ workspace.modeName }} · {{ workspace.conditions.scale }}</span><button
+                @click="workspace.showConditions=true">修改审查条件</button>
+            </section>
+            <section>
+              <h3>审查模型</h3> <!-- 动态模型选择 -->
+              <div class="flex items-center space-x-1.5 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5">
+                <span class="text-slate-500 text-xs">模型:</span>
+                <select v-model="selectedModel"
+                  class="bg-transparent text-xs text-slate-800 font-semibold outline-none cursor-pointer">
+                  <option
+                    v-if="!['deepseek-v4-flash', 'deepseek-chat', 'deepseek-reasoner', 'gpt-4o', 'qwen-plus', 'custom'].includes(selectedModel)"
+                    :value="selectedModel">{{ selectedModel }}</option>
+                  <option value="deepseek-v4-flash">DeepSeek-V4 Flash</option>
+                  <option value="deepseek-chat">DeepSeek-V3</option>
+                  <option value="deepseek-reasoner">DeepSeek-R1 (深度推理)</option>
+                  <option value="gpt-4o">GPT-4o (OpenAI)</option>
+                  <option value="qwen-plus">通义千问 Qwen-Plus</option>
+                  <option value="custom">自定义端点...</option>
+                </select>
+                <button @click="openModelModal" title="设置 API Key 与 Base URL"
+                  class="text-slate-400 hover:text-blue-600 transition ml-1 cursor-pointer">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path
+                      d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                    </path>
+                  </svg>
+                </button>
+              </div>
 
-</section></div></details>
+            </section>
+          </div>
+        </details>
         <!-- 导出/查看法务审查意见书 -->
-        <button @click="showReportModal = true" :disabled="!reviewResult" class="flex items-center space-x-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 transition shadow-sm cursor-pointer">
+        <button @click="showReportModal = true" :disabled="!reviewResult"
+          class="flex items-center space-x-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 transition shadow-sm cursor-pointer">
           <svg class="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
@@ -229,10 +668,10 @@
         </button>
 
         <!-- 主操作按钮：绝不锁死，可随时点击重新审查 -->
-        <button @click="startReview" 
-                :disabled="isReviewing || workspace.loading || workspace.historical || workspace.task?.status === 'running' || !contractText.trim()"
-                class="flex items-center space-x-2 text-sm font-semibold px-5 py-2 rounded-lg transition shadow-sm cursor-pointer"
-                :class="isReviewing ? 'bg-blue-400 text-white cursor-wait' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20 active:scale-95'">
+        <button @click="startReview"
+          :disabled="isReviewing || workspace.loading || workspace.historical || workspace.task?.status === 'running' || !contractText.trim()"
+          class="flex items-center space-x-2 text-sm font-semibold px-5 py-2 rounded-lg transition shadow-sm cursor-pointer"
+          :class="isReviewing ? 'bg-blue-400 text-white cursor-wait' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20 active:scale-95'">
           <svg v-if="isReviewing" class="animate-spin w-4 h-4 text-white" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
@@ -249,168 +688,215 @@
     <main class="flex-1 flex overflow-hidden">
 
       <!-- 左栏：合规健康评分、财税4大要件核验、LangGraph工作流状态 -->
-      <aside id="review-summary-panel" data-testid="review-summary" class="wb-sidebar wb-summary-panel" :class="{'is-collapsed':!summaryOpen}">
-        <div class="wb-sidebar-heading"><button @click="toggleSummary" :aria-expanded="summaryOpen" aria-controls="review-summary-content" :aria-label="summaryOpen ? '收起审查概览' : '展开审查概览'" :title="summaryOpen ? '收起审查概览' : '展开审查概览'" class="wb-sidebar-toggle"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg></button><strong v-show="summaryOpen">审查概览</strong></div>
+      <aside id="review-summary-panel" data-testid="review-summary" class="wb-sidebar wb-summary-panel"
+        :class="{'is-collapsed':!summaryOpen}">
+        <div class="wb-sidebar-heading"><button @click="toggleSummary" :aria-expanded="summaryOpen"
+            aria-controls="review-summary-content" :aria-label="summaryOpen ? '收起审查概览' : '展开审查概览'"
+            :title="summaryOpen ? '收起审查概览' : '展开审查概览'" class="wb-sidebar-toggle"><svg viewBox="0 0 20 20" fill="none"
+              stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+              aria-hidden="true">
+              <path d="m12 5-5 5 5 5" />
+            </svg></button><strong v-show="summaryOpen">审查概览</strong></div>
         <div v-show="summaryOpen" id="review-summary-content" class="wb-summary-content space-y-4">
 
-        <div v-if="reviewResult" class="text-[11px] text-slate-500 px-1 leading-relaxed">结果来源：{{ reviewSource }}<br>{{ reviewResult.summary.compliance_score == null ? "本模式不计算健康分。" : "评分基于审查原文，采纳修订后不会自动重算。" }}</div>
-        <div v-if="reviewResult?.checklist_findings" class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
-          <h3 class="text-xs font-semibold text-slate-700">{{ workspace.conditions.checklist?.name }} · v{{ workspace.conditions.checklist?.version }}</h3>
-          <div v-for="finding in reviewResult.checklist_findings" class="border-t border-slate-100 pt-3 mt-3 text-xs"><div class="flex justify-between gap-2"><span class="font-medium">{{ finding.title }}</span><span class="shrink-0" :class="finding.status === 'pass' ? 'text-emerald-700' : finding.status === 'fail' ? 'text-red-700' : 'text-amber-700'">{{ {pass:'通过',fail:'未通过',needs_review:'待确认',not_applicable:'不适用'}[finding.status] }}</span></div><p class="text-[11px] text-slate-500 mt-1 leading-relaxed">{{ finding.explanation }}</p></div>
-        </div>
-        <div v-if="reviewResult?.differences" class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm text-xs"><h3 class="font-semibold mb-2">合同差异概览</h3><p class="text-slate-500">共 {{ reviewResult.differences.length }} 处变更</p><p class="text-[11px] text-slate-400 mt-2">文字变化需结合交易背景评估，删除内容可在右栏查看。</p></div>
-<div v-if="reviewResult?.coverage" class="text-[11px] text-slate-500 px-1 leading-relaxed">{{ reviewResult.coverage }}</div>
-        <!-- 合规健康分卡片 -->
-        <div v-if="!['checklist','compare'].includes(workspace.conditions.mode)" class="border border-slate-200 rounded-xl p-4 bg-slate-50/60 shadow-sm">
-          <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">合规健康度量化</div>
-          
-          <div v-if="reviewResult" class="flex items-baseline space-x-2">
-            <span class="text-4xl font-extrabold font-mono" :class="reviewResult.summary.compliance_score == null ? 'text-slate-400' : getScoreColor(reviewResult.summary.compliance_score)">
-              {{ reviewResult.summary.compliance_score ?? '—' }}
-            </span>
-            <span class="text-xs text-slate-400 font-medium">{{ reviewResult.summary.compliance_score == null ? "不计算健康分" : "/ 100分" }}</span>
-            <span class="ml-auto text-xs font-bold px-2.5 py-0.5 rounded-full" 
-                  :class="reviewResult.summary.compliance_score == null ? 'bg-slate-100 text-slate-600' : reviewResult.summary.compliance_score < 60 ? 'bg-red-100 text-red-700' : (reviewResult.summary.compliance_score < 80 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')">
-              {{ reviewResult.summary.risk_level }}
-            </span>
-          </div>
-          <div v-else class="text-xs text-slate-400 py-3 text-center">
-            点击右上角【开始审查】计算健康度
-          </div>
-
-          <!-- 风险数量统计 -->
-          <div v-if="reviewResult" class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-200 text-center">
-            <div class="bg-white border border-slate-200 rounded-lg py-1.5">
-              <div class="text-base font-bold font-mono text-red-600">{{ reviewResult.summary.critical_count }}</div>
-              <div class="text-[11px] text-slate-500">重大风险</div>
-            </div>
-            <div class="bg-white border border-slate-200 rounded-lg py-1.5">
-              <div class="text-base font-bold font-mono text-amber-600">{{ reviewResult.summary.warning_count }}</div>
-              <div class="text-[11px] text-slate-500">一般风险</div>
-            </div>
-            <div class="bg-white border border-slate-200 rounded-lg py-1.5">
-              <div class="text-base font-bold font-mono text-slate-700">{{ reviewResult.summary.info_count }}</div>
-              <div class="text-[11px] text-slate-500">优化建议</div>
+          <div v-if="reviewResult" class="text-[11px] text-slate-500 px-1 leading-relaxed">结果来源：{{ reviewSource }}<br>{{
+            reviewResult.summary.compliance_score == null ? "本模式不计算健康分。" : "评分基于审查原文，采纳修订后不会自动重算。" }}</div>
+          <div v-if="reviewResult?.checklist_findings"
+            class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
+            <h3 class="text-xs font-semibold text-slate-700">{{ workspace.conditions.checklist?.name }} · v{{
+              workspace.conditions.checklist?.version }}</h3>
+            <div v-for="finding in reviewResult.checklist_findings" class="border-t border-slate-100 pt-3 mt-3 text-xs">
+              <div class="flex justify-between gap-2"><span class="font-medium">{{ finding.title }}</span><span
+                  class="shrink-0"
+                  :class="finding.status === 'pass' ? 'text-emerald-700' : finding.status === 'fail' ? 'text-red-700' : 'text-amber-700'">{{
+                  {pass:'通过',fail:'未通过',needs_review:'待确认',not_applicable:'不适用'}[finding.status] }}</span></div>
+              <p class="text-[11px] text-slate-500 mt-1 leading-relaxed">{{ finding.explanation }}</p>
             </div>
           </div>
-        </div>
-
-        <!-- 商务合作合同 · 财税与结算专项审核卡 (4大核心审核点) -->
-        <div v-if="workspace.conditions.mode === 'quick' || workspace.conditions.mode === 'deep'" class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
-          <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
-            <span class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
-              <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6"/><path d="M16 12h-6"/><path d="M14 16h-4"/>
-              </svg>
-              <span>财税与结算专项审核 (4大要件)</span>
-            </span>
+          <div v-if="reviewResult?.differences"
+            class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm text-xs">
+            <h3 class="font-semibold mb-2">合同差异概览</h3>
+            <p class="text-slate-500">共 {{ reviewResult.differences.length }} 处变更</p>
+            <p class="text-[11px] text-slate-400 mt-2">文字变化需结合交易背景评估，删除内容可在右栏查看。</p>
           </div>
+          <div v-if="reviewResult?.coverage" class="text-[11px] text-slate-500 px-1 leading-relaxed">{{
+            reviewResult.coverage }}</div>
+          <!-- 合规健康分卡片 -->
+          <div v-if="!['checklist','compare'].includes(workspace.conditions.mode)"
+            class="border border-slate-200 rounded-xl p-4 bg-slate-50/60 shadow-sm">
+            <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">合规健康度量化</div>
 
-          <div v-if="reviewResult && currentTaxSettlement" class="space-y-2.5 text-xs">
-            <!-- 审核点 1：是否单列增值税税额 -->
-            <div class="p-2.5 rounded-lg border flex flex-col space-y-1 transition"
-                 :class="currentTaxSettlement.has_separate_vat_amount ? 'bg-emerald-50/50 border-emerald-200' : 'bg-red-50/50 border-red-200'">
-              <div class="flex items-center justify-between font-semibold">
-                <span class="flex items-center space-x-1.5">
-                  <span class="w-2 h-2 rounded-full" :class="currentTaxSettlement.has_separate_vat_amount ? 'bg-emerald-500' : 'bg-red-500'"></span>
-                  <span :class="currentTaxSettlement.has_separate_vat_amount ? 'text-emerald-900' : 'text-red-900'">1. 增值税税额单列</span>
-                </span>
-                <span class="text-[11px] font-bold" :class="currentTaxSettlement.has_separate_vat_amount ? 'text-emerald-700' : 'text-red-700'">
-                  {{ currentTaxSettlement.has_separate_vat_amount ? '已单列' : '未单列(总额混淆)' }}
-                </span>
+            <div v-if="reviewResult" class="flex items-baseline space-x-2">
+              <span class="text-4xl font-extrabold font-mono"
+                :class="reviewResult.summary.compliance_score == null ? 'text-slate-400' : getScoreColor(reviewResult.summary.compliance_score)">
+                {{ reviewResult.summary.compliance_score ?? '—' }}
+              </span>
+              <span class="text-xs text-slate-400 font-medium">{{ reviewResult.summary.compliance_score == null ?
+                "不计算健康分" : "/ 100分" }}</span>
+              <span class="ml-auto text-xs font-bold px-2.5 py-0.5 rounded-full"
+                :class="reviewResult.summary.compliance_score == null ? 'bg-slate-100 text-slate-600' : reviewResult.summary.compliance_score < 60 ? 'bg-red-100 text-red-700' : (reviewResult.summary.compliance_score < 80 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')">
+                {{ reviewResult.summary.risk_level }}
+              </span>
+            </div>
+            <div v-else class="text-xs text-slate-400 py-3 text-center">
+              点击右上角【开始审查】计算健康度
+            </div>
+
+            <!-- 风险数量统计 -->
+            <div v-if="reviewResult" class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-200 text-center">
+              <div class="bg-white border border-slate-200 rounded-lg py-1.5">
+                <div class="text-base font-bold font-mono text-red-600">{{ reviewResult.summary.critical_count }}</div>
+                <div class="text-[11px] text-slate-500">重大风险</div>
               </div>
-              <p class="text-[11px] text-slate-500 leading-snug">{{ currentTaxSettlement.vat_amount_detail }}</p>
-            </div>
-
-            <!-- 审核点 2：增值税税率是多少 -->
-            <div class="p-2.5 rounded-lg border flex flex-col space-y-1 transition"
-                 :class="currentTaxSettlement.vat_rate !== '未明确税率' ? 'bg-slate-50 border-slate-200' : 'bg-amber-50/50 border-amber-200'">
-              <div class="flex items-center justify-between font-semibold">
-                <span class="flex items-center space-x-1.5">
-                  <span class="w-2 h-2 rounded-full" :class="currentTaxSettlement.vat_rate !== '未明确税率' ? 'bg-blue-500' : 'bg-amber-500'"></span>
-                  <span :class="currentTaxSettlement.vat_rate !== '未明确税率' ? 'text-slate-900' : 'text-amber-900'">2. 增值税税率核验</span>
-                </span>
-                <span class="text-[11px] font-bold font-mono px-1.5 py-0.5 rounded" :class="currentTaxSettlement.vat_rate !== '未明确税率' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'">
-                  {{ currentTaxSettlement.vat_rate }}
-                </span>
+              <div class="bg-white border border-slate-200 rounded-lg py-1.5">
+                <div class="text-base font-bold font-mono text-amber-600">{{ reviewResult.summary.warning_count }}</div>
+                <div class="text-[11px] text-slate-500">一般风险</div>
               </div>
-              <p class="text-[11px] text-slate-500 leading-snug">{{ currentTaxSettlement.vat_rate_evaluation }}</p>
-            </div>
-
-            <!-- 审核点 3：是否是增值税专用发票 -->
-            <div class="p-2.5 rounded-lg border flex flex-col space-y-1 transition"
-                 :class="currentTaxSettlement.is_special_vat_invoice ? 'bg-emerald-50/50 border-emerald-200' : 'bg-red-50/50 border-red-200'">
-              <div class="flex items-center justify-between font-semibold">
-                <span class="flex items-center space-x-1.5">
-                  <span class="w-2 h-2 rounded-full" :class="currentTaxSettlement.is_special_vat_invoice ? 'bg-emerald-500' : 'bg-red-500'"></span>
-                  <span :class="currentTaxSettlement.is_special_vat_invoice ? 'text-emerald-900' : 'text-red-900'">3. 增值税专用发票</span>
-                </span>
-                <span class="text-[11px] font-bold" :class="currentTaxSettlement.is_special_vat_invoice ? 'text-emerald-700' : 'text-red-700'">
-                  {{ currentTaxSettlement.is_special_vat_invoice ? '明确专票' : '未锁定专票(普票风险)' }}
-                </span>
+              <div class="bg-white border border-slate-200 rounded-lg py-1.5">
+                <div class="text-base font-bold font-mono text-slate-700">{{ reviewResult.summary.info_count }}</div>
+                <div class="text-[11px] text-slate-500">优化建议</div>
               </div>
-              <p class="text-[11px] text-slate-500 leading-snug">{{ currentTaxSettlement.invoice_detail }}</p>
-            </div>
-
-            <!-- 审核点 4：结算方式与结算条件 -->
-            <div class="p-2.5 rounded-lg border flex flex-col space-y-1 transition bg-amber-50/40 border-amber-200">
-              <div class="flex items-center justify-between font-semibold">
-                <span class="flex items-center space-x-1.5">
-                  <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                  <span class="text-amber-900">4. 结算方式与条件</span>
-                </span>
-                <span class="text-[11px] font-bold text-amber-800">
-                  {{ currentTaxSettlement.settlement_method && currentTaxSettlement.settlement_method.includes('承兑') ? '承兑汇票(高危)' : '需关注前置' }}
-                </span>
-              </div>
-              <p class="text-[11px] text-slate-600 leading-snug">{{ currentTaxSettlement.settlement_condition_analysis }}</p>
             </div>
           </div>
 
-          <div v-else class="text-xs text-slate-400 py-3 text-center">
-            审查后即刻呈现增值税与结算 4 大核验详情
-          </div>
-        </div>
-
-        <!-- LangGraph 工作流编排（极简商务步骤条） -->
-        <div class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm flex-1 flex flex-col">
-          <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
-            <span class="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center space-x-1.5">
-              <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"></circle>
-                <line x1="3" y1="12" x2="9" y2="12"></line>
-                <line x1="15" y1="12" x2="21" y2="12"></line>
-              </svg>
-              <span>审查进度</span>
-            </span>
-          </div>
-
-          <div class="space-y-3 relative text-xs">
-            <div v-for="(node, idx) in pipelineNodes" :key="node.id" class="flex items-start space-x-3">
-              <!-- 状态标点 -->
-              <div class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[11px] font-semibold"
-                   :class="nodeStates[node.id] === 'completed' ? 'bg-emerald-100 text-emerald-700' : (nodeStates[node.id] === 'running' ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-500/30' : 'bg-slate-100 text-slate-400')">
-                <svg v-if="nodeStates[node.id] === 'completed'" class="w-3 h-3 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                  <polyline points="20 6 9 17 4 12"></polyline>
+          <!-- 商务合作合同 · 财税与结算专项审核卡 (4大核心审核点) -->
+          <div v-if="workspace.conditions.mode === 'quick' || workspace.conditions.mode === 'deep'"
+            class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+              <span class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  stroke-width="2">
+                  <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+                  <path d="M16 8h-6" />
+                  <path d="M16 12h-6" />
+                  <path d="M14 16h-4" />
                 </svg>
-                <span v-else>{{ idx + 1 }}</span>
+                <span>财税与结算专项审核 (4大要件)</span>
+              </span>
+            </div>
+
+            <div v-if="reviewResult && currentTaxSettlement" class="space-y-2.5 text-xs">
+              <!-- 审核点 1：是否单列增值税税额 -->
+              <div class="p-2.5 rounded-lg border flex flex-col space-y-1 transition"
+                :class="currentTaxSettlement.has_separate_vat_amount ? 'bg-emerald-50/50 border-emerald-200' : 'bg-red-50/50 border-red-200'">
+                <div class="flex items-center justify-between font-semibold">
+                  <span class="flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full"
+                      :class="currentTaxSettlement.has_separate_vat_amount ? 'bg-emerald-500' : 'bg-red-500'"></span>
+                    <span :class="currentTaxSettlement.has_separate_vat_amount ? 'text-emerald-900' : 'text-red-900'">1.
+                      增值税税额单列</span>
+                  </span>
+                  <span class="text-[11px] font-bold"
+                    :class="currentTaxSettlement.has_separate_vat_amount ? 'text-emerald-700' : 'text-red-700'">
+                    {{ currentTaxSettlement.has_separate_vat_amount ? '已单列' : '未单列(总额混淆)' }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-500 leading-snug">{{ currentTaxSettlement.vat_amount_detail }}</p>
               </div>
 
-              <!-- 节点信息 -->
-              <div class="flex-1">
-                <div class="font-medium text-xs text-slate-800" :class="nodeStates[node.id] === 'running' ? 'text-blue-700 font-bold' : ''">
-                  {{ node.name }}
+              <!-- 审核点 2：增值税税率是多少 -->
+              <div class="p-2.5 rounded-lg border flex flex-col space-y-1 transition"
+                :class="currentTaxSettlement.vat_rate !== '未明确税率' ? 'bg-slate-50 border-slate-200' : 'bg-amber-50/50 border-amber-200'">
+                <div class="flex items-center justify-between font-semibold">
+                  <span class="flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full"
+                      :class="currentTaxSettlement.vat_rate !== '未明确税率' ? 'bg-blue-500' : 'bg-amber-500'"></span>
+                    <span :class="currentTaxSettlement.vat_rate !== '未明确税率' ? 'text-slate-900' : 'text-amber-900'">2.
+                      增值税税率核验</span>
+                  </span>
+                  <span class="text-[11px] font-bold font-mono px-1.5 py-0.5 rounded"
+                    :class="currentTaxSettlement.vat_rate !== '未明确税率' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'">
+                    {{ currentTaxSettlement.vat_rate }}
+                  </span>
                 </div>
-                <div class="text-[11px] text-slate-400 mt-0.5">{{ node.description }}</div>
+                <p class="text-[11px] text-slate-500 leading-snug">{{ currentTaxSettlement.vat_rate_evaluation }}</p>
               </div>
+
+              <!-- 审核点 3：是否是增值税专用发票 -->
+              <div class="p-2.5 rounded-lg border flex flex-col space-y-1 transition"
+                :class="currentTaxSettlement.is_special_vat_invoice ? 'bg-emerald-50/50 border-emerald-200' : 'bg-red-50/50 border-red-200'">
+                <div class="flex items-center justify-between font-semibold">
+                  <span class="flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full"
+                      :class="currentTaxSettlement.is_special_vat_invoice ? 'bg-emerald-500' : 'bg-red-500'"></span>
+                    <span :class="currentTaxSettlement.is_special_vat_invoice ? 'text-emerald-900' : 'text-red-900'">3.
+                      增值税专用发票</span>
+                  </span>
+                  <span class="text-[11px] font-bold"
+                    :class="currentTaxSettlement.is_special_vat_invoice ? 'text-emerald-700' : 'text-red-700'">
+                    {{ currentTaxSettlement.is_special_vat_invoice ? '明确专票' : '未锁定专票(普票风险)' }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-500 leading-snug">{{ currentTaxSettlement.invoice_detail }}</p>
+              </div>
+
+              <!-- 审核点 4：结算方式与结算条件 -->
+              <div class="p-2.5 rounded-lg border flex flex-col space-y-1 transition bg-amber-50/40 border-amber-200">
+                <div class="flex items-center justify-between font-semibold">
+                  <span class="flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span class="text-amber-900">4. 结算方式与条件</span>
+                  </span>
+                  <span class="text-[11px] font-bold text-amber-800">
+                    {{ currentTaxSettlement.settlement_method && currentTaxSettlement.settlement_method.includes('承兑') ?
+                    '承兑汇票(高危)' : '需关注前置' }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-600 leading-snug">{{ currentTaxSettlement.settlement_condition_analysis
+                  }}</p>
+              </div>
+            </div>
+
+            <div v-else class="text-xs text-slate-400 py-3 text-center">
+              审查后即刻呈现增值税与结算 4 大核验详情
             </div>
           </div>
 
-          <!-- 实时进展提示 -->
-          <div v-if="latestLogMessage" class="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg leading-relaxed">
-            <span class="font-semibold text-blue-600">当前：</span>{{ latestLogMessage }}
+          <!-- LangGraph 工作流编排（极简商务步骤条） -->
+          <div class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm flex-1 flex flex-col">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+              <span class="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center space-x-1.5">
+                <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  stroke-width="2">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <line x1="3" y1="12" x2="9" y2="12"></line>
+                  <line x1="15" y1="12" x2="21" y2="12"></line>
+                </svg>
+                <span>审查进度</span>
+              </span>
+            </div>
+
+            <div class="space-y-3 relative text-xs">
+              <div v-for="(node, idx) in pipelineNodes" :key="node.id" class="flex items-start space-x-3">
+                <!-- 状态标点 -->
+                <div
+                  class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[11px] font-semibold"
+                  :class="nodeStates[node.id] === 'completed' ? 'bg-emerald-100 text-emerald-700' : (nodeStates[node.id] === 'running' ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-500/30' : 'bg-slate-100 text-slate-400')">
+                  <svg v-if="nodeStates[node.id] === 'completed'" class="w-3 h-3 text-emerald-700" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  <span v-else>{{ idx + 1 }}</span>
+                </div>
+
+                <!-- 节点信息 -->
+                <div class="flex-1">
+                  <div class="font-medium text-xs text-slate-800"
+                    :class="nodeStates[node.id] === 'running' ? 'text-blue-700 font-bold' : ''">
+                    {{ node.name }}
+                  </div>
+                  <div class="text-[11px] text-slate-400 mt-0.5">{{ node.description }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 实时进展提示 -->
+            <details v-if="reviewTrace.length" class="mt-3 border-t border-slate-100 pt-3"><summary class="text-xs text-slate-500 cursor-pointer">查看本次审查记录 · {{ reviewTrace.length }} 条</summary><ol class="mt-3 max-h-64 overflow-auto space-y-2 text-[11px] text-slate-500"><li v-for="(item,index) in reviewTrace" :key="index" class="leading-relaxed"><span class="text-slate-400 mr-2">{{ new Date(item.time).toLocaleTimeString('zh-CN',{hour12:false}) }}</span>{{ item.detail }}</li></ol></details>
+            <div v-if="latestLogMessage"
+              class="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg leading-relaxed">
+              <span class="font-semibold text-blue-600">当前：</span>{{ latestLogMessage }}
+            </div>
           </div>
-        </div>
 
         </div>
       </aside>
@@ -418,13 +904,27 @@
       <!-- 中间栏：合同正文阅卷室 (清晰大字号 15px - 16px、舒适行高、白底黑字、护眼商务) -->
       <section class="flex-1 min-w-0 flex flex-col bg-slate-100/60 overflow-hidden">
         <div class="wb-toolbar">
-          <div class="wb-title"><div class="min-w-0"><h1 class="font-semibold text-sm text-slate-900 truncate" :title="contractTitle">{{ contractTitle }}</h1><p class="mt-1 text-xs text-slate-400">{{ contractType }}</p></div></div>
-          <div class="wb-tools"><div class="flex items-center gap-2 text-xs">
-            <button @click="openEditor" :disabled="documentSaving || workspace.historical || workspace.loading" class="px-3 py-2 rounded-lg border border-slate-200 text-slate-700">编辑正文</button>
-            <button @click="saveDocument" :disabled="documentSaving || workspace.saving || workspace.historical" class="px-3 py-2 text-blue-600">{{ workspace.saving ? '保存中…' : '保存' }}</button>
-            <button @click="exportDocument" :disabled="documentSaving || workspace.loading || !contractText.trim()" :title="documentCompare ? '导出右侧显示的文档' : '导出当前合同'" class="px-3 py-2 rounded-lg border border-slate-200 text-slate-700">导出</button>
-            <button @click="workspace.finish" :disabled="workspace.historical || resultStale || workspace.saving || workspace.task?.status !== 'pending_review'" :title="resultStale ? '请先重新审查当前正文' : ''" class="px-3 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-40">{{ workspace.task?.status==='completed' ? '已完成复核' : '完成复核' }}</button>
-            <!-- 暂停更多操作入口，保留以便后续恢复。
+          <div class="wb-title">
+            <div class="min-w-0">
+              <h1 class="font-semibold text-sm text-slate-900 truncate" :title="contractTitle">{{ contractTitle }}</h1>
+              <p class="mt-1 text-xs text-slate-400">{{ contractType }}</p>
+            </div>
+          </div>
+          <div class="wb-tools">
+            <div class="flex items-center gap-2 text-xs">
+              <button @click="openEditor" :disabled="documentSaving || workspace.historical || workspace.loading"
+                class="px-3 py-2 rounded-lg border border-slate-200 text-slate-700">编辑正文</button>
+              <button @click="saveDocument" :disabled="documentSaving || workspace.saving || workspace.historical"
+                class="px-3 py-2 text-blue-600">{{ workspace.saving ? '保存中…' : '保存' }}</button>
+              <button @click="exportDocument" :disabled="documentSaving || workspace.loading || !contractText.trim()"
+                :title="documentCompare ? '导出右侧显示的文档' : '导出当前合同'"
+                class="px-3 py-2 rounded-lg border border-slate-200 text-slate-700">导出</button>
+              <button @click="workspace.finish"
+                :disabled="workspace.historical || resultStale || workspace.saving || workspace.task?.status !== 'pending_review'"
+                :title="resultStale ? '请先重新审查当前正文' : ''"
+                class="px-3 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-40">{{
+                workspace.task?.status==='completed' ? '已完成复核' : '完成复核' }}</button>
+              <!-- 暂停更多操作入口，保留以便后续恢复。
             <details class="wb-menu"><summary id="document-more-actions">更多操作 ▾</summary><div class="wb-popover">
               <section v-if="!opinionsOpen"><h3>工作区</h3><button @click="openOpinions(); $event.target.closest('details').open=false">展开审查意见</button></section><section><h3>当前合同 · 与审查无关</h3><button @click="workspace.exportDocument" :disabled="workspace.loading || !contractText.trim()" class="text-blue-600">下载当前合同 Word</button></section>
               <section v-if="workspace.versions.length"><h3>审查历史 · 切换查看对应版本</h3><select v-if="workspace.versions.length" aria-label="审查历史版本" @change="workspace.leaveFor('/workbench?task='+workspace.taskId+'&run='+$event.target.value)" :value="workspace.run?.id" class="text-xs border border-slate-200 rounded-lg px-2 py-1.5"><option v-for="version in workspace.versions" :value="version.id">第 {{ version.number }} 次 · {{ version.status === 'completed' ? '已完成' : '未完成' }}</option></select></section>
@@ -432,262 +932,431 @@
               <section v-if="workspace.conditions.mode==='compare'"><h3>合同比对</h3><button @click="viewMode=viewMode==='comparison' ? (workspace.conditions.source_id ? 'original' : 'raw') : 'comparison'">{{ viewMode==='comparison' ? '返回合同文档' : '查看差异对照' }}</button></section><section><h3>复核流程</h3><button v-if="appliedIssueIds.length && !workspace.historical" @click="reviewAcceptedDraft" :disabled="resultStale || isReviewing">以已采纳稿再审查</button><button v-if="!workspace.historical" @click="workspace.finish" :disabled="resultStale || workspace.task?.status !== 'pending_review'" :title="resultStale ? '请先审查当前合同再完成复核' : ''">完成复核</button></section>
             </div></details>
             -->
-          </div></div>
+            </div>
+          </div>
         </div>
-        <div v-if="workspace.historical" class="px-6 py-3 text-xs text-blue-700 bg-blue-50 border-b border-blue-200">正在查看历史审查版本，原文和结果保留不变。<a :href="'/workbench?task='+workspace.taskId" class="ml-2 underline">返回当前任务</a></div>
-        <div v-if="workspace.error" class="px-6 py-3 text-xs text-red-700 bg-red-50 border-b border-red-200" role="alert">{{ workspace.error }}</div>
-        <div v-if="reviewError" class="px-6 py-3 text-xs text-amber-800 bg-amber-50 border-b border-amber-200" role="alert">{{ reviewError }}</div>
+        <div v-if="workspace.historical" class="px-6 py-3 text-xs text-blue-700 bg-blue-50 border-b border-blue-200">
+          正在查看历史审查版本，原文和结果保留不变。<a :href="'/workbench?task='+workspace.taskId" class="ml-2 underline">返回当前任务</a></div>
+        <div v-if="workspace.error" class="px-6 py-3 text-xs text-red-700 bg-red-50 border-b border-red-200"
+          role="alert">{{ workspace.error }}</div>
+        <div v-if="reviewError" class="px-6 py-3 text-xs text-amber-800 bg-amber-50 border-b border-amber-200"
+          role="alert">{{ reviewError }}</div>
         <!-- 正文视窗：大字号 15px、清晰可读、纯正商务卷宗感 -->
         <div class="wb-document-grid" :class="{'is-comparing':documentCompare}">
           <div v-if="documentCompare" class="wb-document-pane" data-testid="original-document-pane">
             <div v-if="!reviewBaseline.sourceId" class="wb-pane-heading">原始文档<small>本次审查前的正文 · 只读</small></div>
-            <iframe v-if="reviewBaseline.sourceId" :src="'/static/document-preview.html?source='+reviewBaseline.sourceId+'&readonly=1&pane=original&shared=1'" title="原始合同文档" sandbox="allow-scripts allow-same-origin allow-downloads" class="border-0"></iframe>
+            <iframe v-if="reviewBaseline.sourceId"
+              :src="'/static/document-preview.html?source='+reviewBaseline.sourceId+'&readonly=1&pane=original&shared=1'"
+              title="原始合同文档" sandbox="allow-scripts allow-same-origin allow-downloads" class="border-0"></iframe>
             <div v-else class="wb-original-text">{{ reviewBaseline.text }}</div>
           </div>
           <div class="wb-document-pane" data-testid="revised-document-pane">
-            <div v-if="documentCompare && (isReviewing || viewMode!=='original' || !workspace.conditions.source_id)" class="wb-pane-heading">修改后的文档<small>{{ isReviewing ? '正在生成修订建议…' : resultStale ? '当前编辑稿' : revisionScope==='all' ? '全部建议稿 · 未自动采纳' : '仅包含已采纳修改' }}</small></div>
-            <div v-if="documentCompare && isReviewing" class="wb-review-placeholder"><strong>正在审查合同</strong><span>完成后在此展示修订后的文档</span></div>
-        <iframe v-else-if="viewMode==='original' && workspace.conditions.source_id" :src="'/static/document-preview.html?source='+workspace.conditions.source_id + '&pane='+(documentCompare ? 'revised' : 'original')+(resultStale ? '&edited=1' : '') + (documentCompare && !resultStale && workspace.run && reviewResult ? '&run='+workspace.run.id+'&scope='+revisionScope+'&applied='+encodeURIComponent((workspace.run.applied || []).join(',')) : '')" title="合同原件预览" sandbox="allow-scripts allow-same-origin allow-downloads" class="flex-1 w-full border-0" style="min-height:400px"></iframe>
-        <div v-else class="flex-1 overflow-y-auto p-8" id="contract-viewer">
-          
-          <!-- 模式一：原文排版（大字号 15px，行间距适中） -->
-          <div v-if="viewMode === 'raw'" class="max-w-4xl mx-auto bg-white border border-slate-200 rounded-xl p-10 shadow-sm">
-            
-            <div v-for="(line, idx) in formattedLines" :key="idx"
-                 :id="'line-' + (idx + 1)"
-                 :class="[
+            <div v-if="documentCompare && (isReviewing || viewMode!=='original' || !workspace.conditions.source_id)"
+              class="wb-pane-heading">修改后的文档<small>{{ isReviewing ? '正在生成修订建议…' : resultStale ? '当前编辑稿' :
+                revisionScope==='all' ? '全部建议稿 · 未自动采纳' : '仅包含已采纳修改' }}</small></div>
+            <div v-if="documentCompare && isReviewing" class="wb-review-placeholder">
+              <strong>正在审查合同</strong><span>完成后在此展示修订后的文档</span></div>
+            <iframe v-else-if="viewMode==='original' && workspace.conditions.source_id"
+              :src="'/static/document-preview.html?source='+workspace.conditions.source_id + '&pane='+(documentCompare ? 'revised' : 'original')+(resultStale ? '&edited=1' : '') + (documentCompare && !resultStale && workspace.run && reviewResult ? '&run='+workspace.run.id+'&scope='+revisionScope+'&applied='+encodeURIComponent((workspace.run.applied || []).join(',')) : '')"
+              title="合同原件预览" sandbox="allow-scripts allow-same-origin allow-downloads" class="flex-1 w-full border-0"
+              style="min-height:400px"></iframe>
+            <div v-else class="flex-1 overflow-y-auto p-8" id="contract-viewer">
+
+              <!-- 模式一：原文排版（大字号 15px，行间距适中） -->
+              <div v-if="viewMode === 'raw'"
+                class="max-w-4xl mx-auto bg-white border border-slate-200 rounded-xl p-10 shadow-sm">
+
+                <div v-for="(line, idx) in formattedLines" :key="idx" :id="'line-' + (idx + 1)" :class="[
                    line.highlightClass,
                    focusedIssueId && line.issueId === focusedIssueId ? 'clause-active' : ''
-                 ]"
-                 @click="line.issueId && selectIssue(line.issueId)"
-                 class="py-1 px-3 text-[15px] leading-relaxed transition-all cursor-pointer flex items-start space-x-4 hover:bg-slate-50/80">
-              
-              <!-- 行号：清晰中性灰 -->
-              <span class="w-8 shrink-0 text-right text-xs font-mono text-slate-400 select-none pt-1">
-                {{ idx + 1 }}
-              </span>
+                 ]" @click="line.issueId && selectIssue(line.issueId)"
+                  class="py-1 px-3 text-[15px] leading-relaxed transition-all cursor-pointer flex items-start space-x-4 hover:bg-slate-50/80">
 
-              <!-- 正文文本 -->
-              <div class="flex-1 text-slate-800 whitespace-pre-wrap font-normal">
-                {{ line.text }}
+                  <!-- 行号：清晰中性灰 -->
+                  <span class="w-8 shrink-0 text-right text-xs font-mono text-slate-400 select-none pt-1">
+                    {{ idx + 1 }}
+                  </span>
+
+                  <!-- 正文文本 -->
+                  <div class="flex-1 text-slate-800 whitespace-pre-wrap font-normal">
+                    {{ line.text }}
+                  </div>
+
+                  <!-- 风险标记 -->
+                  <span v-if="line.severity"
+                    class="shrink-0 text-xs px-2 py-0.5 rounded font-semibold uppercase self-center"
+                    :class="line.severity === 'critical' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-amber-100 text-amber-700 border border-amber-200'">
+                    {{ severityLabel(line.severity) }}
+                  </span>
+                </div>
+
+                <!-- 空白状态直接粘贴输入 -->
+                <div v-if="!contractText.trim()" class="py-12 text-center text-slate-400">
+                  <svg class="w-12 h-12 mx-auto mb-3 opacity-30 text-slate-400" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  <p class="text-base font-medium text-slate-600">在此处粘贴需要审查的合同全文</p>
+                  <p class="text-xs text-slate-400 mt-1">可返回首页上传文件，或使用示例合同熟悉流程</p>
+                  <button @click="openEditor" :disabled="documentSaving || workspace.historical || workspace.loading"
+                    class="mt-4 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs">粘贴合同正文</button>
+                </div>
               </div>
 
-              <!-- 风险标记 -->
-              <span v-if="line.severity" class="shrink-0 text-xs px-2 py-0.5 rounded font-semibold uppercase self-center"
-                    :class="line.severity === 'critical' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-amber-100 text-amber-700 border border-amber-200'">
-                {{ severityLabel(line.severity) }}
-              </span>
+              <div v-else-if="viewMode==='comparison'" class="max-w-4xl mx-auto space-y-4">
+                <div v-for="diff in reviewResult?.differences || []"
+                  class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                  <div class="flex justify-between mb-4 text-xs"><strong>{{
+                      {replace:'条款修改',delete:'条款删除',insert:'条款新增'}[diff.change_type] }}</strong><button
+                      @click="selectIssue(diff.id)" class="text-blue-600">查看分析 →</button></div>
+                  <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <div>
+                      <h3 class="text-xs text-slate-500 mb-2">参考合同</h3>
+                      <div
+                        class="p-4 bg-red-50 border border-red-200 rounded-lg text-sm leading-relaxed whitespace-pre-wrap text-red-800">
+                        {{ diff.original || '（无，此项为新增）' }}</div>
+                    </div>
+                    <div>
+                      <h3 class="text-xs text-slate-500 mb-2">待审合同</h3>
+                      <div
+                        class="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm leading-relaxed whitespace-pre-wrap text-blue-900">
+                        {{ diff.current || '（已删除）' }}</div>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="!reviewResult?.differences?.length"
+                  class="bg-white border border-slate-200 rounded-xl p-12 text-center text-sm text-slate-500">
+                  两份合同未识别到文字差异</div>
+              </div>
+
+
             </div>
-
-            <!-- 空白状态直接粘贴输入 -->
-            <div v-if="!contractText.trim()" class="py-12 text-center text-slate-400">
-              <svg class="w-12 h-12 mx-auto mb-3 opacity-30 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-              </svg>
-              <p class="text-base font-medium text-slate-600">在此处粘贴需要审查的合同全文</p>
-              <p class="text-xs text-slate-400 mt-1">可返回首页上传文件，或使用示例合同熟悉流程</p>
-              <button @click="openEditor" :disabled="documentSaving || workspace.historical || workspace.loading" class="mt-4 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs">粘贴合同正文</button>
-            </div>
-          </div>
-
-          <div v-else-if="viewMode==='comparison'" class="max-w-4xl mx-auto space-y-4">
-            <div v-for="diff in reviewResult?.differences || []" class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm"><div class="flex justify-between mb-4 text-xs"><strong>{{ {replace:'条款修改',delete:'条款删除',insert:'条款新增'}[diff.change_type] }}</strong><button @click="selectIssue(diff.id)" class="text-blue-600">查看分析 →</button></div><div class="grid grid-cols-1 xl:grid-cols-2 gap-4"><div><h3 class="text-xs text-slate-500 mb-2">参考合同</h3><div class="p-4 bg-red-50 border border-red-200 rounded-lg text-sm leading-relaxed whitespace-pre-wrap text-red-800">{{ diff.original || '（无，此项为新增）' }}</div></div><div><h3 class="text-xs text-slate-500 mb-2">待审合同</h3><div class="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm leading-relaxed whitespace-pre-wrap text-blue-900">{{ diff.current || '（已删除）' }}</div></div></div></div>
-            <div v-if="!reviewResult?.differences?.length" class="bg-white border border-slate-200 rounded-xl p-12 text-center text-sm text-slate-500">两份合同未识别到文字差异</div>
-          </div>
-
-
-        </div>
           </div>
         </div>
       </section>
 
       <!-- 右栏：审查意见与条款修订单 (清晰大字号 14px、对比鲜明) -->
-      <aside id="opinion-drawer" role="region" aria-labelledby="opinion-drawer-title" class="wb-sidebar wb-opinion-drawer" :class="{'is-collapsed':!opinionsOpen}">
-        <div class="wb-sidebar-heading"><button @click="toggleOpinions" :aria-expanded="opinionsOpen" aria-controls="review-opinion-content" :aria-label="opinionsOpen ? '收起审查意见与修订清单' : '展开审查意见与修订清单'" :title="opinionsOpen ? '收起审查意见与修订清单' : '展开审查意见与修订清单'" class="wb-sidebar-toggle"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg></button><strong id="opinion-drawer-title" v-show="opinionsOpen">审查意见与修订清单 <span class="wb-sidebar-count">{{ filteredIssues.length }}</span></strong></div>
+      <aside id="opinion-drawer" role="region" aria-labelledby="opinion-drawer-title"
+        class="wb-sidebar wb-opinion-drawer" :class="{'is-collapsed':!opinionsOpen}">
+        <div class="wb-sidebar-heading"><button @click="toggleOpinions" :aria-expanded="opinionsOpen"
+            aria-controls="review-opinion-content" :aria-label="opinionsOpen ? '收起审查意见与修订清单' : '展开审查意见与修订清单'"
+            :title="opinionsOpen ? '收起审查意见与修订清单' : '展开审查意见与修订清单'" class="wb-sidebar-toggle"><svg viewBox="0 0 20 20"
+              fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+              aria-hidden="true">
+              <path d="m12 5-5 5 5 5" />
+            </svg></button><strong id="opinion-drawer-title" v-show="opinionsOpen">审查意见与修订清单 <span
+              class="wb-sidebar-count">{{ filteredIssues.length }}</span></strong></div>
         <div v-show="opinionsOpen" id="review-opinion-content" class="wb-opinion-content">
-        <!-- 头部 -->
-        <div class="border-b border-slate-200 px-4 py-3 flex flex-wrap gap-2 items-center justify-between shrink-0 bg-slate-50/50">
-          <div class="w-full text-[11px] text-slate-500">已采纳 {{ appliedIssueIds.length }} 项 · 待处理 {{ (reviewResult?.issues || []).filter(i => !appliedIssueIds.includes(i.id) && !['rejected'].includes(workspace.decisions[i.id])).length }} 项</div>
-          <!-- 筛选 -->
-          <div class="flex items-center space-x-1 text-xs">
-            <button @click="severityFilter = 'all'" :class="severityFilter === 'all' ? 'text-blue-600 font-bold' : 'text-slate-500'" class="px-2 py-0.5 cursor-pointer">全部</button>
-            <span class="text-slate-300">|</span>
-            <button @click="severityFilter = 'critical'" :class="severityFilter === 'critical' ? 'text-red-600 font-bold' : 'text-slate-500'" class="px-2 py-0.5 cursor-pointer">重大</button>
-            <span class="text-slate-300">|</span>
-            <button @click="severityFilter = 'warning'" :class="severityFilter === 'warning' ? 'text-amber-600 font-bold' : 'text-slate-500'" class="px-2 py-0.5 cursor-pointer">一般</button>
+          <!-- 头部 -->
+          <div
+            class="border-b border-slate-200 px-4 py-3 flex flex-wrap gap-2 items-center justify-between shrink-0 bg-slate-50/50">
+            <div class="w-full text-[11px] text-slate-500">已采纳 {{ appliedIssueIds.length }} 项 · 待处理 {{
+              (reviewResult?.issues || []).filter(i => !appliedIssueIds.includes(i.id) &&
+              !['rejected'].includes(workspace.decisions[i.id])).length }} 项</div>
+            <!-- 筛选 -->
+            <div class="flex items-center space-x-1 text-xs">
+              <button @click="severityFilter = 'all'"
+                :class="severityFilter === 'all' ? 'text-blue-600 font-bold' : 'text-slate-500'"
+                class="px-2 py-0.5 cursor-pointer">全部</button>
+              <span class="text-slate-300">|</span>
+              <button @click="severityFilter = 'critical'"
+                :class="severityFilter === 'critical' ? 'text-red-600 font-bold' : 'text-slate-500'"
+                class="px-2 py-0.5 cursor-pointer">重大</button>
+              <span class="text-slate-300">|</span>
+              <button @click="severityFilter = 'warning'"
+                :class="severityFilter === 'warning' ? 'text-amber-600 font-bold' : 'text-slate-500'"
+                class="px-2 py-0.5 cursor-pointer">一般</button>
+            </div>
           </div>
-        </div>
 
-        <div class="px-4 py-2 border-b border-slate-100 space-y-2">
-          <input v-model="issueSearch" placeholder="搜索条款、风险或审查意见" aria-label="搜索审查意见" class="w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-blue-500">
-          <div class="flex gap-2 text-xs">
-            <select v-model="handlingFilter" class="border border-slate-200 rounded p-1"><option value="all">全部处理状态</option><option value="pending">待处理</option><option value="applied">已采纳</option><option value="rejected">不采纳</option><option value="needs_review">待复核</option></select>
-            <button @click="severityFilter = 'info'" class="text-slate-600" :class="{'font-bold text-blue-600': severityFilter === 'info'}">优化建议</button>
-            <button @click="severityFilter = 'favorable'" class="text-slate-600" :class="{'font-bold text-blue-600': severityFilter === 'favorable'}">有利条款</button>
+          <div class="px-4 py-2 border-b border-slate-100 space-y-2">
+            <input v-model="issueSearch" placeholder="搜索条款、风险或审查意见" aria-label="搜索审查意见"
+              class="w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-blue-500">
+            <div class="flex gap-2 text-xs">
+              <select v-model="handlingFilter" class="border border-slate-200 rounded p-1">
+                <option value="all">全部处理状态</option>
+                <option value="pending">待处理</option>
+                <option value="applied">已采纳</option>
+                <option value="rejected">不采纳</option>
+                <option value="needs_review">待复核</option>
+              </select>
+              <button @click="severityFilter = 'info'" class="text-slate-600"
+                :class="{'font-bold text-blue-600': severityFilter === 'info'}">优化建议</button>
+              <button @click="severityFilter = 'favorable'" class="text-slate-600"
+                :class="{'font-bold text-blue-600': severityFilter === 'favorable'}">有利条款</button>
+            </div>
           </div>
-        </div>
-        <!-- 问题卡片列表：清晰、整洁、大字号 -->
-        <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
-          
-          <div v-for="issue in filteredIssues" :key="issue.id"
-               :id="'card-' + issue.id"
-               @click="highlightInContract(issue)"
-               :class="focusedIssueId === issue.id ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md' : 'border-slate-200 hover:border-slate-300 shadow-sm'"
-               class="bg-white border rounded-xl p-5 transition cursor-pointer">
-            
-            <!-- 头部条款与标签 -->
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-bold text-slate-600 truncate max-w-[240px]">
-                {{ issue.clause_title }}
-              </span>
-              <span class="text-xs px-2 py-0.5 rounded font-bold uppercase shrink-0 whitespace-nowrap"
-                    :class="(issue.checklist_status === 'needs_review' || issue.diff && !issue.model_assessed) ? 'bg-amber-50 text-amber-700 border border-amber-200' : issue.severity === 'critical' ? 'bg-red-50 text-red-700 border border-red-200' : (issue.severity === 'warning' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200')">
-                {{ issue.checklist_status === "needs_review" ? "待人工确认" : issue.diff && !issue.model_assessed ? "变更待评估" : severityLabel(issue.severity) }}
-              </span>
-            </div>
+          <!-- 问题卡片列表：清晰、整洁、大字号 -->
+          <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
 
-            <div class="mb-2 text-[11px] text-blue-700">处理状态：{{ workspace.decisionName(issue.id) }}</div>
-            <div v-if="issue.diff" class="text-xs space-y-2 mb-3"><div class="p-3 bg-red-50 text-red-800 border border-red-200 rounded-lg whitespace-pre-wrap"><strong>参考合同：</strong>{{ issue.diff.original || '（无，此项为新增）' }}</div><div class="p-3 bg-blue-50 text-blue-900 border border-blue-200 rounded-lg whitespace-pre-wrap"><strong>待审合同：</strong>{{ issue.diff.current || '（已删除）' }}</div></div>
-            <div v-else-if="issue.evidence" class="wb-evidence text-xs mb-3 p-3 text-slate-600 rounded-lg whitespace-pre-wrap"><strong>原文证据：</strong>{{ issue.evidence }}</div>
-            <!-- 问题标题与风险说明：重点区域 -->
-            <div class="wb-risk-area" :class="issue.severity==='favorable' ? 'wb-risk-favorable' : ''">
-            <h4 class="text-sm font-bold text-slate-900 leading-snug">
-              {{ issue.issue_title }}
-            </h4>
+            <div v-for="issue in filteredIssues" :key="issue.id" :id="'card-' + issue.id"
+              @click="highlightInContract(issue)"
+              :class="focusedIssueId === issue.id ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md' : 'border-slate-200 hover:border-slate-300 shadow-sm'"
+              class="bg-white border rounded-xl p-5 transition cursor-pointer">
 
-            <!-- 商业法律后果剖析 (大字号 13px) -->
-            <div v-if="issue.risk_points?.length > 1" class="wb-risk-description space-y-3">
-              <div v-for="(point, index) in issue.risk_points" :key="index"><strong>{{ index + 1 }}. {{ point.title }}</strong><p class="mt-1">{{ point.analysis }}</p></div>
-            </div>
-            <div v-else class="wb-risk-description">
-              {{ issue.risk_analysis }}
-            </div>
-            </div>
-            <p v-if="issue.rewrite_warning" class="mt-2 p-2 rounded bg-amber-50 text-amber-800 text-xs">{{ issue.rewrite_warning }}</p>
-            <p v-else-if="issue.redline" class="mt-2 text-xs text-red-700">统一改写已展示在右侧修订文档，采纳状态单独记录。</p>
+              <!-- 头部条款与标签 -->
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold text-slate-600 truncate max-w-[240px]">
+                  {{ issue.clause_title }}
+                </span>
+                <span class="text-xs px-2 py-0.5 rounded font-bold uppercase shrink-0 whitespace-nowrap"
+                  :class="(issue.checklist_status === 'needs_review' || issue.diff && !issue.model_assessed) ? 'bg-amber-50 text-amber-700 border border-amber-200' : issue.severity === 'critical' ? 'bg-red-50 text-red-700 border border-red-200' : (issue.severity === 'warning' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200')">
+                  {{ issue.checklist_status === "needs_review" ? "待人工确认" : issue.diff && !issue.model_assessed ? "变更待评估"
+                  : severityLabel(issue.severity) }}
+                </span>
+              </div>
 
-            <details class="mt-3 text-xs" @click.stop><summary class="text-slate-500 cursor-pointer">依据与处理建议</summary>
-            <!-- 法律法规条文依据 -->
-            <div class="mt-2.5 text-xs text-slate-500 flex items-start space-x-1.5">
-              <svg class="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
-              </svg>
-              <span class="leading-relaxed">{{ issue.legal_basis }}</span>
-            </div>
+              <div class="mb-2 text-[11px] text-blue-700">处理状态：{{ workspace.decisionName(issue.id) }}</div>
+              <div v-if="issue.diff" class="text-xs space-y-2 mb-3">
+                <div class="p-3 bg-red-50 text-red-800 border border-red-200 rounded-lg whitespace-pre-wrap">
+                  <strong>参考合同：</strong>{{ issue.diff.original || '（无，此项为新增）' }}</div>
+                <div class="p-3 bg-blue-50 text-blue-900 border border-blue-200 rounded-lg whitespace-pre-wrap">
+                  <strong>待审合同：</strong>{{ issue.diff.current || '（已删除）' }}</div>
+              </div>
+              <div v-else-if="issue.evidence"
+                class="wb-evidence text-xs mb-3 p-3 text-slate-600 rounded-lg whitespace-pre-wrap">
+                <strong>原文证据：</strong>{{ issue.evidence }}</div>
+              <!-- 问题标题与风险说明：重点区域 -->
+              <div class="wb-risk-area" :class="issue.severity==='favorable' ? 'wb-risk-favorable' : ''">
+                <h4 class="text-sm font-bold text-slate-900 leading-snug">
+                  {{ issue.issue_title }}
+                </h4>
 
-            <!-- 谈判抗辩策略 -->
-            <div class="mt-2 text-xs text-amber-800 bg-amber-50/80 border border-amber-200/60 p-2.5 rounded-lg leading-relaxed">
-              <strong>谈判策略：</strong>{{ issue.negotiation_strategy }}
-            </div>
-
-            </details>
-            <!-- Redline 修订对照 (原条款 vs 修正条款) -->
-            <div v-if="issue.redline" class="mt-3.5 pt-3 border-t border-slate-200">
-              <div class="text-xs font-semibold text-slate-500 mb-2">条款修订方案对照</div>
-
-              <div class="space-y-2 text-xs">
-                <!-- 原条款删除线 -->
-                <div class="bg-red-50/80 border border-red-200 text-red-800 line-through p-2.5 rounded leading-relaxed">
-                  {{ issue.redline.original_text }}
+                <!-- 商业法律后果剖析 (大字号 13px) -->
+                <div v-if="issue.risk_points?.length > 1" class="wb-risk-description space-y-3">
+                  <div v-for="(point, index) in issue.risk_points" :key="index"><strong>{{ index + 1 }}. {{ point.title
+                      }}</strong>
+                    <p class="mt-1">{{ point.analysis }}</p>
+                  </div>
                 </div>
-                <!-- 建议修改版本 -->
-                <div class="bg-emerald-50 border border-emerald-200 text-emerald-900 font-medium p-2.5 rounded leading-relaxed">
-                  {{ issue.redline.suggested_text }}
+                <div v-else class="wb-risk-description">
+                  {{ issue.risk_analysis }}
                 </div>
               </div>
+              <p v-if="issue.rewrite_warning" class="mt-2 p-2 rounded bg-amber-50 text-amber-800 text-xs">{{
+                issue.rewrite_warning }}</p>
+              <p v-else-if="issue.redline" class="mt-2 text-xs text-red-700">统一改写已展示在右侧修订文档，采纳状态单独记录。</p>
 
-              <!-- 采纳与复制按钮 -->
-              <div class="mt-3 flex items-center space-x-2">
-                <button @click.stop="applyRedline(issue)" 
-                        :disabled="resultStale || workspace.historical"
-                        class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center space-x-1 cursor-pointer"
-                        :class="appliedIssueIds.includes(issue.id) ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm active:scale-95'">
-                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <polyline points="20 6 9 17 4 12"></polyline>
+              <details class="mt-3 text-xs" @click.stop>
+                <summary class="text-slate-500 cursor-pointer">依据与处理建议</summary>
+                <!-- 法律法规条文依据 -->
+                <div class="mt-2.5 text-xs text-slate-500 flex items-start space-x-1.5">
+                  <svg class="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor" stroke-width="2">
+                    <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+                    <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+                    <path d="M7 21h10" />
+                    <path d="M12 3v18" />
+                    <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" />
                   </svg>
-                  <span>{{ appliedIssueIds.includes(issue.id) ? '撤销采纳' : '采纳此项修订' }}</span>
-                </button>
-                <button @click.stop="copyText(issue.redline.suggested_text)" title="复制修订条款" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs cursor-pointer">
-                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
-                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
-                  </svg>
-                </button>
+                  <span class="leading-relaxed">{{ issue.legal_basis }}</span>
+                </div>
+
+                <!-- 谈判抗辩策略 -->
+                <div
+                  class="mt-2 text-xs text-amber-800 bg-amber-50/80 border border-amber-200/60 p-2.5 rounded-lg leading-relaxed">
+                  <strong>谈判策略：</strong>{{ issue.negotiation_strategy }}
+                </div>
+
+              </details>
+              <!-- Redline 修订对照 (原条款 vs 修正条款) -->
+              <div v-if="issue.redline" class="mt-3.5 pt-3 border-t border-slate-200">
+                <div class="text-xs font-semibold text-slate-500 mb-2">条款修订方案对照</div>
+
+                <div class="space-y-2 text-xs">
+                  <!-- 原条款删除线 -->
+                  <div
+                    class="bg-red-50/80 border border-red-200 text-red-800 line-through p-2.5 rounded leading-relaxed">
+                    {{ issue.redline.original_text }}
+                  </div>
+                  <!-- 建议修改版本 -->
+                  <div
+                    class="bg-emerald-50 border border-emerald-200 text-emerald-900 font-medium p-2.5 rounded leading-relaxed">
+                    {{ issue.redline.suggested_text }}
+                  </div>
+                </div>
+
+                <!-- 采纳与复制按钮 -->
+                <div class="mt-3 flex items-center space-x-2">
+                  <button @click.stop="applyRedline(issue)" :disabled="resultStale || workspace.historical"
+                    class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center space-x-1 cursor-pointer"
+                    :class="appliedIssueIds.includes(issue.id) ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm active:scale-95'">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>{{ appliedIssueIds.includes(issue.id) ? '撤销采纳' : '采纳此项修订' }}</span>
+                  </button>
+                  <button @click.stop="copyText(issue.redline.suggested_text)" title="复制修订条款"
+                    class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+                      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="workspace.run" class="mt-4 pt-3 border-t border-slate-100 space-y-3" @click.stop>
+                <div class="wb-issue-actions flex gap-2 text-xs"><button
+                    @click="workspace.setDecision(issue,'rejected')"
+                    :aria-pressed="workspace.decisionName(issue.id)==='不采纳'"
+                    :class="workspace.decisionName(issue.id)==='不采纳' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''"
+                    :disabled="workspace.historical || workspace.loading || isReviewing"
+                    class="px-2 py-1 border border-slate-200 rounded text-slate-600">不采纳</button><button
+                    @click="workspace.setDecision(issue,'needs_review')"
+                    :aria-pressed="workspace.decisionName(issue.id)==='待复核'"
+                    :class="workspace.decisionName(issue.id)==='待复核' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''"
+                    :disabled="workspace.historical || workspace.loading || isReviewing"
+                    class="px-2 py-1 border border-slate-200 rounded text-amber-700">待复核</button><button
+                    @click="workspace.setDecision(issue,'pending')"
+                    :aria-pressed="workspace.decisionName(issue.id)==='待处理'"
+                    :class="workspace.decisionName(issue.id)==='待处理' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''"
+                    :disabled="workspace.historical || workspace.loading || isReviewing"
+                    class="px-2 py-1 text-slate-400">重置状态</button><button @click="openClauseEditor(issue)"
+                    :disabled="documentSaving || workspace.historical || workspace.loading || isReviewing"
+                    class="px-2 py-1 text-blue-600">编辑条款</button><button
+                    @click="workspace.followupIssue=workspace.followupIssue===issue.id ? null : issue.id"
+                    class="ml-auto px-2 py-1 text-blue-600">追问意见</button></div>
+                <textarea v-model="workspace.comments[issue.id]"
+                  :disabled="workspace.historical || workspace.loading || isReviewing" placeholder="添加人工备注或处理理由…"
+                  aria-label="条目处理备注"
+                  class="w-full border border-slate-200 rounded-lg p-2 text-xs leading-relaxed outline-none focus:border-blue-500"
+                  rows="2"></textarea>
+                <div v-if="workspace.followupIssue===issue.id" class="space-y-3">
+                  <div v-for="answer in workspace.followups[issue.id] || []"
+                    class="p-3 border border-slate-200 bg-slate-50 rounded-lg text-xs leading-relaxed">
+                    <div class="font-semibold text-slate-700">{{ answer.question }}</div>
+                    <p class="mt-2 whitespace-pre-wrap text-slate-600">{{ answer.answer }}</p>
+                    <p v-if="answer.suggested_text" class="mt-2 whitespace-pre-wrap text-emerald-800">{{
+                      answer.suggested_text }}</p><button v-if="answer.suggested_text"
+                      @click="workspace.previewFollowup(answer)" class="mt-2 text-blue-600">复制替代条款，核对后编辑正文</button>
+                  </div>
+                  <textarea v-model="workspace.question" placeholder="例如：解释这一风险，或提出更温和的修改方案…"
+                    class="w-full p-2 text-xs border border-slate-200 rounded-lg" rows="3"></textarea><button
+                    @click="workspace.ask(issue)"
+                    :disabled="workspace.followupBusy || !workspace.question.trim() || workspace.historical"
+                    class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs">{{ workspace.followupBusy ? '正在回答…' :
+                    '发送追问' }}</button>
+                </div>
               </div>
             </div>
 
-            <div v-if="workspace.run" class="mt-4 pt-3 border-t border-slate-100 space-y-3" @click.stop>
-              <div class="wb-issue-actions flex gap-2 text-xs"><button @click="workspace.setDecision(issue,'rejected')" :aria-pressed="workspace.decisionName(issue.id)==='不采纳'" :class="workspace.decisionName(issue.id)==='不采纳' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''" :disabled="workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 border border-slate-200 rounded text-slate-600">不采纳</button><button @click="workspace.setDecision(issue,'needs_review')" :aria-pressed="workspace.decisionName(issue.id)==='待复核'" :class="workspace.decisionName(issue.id)==='待复核' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''" :disabled="workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 border border-slate-200 rounded text-amber-700">待复核</button><button @click="workspace.setDecision(issue,'pending')" :aria-pressed="workspace.decisionName(issue.id)==='待处理'" :class="workspace.decisionName(issue.id)==='待处理' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''" :disabled="workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 text-slate-400">重置状态</button><button @click="openClauseEditor(issue)" :disabled="documentSaving || workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 text-blue-600">编辑条款</button><button @click="workspace.followupIssue=workspace.followupIssue===issue.id ? null : issue.id" class="ml-auto px-2 py-1 text-blue-600">追问意见</button></div>
-              <textarea v-model="workspace.comments[issue.id]" :disabled="workspace.historical || workspace.loading || isReviewing" placeholder="添加人工备注或处理理由…" aria-label="条目处理备注" class="w-full border border-slate-200 rounded-lg p-2 text-xs leading-relaxed outline-none focus:border-blue-500" rows="2"></textarea>
-              <div v-if="workspace.followupIssue===issue.id" class="space-y-3">
-                <div v-for="answer in workspace.followups[issue.id] || []" class="p-3 border border-slate-200 bg-slate-50 rounded-lg text-xs leading-relaxed"><div class="font-semibold text-slate-700">{{ answer.question }}</div><p class="mt-2 whitespace-pre-wrap text-slate-600">{{ answer.answer }}</p><p v-if="answer.suggested_text" class="mt-2 whitespace-pre-wrap text-emerald-800">{{ answer.suggested_text }}</p><button v-if="answer.suggested_text" @click="workspace.previewFollowup(answer)" class="mt-2 text-blue-600">复制替代条款，核对后编辑正文</button></div>
-                <textarea v-model="workspace.question" placeholder="例如：解释这一风险，或提出更温和的修改方案…" class="w-full p-2 text-xs border border-slate-200 rounded-lg" rows="3"></textarea><button @click="workspace.ask(issue)" :disabled="workspace.followupBusy || !workspace.question.trim() || workspace.historical" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs">{{ workspace.followupBusy ? '正在回答…' : '发送追问' }}</button>
+            <!-- 未审查时的操作引导状态 -->
+            <div v-if="!reviewResult && !isReviewing"
+              class="text-center py-20 px-6 text-slate-400 text-sm flex flex-col items-center">
+              <div
+                class="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 mb-3 shadow-sm">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
               </div>
+              <p class="font-bold text-slate-700 text-base">待发起合同审查</p>
+              <p class="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-xs">
+                核对正文与审查条件后，按所选模式发起审查。
+              </p>
+              <button @click="startReview"
+                :disabled="workspace.loading || workspace.historical || workspace.task?.status === 'running' || !contractText.trim()"
+                class="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 cursor-pointer">
+                立即开始审查
+              </button>
             </div>
-          </div>
 
-          <!-- 未审查时的操作引导状态 -->
-          <div v-if="!reviewResult && !isReviewing" class="text-center py-20 px-6 text-slate-400 text-sm flex flex-col items-center">
-            <div class="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 mb-3 shadow-sm">
-              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <!-- 审查中状态 -->
+            <div v-else-if="isReviewing" class="text-center py-24 text-slate-500 text-sm flex flex-col items-center">
+              <svg class="animate-spin w-8 h-8 text-blue-600 mb-3" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
               </svg>
+              <span class="font-semibold text-slate-700">正在进行法务深度研判...</span>
+              <span class="text-xs text-slate-400 mt-1">请查看中央浮动进度条</span>
             </div>
-            <p class="font-bold text-slate-700 text-base">待发起合同审查</p>
-            <p class="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-xs">
-              核对正文与审查条件后，按所选模式发起审查。
-            </p>
-            <button @click="startReview" :disabled="workspace.loading || workspace.historical || workspace.task?.status === 'running' || !contractText.trim()" class="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 cursor-pointer">
-              立即开始审查
-            </button>
-          </div>
 
-          <!-- 审查中状态 -->
-          <div v-else-if="isReviewing" class="text-center py-24 text-slate-500 text-sm flex flex-col items-center">
-            <svg class="animate-spin w-8 h-8 text-blue-600 mb-3" viewBox="0 0 24 24" fill="none">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-            </svg>
-            <span class="font-semibold text-slate-700">正在进行法务深度研判...</span>
-            <span class="text-xs text-slate-400 mt-1">请查看中央浮动进度条</span>
-          </div>
+            <!-- 审查完成且确实 0 项该等级风险 -->
+            <div v-else-if="filteredIssues.length === 0" class="text-center py-24 text-slate-400 text-sm">
+              <svg class="w-10 h-10 mx-auto mb-2 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p class="font-semibold text-slate-700">当前没有匹配的条目</p>
+              <p class="text-xs text-slate-400 mt-1">可调整风险等级、处理状态或搜索条件；此状态不代表合同整体合规</p>
+            </div>
 
-          <!-- 审查完成且确实 0 项该等级风险 -->
-          <div v-else-if="filteredIssues.length === 0" class="text-center py-24 text-slate-400 text-sm">
-            <svg class="w-10 h-10 mx-auto mb-2 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p class="font-semibold text-slate-700">当前没有匹配的条目</p>
-            <p class="text-xs text-slate-400 mt-1">可调整风险等级、处理状态或搜索条件；此状态不代表合同整体合规</p>
           </div>
-
-        </div>
         </div>
       </aside>
 
     </main>
 
-    <div v-if="clauseEdit" class="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-6"><div class="bg-white border border-slate-200 rounded-xl p-6 max-w-2xl w-full space-y-4 shadow-xl"><h3 class="font-semibold">编辑条款 · {{ clauseEdit.title }}</h3><p class="text-xs text-slate-500">保存将更新待审正文，旧审查结果及处理记录保留，请重新审查新版本。</p><textarea :disabled="documentSaving" v-model="clauseEdit.text" class="w-full h-56 text-sm leading-relaxed p-4 border border-slate-200 rounded-lg"></textarea><div class="flex justify-end gap-3"><button @click="clauseEdit=null" class="px-3 py-2 text-xs text-slate-500">取消</button><button @click="saveClauseEditor" :disabled="documentSaving" class="px-4 py-2 text-xs text-white bg-blue-600 rounded-lg">保存条款</button></div></div></div>
-    <div v-if="workspace.showConditions" class="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-6"><div class="bg-white rounded-xl p-6 w-full max-w-2xl space-y-4 shadow-xl max-h-[90vh] overflow-y-auto"><div class="flex justify-between"><h3 class="font-semibold">审查条件 · {{ workspace.modeName }}</h3><button @click="workspace.showConditions=false">✕</button></div><p class="text-xs text-slate-500">修改条件后需要重新审查，原结果保留为历史版本。</p><label class="block text-xs text-slate-600">审查尺度<select v-model="workspace.conditions.scale" :disabled="workspace.historical" class="block mt-2 w-full p-2 border rounded-lg"><option>中立</option><option>强势</option><option>弱势</option></select></label><label class="block text-xs text-slate-600">交易背景<textarea v-model="workspace.conditions.background" :disabled="workspace.historical" class="block mt-2 w-full p-3 h-24 border rounded-lg"></textarea></label><label class="block text-xs text-slate-600">重点要求<textarea v-model="workspace.conditions.focus" :disabled="workspace.historical" class="block mt-2 w-full p-3 h-20 border rounded-lg"></textarea></label><div v-if="workspace.conditions.checklist" class="text-xs text-slate-500">清单：{{ workspace.conditions.checklist.name }} · v{{ workspace.conditions.checklist.version }}（固定本次版本）</div><details v-for="material in workspace.conditions.references" class="text-xs text-slate-500"><summary class="cursor-pointer">参考资料：{{ material.name }}</summary><pre class="whitespace-pre-wrap mt-2">{{ material.text }}</pre></details><details v-if="workspace.conditions.reference_text" class="text-xs text-slate-500"><summary class="cursor-pointer">查看参考合同</summary><pre class="whitespace-pre-wrap mt-2">{{ workspace.conditions.reference_text }}</pre></details><button @click="workspace.showConditions=false; workspace.save()" :disabled="workspace.historical" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs">保存审查条件</button></div></div>
+    <div v-if="clauseEdit" class="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-6">
+      <div class="bg-white border border-slate-200 rounded-xl p-6 max-w-2xl w-full space-y-4 shadow-xl">
+        <h3 class="font-semibold">编辑条款 · {{ clauseEdit.title }}</h3>
+        <p class="text-xs text-slate-500">保存将更新待审正文，旧审查结果及处理记录保留，请重新审查新版本。</p><textarea :disabled="documentSaving"
+          v-model="clauseEdit.text"
+          class="w-full h-56 text-sm leading-relaxed p-4 border border-slate-200 rounded-lg"></textarea>
+        <div class="flex justify-end gap-3"><button @click="clauseEdit=null"
+            class="px-3 py-2 text-xs text-slate-500">取消</button><button @click="saveClauseEditor"
+            :disabled="documentSaving" class="px-4 py-2 text-xs text-white bg-blue-600 rounded-lg">保存条款</button></div>
+      </div>
+    </div>
+    <div v-if="workspace.showConditions"
+      class="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-6">
+      <div class="bg-white rounded-xl p-6 w-full max-w-2xl space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between">
+          <h3 class="font-semibold">审查条件 · {{ workspace.modeName }}</h3><button
+            @click="workspace.showConditions=false">✕</button>
+        </div>
+        <p class="text-xs text-slate-500">修改条件后需要重新审查，原结果保留为历史版本。</p><label
+          class="block text-xs text-slate-600">审查尺度<select v-model="workspace.conditions.scale"
+            :disabled="workspace.historical" class="block mt-2 w-full p-2 border rounded-lg">
+            <option>中立</option>
+            <option>强势</option>
+            <option>弱势</option>
+          </select></label><label class="block text-xs text-slate-600">交易背景<textarea
+            v-model="workspace.conditions.background" :disabled="workspace.historical"
+            class="block mt-2 w-full p-3 h-24 border rounded-lg"></textarea></label><label
+          class="block text-xs text-slate-600">重点要求<textarea v-model="workspace.conditions.focus"
+            :disabled="workspace.historical" class="block mt-2 w-full p-3 h-20 border rounded-lg"></textarea></label>
+        <div v-if="workspace.conditions.checklist" class="text-xs text-slate-500">清单：{{
+          workspace.conditions.checklist.name }} · v{{ workspace.conditions.checklist.version }}（固定本次版本）</div>
+        <details v-for="material in workspace.conditions.references" class="text-xs text-slate-500">
+          <summary class="cursor-pointer">参考资料：{{ material.name }}</summary>
+          <pre class="whitespace-pre-wrap mt-2">{{ material.text }}</pre>
+        </details>
+        <details v-if="workspace.conditions.reference_text" class="text-xs text-slate-500">
+          <summary class="cursor-pointer">查看参考合同</summary>
+          <pre class="whitespace-pre-wrap mt-2">{{ workspace.conditions.reference_text }}</pre>
+        </details><button @click="workspace.showConditions=false; workspace.save()" :disabled="workspace.historical"
+          class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs">保存审查条件</button>
+      </div>
+    </div>
     <div v-if="showEditor" class="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-6">
       <div class="bg-white rounded-xl p-6 w-full max-w-3xl space-y-4 shadow-xl">
         <h3 class="font-semibold text-slate-900">编辑审查原文</h3>
         <p class="text-xs text-slate-500">保存正文后需要重新审查。已采纳的修改请通过“导出修订稿”保留。</p>
-        <div class="grid grid-cols-2 gap-3 text-xs"><label>合同名称<input v-model="editTitle" class="mt-1 w-full border rounded-lg p-2"></label><label>合同类型<input v-model="editType" class="mt-1 w-full border rounded-lg p-2"></label></div>
-        <textarea :disabled="documentSaving" v-model="editText" aria-label="编辑合同正文" class="w-full h-80 border border-slate-200 rounded-lg p-4 text-sm leading-relaxed outline-none focus:border-blue-500"></textarea>
-        <div class="flex justify-end gap-3"><button @click="showEditor = false" class="text-xs text-slate-600 px-3 py-2">取消</button><button @click="saveEditor" :disabled="documentSaving || !editText.trim()" class="text-xs bg-blue-600 text-white rounded-lg px-4 py-2">保存正文</button></div>
+        <div class="grid grid-cols-2 gap-3 text-xs"><label>合同名称<input v-model="editTitle"
+              class="mt-1 w-full border rounded-lg p-2"></label><label>合同类型<input v-model="editType"
+              class="mt-1 w-full border rounded-lg p-2"></label></div>
+        <textarea :disabled="documentSaving" v-model="editText" aria-label="编辑合同正文"
+          class="w-full h-80 border border-slate-200 rounded-lg p-4 text-sm leading-relaxed outline-none focus:border-blue-500"></textarea>
+        <div class="flex justify-end gap-3"><button @click="showEditor = false"
+            class="text-xs text-slate-600 px-3 py-2">取消</button><button @click="saveEditor"
+            :disabled="documentSaving || !editText.trim()"
+            class="text-xs bg-blue-600 text-white rounded-lg px-4 py-2">保存正文</button></div>
       </div>
     </div>
     <!-- 弹窗一：模型参数配置抽屉 -->
-    <div v-if="showModelModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div v-if="showModelModal"
+      class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div class="bg-white border border-slate-200 rounded-xl w-full max-w-md shadow-xl p-6 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <h3 class="text-base font-bold text-slate-900">大模型端点动态配置</h3>
           <button @click="showModelModal = false" class="text-slate-400 hover:text-slate-600 cursor-pointer">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
         </div>
@@ -695,45 +1364,57 @@
         <div class="space-y-3 text-xs">
           <div>
             <label class="block text-slate-700 font-semibold mb-1">模型标识 (Model Identifier)</label>
-            <input v-model="modelConfig.model_name" type="text" placeholder="deepseek-v4-flash 或 deepseek-chat" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono">
+            <input v-model="modelConfig.model_name" type="text" placeholder="deepseek-v4-flash 或 deepseek-chat"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono">
             <p class="text-[11px] text-slate-400 mt-1">支持 DeepSeek 官方各版本、OpenAI、通义千问等</p>
           </div>
 
           <div>
             <label class="block text-slate-700 font-semibold mb-1">API 基础端点 (Base URL)</label>
-            <input v-model="modelConfig.base_url" type="text" placeholder="https://api.deepseek.com/v1" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono">
+            <input v-model="modelConfig.base_url" type="text" placeholder="https://api.deepseek.com/v1"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono">
           </div>
 
           <div>
             <label class="block text-slate-700 font-semibold mb-1">API Key 授权凭据</label>
-            <input v-model="modelConfig.api_key" type="password" placeholder="sk-..." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono">
-            <p class="text-[11px] text-slate-500 mt-1">配置保存在当前浏览器。留空时使用服务端配置；服务端未配置时使用规则检查。</p>
+            <input v-model="modelConfig.api_key" type="password" placeholder="sk-..."
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono">
+            <p class="text-[11px] text-slate-500 mt-1">配置保存在当前浏览器。留空时使用服务端配置；深度审查需要有效模型配置。</p>
           </div>
 
-          <div v-if="testResult" class="p-3 rounded-lg text-xs" :class="testResult.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'">
+          <div><label for="model-retries" class="block text-slate-700 font-semibold mb-1">最大重试次数</label><input id="model-retries" v-model.number="modelConfig.max_retries" type="number" min="0" max="10" step="1" class="w-full border border-slate-300 rounded-lg px-3 py-2"><p class="text-[11px] text-slate-500 mt-1">默认 3 次，不含首次请求。格式错误会反馈给模型修正，网络异常会等待后重试。</p></div>
+
+          <div v-if="testResult" class="p-3 rounded-lg text-xs"
+            :class="testResult.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'">
             {{ testResult.message }}
           </div>
         </div>
 
         <div class="flex items-center justify-between pt-3 border-t border-slate-100">
-          <button @click="testModelConnection" :disabled="isTestingModel" class="px-3.5 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-xs text-slate-700 font-medium transition cursor-pointer">
+          <button @click="testModelConnection" :disabled="isTestingModel"
+            class="px-3.5 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-xs text-slate-700 font-medium transition cursor-pointer">
             {{ isTestingModel ? '连接测试中...' : '测试连通性' }}
           </button>
           <div class="flex items-center space-x-2">
-            <button @click="showModelModal = false" class="px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-700 cursor-pointer">取消</button>
-            <button @click="saveModelConfig" class="px-4 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 transition cursor-pointer">保存配置</button>
+            <button @click="showModelModal = false"
+              class="px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-700 cursor-pointer">取消</button>
+            <button @click="saveModelConfig"
+              class="px-4 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 transition cursor-pointer">保存配置</button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 弹窗二：法务审查意见书导出预览 -->
-    <div v-if="showReportModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="bg-white border border-slate-200 rounded-xl w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden">
+    <div v-if="showReportModal"
+      class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div
+        class="bg-white border border-slate-200 rounded-xl w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden">
         <div class="h-14 border-b border-slate-200 px-6 flex items-center justify-between shrink-0 bg-slate-50">
           <h3 class="text-base font-bold text-slate-900">审查意见书 · 第 {{ workspace.run?.number || 1 }} 次审查</h3>
           <div class="flex items-center space-x-3">
-            <button onclick="window.print()" class="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition flex items-center space-x-1.5 shadow-sm cursor-pointer">
+            <button onclick="window.print()"
+              class="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition flex items-center space-x-1.5 shadow-sm cursor-pointer">
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <polyline points="6 9 6 2 18 2 18 9"></polyline>
                 <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
@@ -741,9 +1422,11 @@
               </svg>
               <span>打印 / 存为 PDF</span>
             </button>
-            <button aria-label="关闭意见书" @click="showReportModal = false" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+            <button aria-label="关闭意见书" @click="showReportModal = false"
+              class="text-slate-400 hover:text-slate-600 cursor-pointer">
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
               </svg>
             </button>
           </div>
@@ -761,9 +1444,13 @@
             <div><strong>合同名称：</strong>{{ workspace.run?.input.title || contractTitle }}</div>
             <div><strong>审查立场：</strong>{{ workspace.run?.input.role || partyRole }}</div>
             <div><strong>合同类型：</strong>{{ contractType }}</div>
-            <div><strong>审查时间：</strong>{{ reviewedAt }}</div><div><strong>结果来源：</strong>{{ reviewSource }}</div><div><strong>修订处理：</strong>已采纳 {{ appliedIssueIds.length }} 项（评分基于审查原文）</div>
-            <div><strong>合规健康分：</strong><span class="font-bold text-red-600">{{ reviewResult?.summary?.compliance_score == null ? "不计算健康分" : reviewResult.summary.compliance_score + " / 100" }}</span></div>
-            <div><strong>风险评级：</strong><span class="font-bold text-red-600">{{ reviewResult?.summary?.risk_level }}</span></div>
+            <div><strong>审查时间：</strong>{{ reviewedAt }}</div>
+            <div><strong>结果来源：</strong>{{ reviewSource }}</div>
+            <div><strong>修订处理：</strong>已采纳 {{ appliedIssueIds.length }} 项（评分基于审查原文）</div>
+            <div><strong>合规健康分：</strong><span class="font-bold text-red-600">{{ reviewResult?.summary?.compliance_score
+                == null ? "不计算健康分" : reviewResult.summary.compliance_score + " / 100" }}</span></div>
+            <div><strong>风险评级：</strong><span class="font-bold text-red-600">{{ reviewResult?.summary?.risk_level
+                }}</span></div>
           </div>
 
           <div class="mb-6">
@@ -773,11 +1460,14 @@
 
           <div class="mb-6">
             <h3 class="text-sm font-bold border-l-4 border-blue-600 pl-2 mb-2">二、 财税与结算检查结果</h3>
-            <div v-if="currentTaxSettlement" class="space-y-1.5 text-xs text-slate-700 bg-slate-50 p-3 rounded border border-slate-200">
+            <div v-if="currentTaxSettlement"
+              class="space-y-1.5 text-xs text-slate-700 bg-slate-50 p-3 rounded border border-slate-200">
               <div><strong>1. 增值税税额单列：</strong>{{ currentTaxSettlement.has_separate_vat_amount ? '已规范单列价税' : '未单列税额 (含税总价混淆)' }} - {{ currentTaxSettlement.vat_amount_detail }}</div>
-              <div><strong>2. 增值税税率核验：</strong>{{ currentTaxSettlement.vat_rate }} - {{ currentTaxSettlement.vat_rate_evaluation }}</div>
+              <div><strong>2. 增值税税率核验：</strong>{{ currentTaxSettlement.vat_rate }} - {{
+                currentTaxSettlement.vat_rate_evaluation }}</div>
               <div><strong>3. 增值税专用发票：</strong>{{ currentTaxSettlement.is_special_vat_invoice ? '明确限定专票' : '未锁定专用发票 (进项抵扣风险)' }} - {{ currentTaxSettlement.invoice_detail }}</div>
-              <div><strong>4. 结算方式与条件：</strong>{{ currentTaxSettlement.settlement_method }} - {{ currentTaxSettlement.settlement_condition_analysis }}</div>
+              <div><strong>4. 结算方式与条件：</strong>{{ currentTaxSettlement.settlement_method }} - {{
+                currentTaxSettlement.settlement_condition_analysis }}</div>
             </div>
           </div>
 
@@ -791,10 +1481,12 @@
           <div class="mb-6">
             <h3 class="text-sm font-bold border-l-4 border-blue-600 pl-2 mb-2">四、 关键条款风险清单与红线修改对照表</h3>
             <div class="space-y-4">
-              <div v-for="issue in reviewResult?.issues" :key="issue.id" class="border border-slate-200 p-4 rounded-lg text-xs">
+              <div v-for="issue in reviewResult?.issues" :key="issue.id"
+                class="border border-slate-200 p-4 rounded-lg text-xs">
                 <div class="font-bold text-slate-800 text-sm flex justify-between">
                   <span>{{ issue.clause_title }}：{{ issue.issue_title }}</span>
-                  <span class="font-bold text-red-600 uppercase">[{{ issue.checklist_status === "needs_review" ? "待人工确认" : issue.diff && !issue.model_assessed ? "变更待评估" : severityLabel(issue.severity) }}]</span>
+                  <span class="font-bold text-red-600 uppercase">[{{ issue.checklist_status === "needs_review" ? "待人工确认"
+                    : issue.diff && !issue.model_assessed ? "变更待评估" : severityLabel(issue.severity) }}]</span>
                 </div>
                 <div class="mt-1 text-blue-700">处理状态：{{ workspace.decisionName(issue.id) }}</div>
                 <div class="text-slate-600 mt-1.5"><strong>法律依据：</strong>{{ issue.legal_basis }}</div>
@@ -831,20 +1523,20 @@
         const selectedModel = ref(localStorage.getItem("LEXIS_MODEL_NAME") || "deepseek-chat");
         const selectedSampleKey = ref("");
         const reviewProgress = ref(0);
-        
+
         const isReviewing = ref(false);
         const viewMode = ref("raw");
         const opinionsOpen = ref(true);
         const summaryOpen = ref(true);
-        const fitDocuments=()=>nextTick(()=>requestAnimationFrame(()=>{
-          for(const title of ['原始合同文档','合同原件预览']) document.querySelector(`iframe[title="${title}"]`)?.contentWindow?.postMessage(documentCompare.value ? {type:'lexis-set-zoom',scale:summaryOpen.value && opinionsOpen.value ? .8 : 1} : {type:'lexis-fit-width'},location.origin);
+        const fitDocuments = () => nextTick(() => requestAnimationFrame(() => {
+          for (const title of ['原始合同文档', '合同原件预览']) document.querySelector(`iframe[title="${title}"]`)?.contentWindow?.postMessage(documentCompare.value ? { type: 'lexis-set-zoom', scale: summaryOpen.value && opinionsOpen.value ? .8 : 1 } : { type: 'lexis-fit-width' }, location.origin);
         }));
-        const toggleSummary = () => { summaryOpen.value=!summaryOpen.value;fitDocuments(); };
-        const toggleOpinions = () => { opinionsOpen.value=!opinionsOpen.value;fitDocuments(); };
-        const openOpinions = () => { opinionsOpen.value=true;fitDocuments(); };
-        const closeOpinions = () => { opinionsOpen.value=false;fitDocuments(); };
+        const toggleSummary = () => { summaryOpen.value = !summaryOpen.value; fitDocuments(); };
+        const toggleOpinions = () => { opinionsOpen.value = !opinionsOpen.value; fitDocuments(); };
+        const openOpinions = () => { opinionsOpen.value = true; fitDocuments(); };
+        const closeOpinions = () => { opinionsOpen.value = false; fitDocuments(); };
         const documentCompare = ref(false);
-        const reviewBaseline = ref({sourceId:null,text:''});
+        const reviewBaseline = ref({ sourceId: null, text: '' });
         const revisionScope = ref('all');
         const previewText = ref(null);
         const documentDraft = ref(null), documentSaving = ref(false);
@@ -853,7 +1545,7 @@
         const clauseEdit = ref(null);
         const severityFilter = ref("all");
         const appliedIssueIds = ref([]);
-        
+
         const showModelModal = ref(false);
         const showReportModal = ref(false);
         const isTestingModel = ref(false);
@@ -861,11 +1553,17 @@
         const toastMessage = ref("");
 
         const latestLogMessage = ref("");
+        const reviewTrace = ref([]);
+        const publicAnalysis = computed(()=>{
+          const attempt=Math.max(1,...reviewTrace.value.map(item=>item.attempt||0));
+          return reviewTrace.value.filter(item=>item.stage==='analysis_summary' && item.attempt===attempt);
+        });
 
         const modelConfig = ref({
           model_name: localStorage.getItem("LEXIS_MODEL_NAME") || "deepseek-v4-flash",
           base_url: localStorage.getItem("LEXIS_BASE_URL") || "https://api.deepseek.com/v1",
-          api_key: localStorage.getItem("LEXIS_API_KEY") || ""
+          api_key: localStorage.getItem("LEXIS_API_KEY") || "",
+          max_retries: Number(localStorage.getItem("LEXIS_MAX_RETRIES") ?? 3)
         });
 
         const sampleContracts = ref({});
@@ -901,88 +1599,91 @@
           reviewedInput.value.title !== contractTitle.value || reviewedInput.value.type !== contractType.value || workspace.isStale));
         const persist = () => {
           try {
-            LexisSession.write('LEXIS_WORK', {title: contractTitle.value, type: contractType.value, role: partyRole.value,
+            LexisSession.write('LEXIS_WORK', {
+              title: contractTitle.value, type: contractType.value, role: partyRole.value,
               text: contractText.value, result: reviewResult.value, applied: appliedIssueIds.value,
-              reviewedAt: reviewedAt.value, reviewedInput: reviewedInput.value});
+              reviewedAt: reviewedAt.value, reviewedInput: reviewedInput.value
+            });
             if (!workspace.taskId) saveStatus.value = '待保存到审查记录';
           } catch { saveStatus.value = '保存失败，请导出备份'; }
         };
-        watch([contractTitle, contractType, partyRole, contractText, reviewResult, appliedIssueIds, reviewedAt], persist, {deep: true});
-        const readInlineSnapshot=()=>{
-          try{
-            const snapshot=document.querySelector('iframe[title="合同原件预览"]')?.contentWindow?.getLexisDocumentSnapshot?.();
-            return snapshot?.source===workspace.conditions.source_id ? snapshot : null;
-          }catch{return null;}
+        watch([contractTitle, contractType, partyRole, contractText, reviewResult, appliedIssueIds, reviewedAt], persist, { deep: true });
+        const readInlineSnapshot = () => {
+          try {
+            const snapshot = document.querySelector('iframe[title="合同原件预览"]')?.contentWindow?.getLexisDocumentSnapshot?.();
+            return snapshot?.source === workspace.conditions.source_id ? snapshot : null;
+          } catch { return null; }
         };
         const currentDocumentText = () => {
-          const snapshot=readInlineSnapshot();
-          if(snapshot?.editing)return snapshot.text;
-          if(documentDraft.value?.source===workspace.conditions.source_id)return documentDraft.value.text;
-          return documentCompare.value && !resultStale.value && reviewResult.value ? previewText.value ?? revisedText(revisionScope.value==='all' ? reviewResult.value.issues.filter(issue=>issue.redline).map(issue=>issue.id) : appliedIssueIds.value) : contractText.value;
+          const snapshot = readInlineSnapshot();
+          if (snapshot?.editing) return snapshot.text;
+          if (documentDraft.value?.source === workspace.conditions.source_id) return documentDraft.value.text;
+          return documentCompare.value && !resultStale.value && reviewResult.value ? previewText.value ?? revisedText(revisionScope.value === 'all' ? reviewResult.value.issues.filter(issue => issue.redline).map(issue => issue.id) : appliedIssueIds.value) : contractText.value;
         };
         const openEditor = async () => {
-          if (viewMode.value === 'original' && (await (await fetch('/api/sources/'+workspace.conditions.source_id)).json()).extension !== '.txt') { document.querySelector('iframe[title="合同原件预览"]')?.contentWindow.postMessage({type:'lexis-edit'}, location.origin); return; }
-          editText.value = currentDocumentText(); editTitle.value = contractTitle.value; editType.value = contractType.value; showEditor.value = true; };
+          if (viewMode.value === 'original' && (await (await fetch('/api/sources/' + workspace.conditions.source_id)).json()).extension !== '.txt') { document.querySelector('iframe[title="合同原件预览"]')?.contentWindow.postMessage({ type: 'lexis-edit' }, location.origin); return; }
+          editText.value = currentDocumentText(); editTitle.value = contractTitle.value; editType.value = contractType.value; showEditor.value = true;
+        };
         let pendingEditLocation = null;
         const saveFormattedText = async (text) => {
           if (!workspace.conditions.source_id) return false;
-          if(documentSaving.value)throw new Error('文档正在保存，请稍后重试');
-          documentSaving.value=true;
-          const sourceId=workspace.conditions.source_id,snapshot=readInlineSnapshot();
-          const beforeText=snapshot?.editing && snapshot.text===text ? snapshot.baseText : currentDocumentText();
-          const editorWindow=document.querySelector('iframe[title="合同原件预览"]')?.contentWindow;
+          if (documentSaving.value) throw new Error('文档正在保存，请稍后重试');
+          documentSaving.value = true;
+          const sourceId = workspace.conditions.source_id, snapshot = readInlineSnapshot();
+          const beforeText = snapshot?.editing && snapshot.text === text ? snapshot.baseText : currentDocumentText();
+          const editorWindow = document.querySelector('iframe[title="合同原件预览"]')?.contentWindow;
           editorWindow?.setLexisDocumentSaving?.(true);
-          try{
-            const info = await (await fetch('/api/sources/'+sourceId)).json();
+          try {
+            const info = await (await fetch('/api/sources/' + sourceId)).json();
             if (info.extension === '.txt') return false;
-            const response = await fetch(`/api/sources/${sourceId}/edit`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({text})});
+            const response = await fetch(`/api/sources/${sourceId}/edit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
             const data = await response.json();
             if (!response.ok) throw new Error(data.detail || "文档保存失败");
-            if(workspace.conditions.source_id!==sourceId)throw new Error('文档版本已变化，请重新打开编辑器');
+            if (workspace.conditions.source_id !== sourceId) throw new Error('文档版本已变化，请重新打开编辑器');
             const before = beforeText.split('\n'), after = data.text.split('\n');
             const index = after.findIndex((line, i) => line !== before[i]);
-            pendingEditLocation = index >= 0 ? {source: data.source_id, index, text:after[index], scroll:editorWindow?.scrollY || 0} : null;
-            documentDraft.value=null;
+            pendingEditLocation = index >= 0 ? { source: data.source_id, index, text: after[index], scroll: editorWindow?.scrollY || 0 } : null;
+            documentDraft.value = null;
             workspace.conditions.source_id = data.source_id;
             contractText.value = data.text;
-            previewText.value=data.text;
+            previewText.value = data.text;
             await workspace.flush();
             viewMode.value = "original";
             return true;
-          }finally{
-            documentSaving.value=false;
+          } finally {
+            documentSaving.value = false;
             editorWindow?.setLexisDocumentSaving?.(false);
           }
         };
-        const commitInlineDraft=async()=>{
-          const snapshot=readInlineSnapshot();
-          if(!snapshot?.editing)return false;
+        const commitInlineDraft = async () => {
+          const snapshot = readInlineSnapshot();
+          if (!snapshot?.editing) return false;
           await saveFormattedText(snapshot.text);
           return true;
         };
-        const saveDocument=async()=>{
-          try{await commitInlineDraft();await workspace.save();}catch(error){showToast(error.message);}
+        const saveDocument = async () => {
+          try { await commitInlineDraft(); await workspace.save(); } catch (error) { showToast(error.message); }
         };
-        const exportDocument=async()=>{
-          try{await commitInlineDraft();await workspace.exportDocument();}catch(error){showToast(error.message);}
+        const exportDocument = async () => {
+          try { await commitInlineDraft(); await workspace.exportDocument(); } catch (error) { showToast(error.message); }
         };
         const saveEditor = async () => {
           if (editText.value.length > 200000) { showToast('正文超过 20 万字，请拆分后审查'); return; }
 
           try {
-          const formatted = await saveFormattedText(editText.value);
-          contractText.value = editText.value; contractTitle.value = editTitle.value; contractType.value = editType.value;
-          showEditor.value = false;
-          if (!formatted) viewMode.value = 'raw';
-          showToast('已更新正文，请重新审查当前版本');
+            const formatted = await saveFormattedText(editText.value);
+            contractText.value = editText.value; contractTitle.value = editTitle.value; contractType.value = editType.value;
+            showEditor.value = false;
+            if (!formatted) viewMode.value = 'raw';
+            showToast('已更新正文，请重新审查当前版本');
           } catch (error) { showToast(error.message); }
         };
         const openClauseEditor = async (issue) => {
           if (workspace.historical || workspace.loading || isReviewing.value) return;
           let original = issue.redline?.original_text || issue.evidence;
-          const suggested=issue.redline?.suggested_text;
-          if(!resultStale.value && suggested && currentDocumentText().split(suggested).length===2 &&
-             (!original || currentDocumentText().split(original).length!==2)) original=suggested;
+          const suggested = issue.redline?.suggested_text;
+          if (!resultStale.value && suggested && currentDocumentText().split(suggested).length === 2 &&
+            (!original || currentDocumentText().split(original).length !== 2)) original = suggested;
           {
             // Resolve the current DOCX paragraphs even when old evidence is still a substring.
             // Appending text leaves the old quote intact but does not make it the current clause.
@@ -990,7 +1691,7 @@
             const start = original && baseline?.indexOf(original);
             if (typeof start === 'number' && start >= 0 && baseline.indexOf(original, start + 1) < 0 && workspace.conditions.source_id) {
               try {
-                const info = await (await fetch('/api/sources/'+workspace.conditions.source_id)).json();
+                const info = await (await fetch('/api/sources/' + workspace.conditions.source_id)).json();
                 const before = baseline.split('\n'), after = currentDocumentText().split('\n');
                 if (info.extension === '.docx' && before.length === after.length) {
                   const first = baseline.slice(0, start).split('\n').length - 1;
@@ -1001,22 +1702,22 @@
             }
           }
           if (!original || currentDocumentText().split(original).length !== 2) { showToast('该项无法唯一定位，请通过编辑正文人工核对'); return; }
-          clauseEdit.value = {original, text: original, title: issue.clause_title, baseText: currentDocumentText()};
+          clauseEdit.value = { original, text: original, title: issue.clause_title, baseText: currentDocumentText() };
         };
         const saveClauseEditor = async () => {
           if (!clauseEdit.value || currentDocumentText().split(clauseEdit.value.original).length !== 2) { showToast('原文已变更，请重新定位'); return; }
           try {
-          const text = currentDocumentText().replace(clauseEdit.value.original, clauseEdit.value.text);
-          const formatted = await saveFormattedText(text);
-          contractText.value = text;
-          if (!formatted) viewMode.value = 'raw';
-          clauseEdit.value = null; showToast('已更新正文，请重新审查当前版本');
+            const text = currentDocumentText().replace(clauseEdit.value.original, clauseEdit.value.text);
+            const formatted = await saveFormattedText(text);
+            contractText.value = text;
+            if (!formatted) viewMode.value = 'raw';
+            clauseEdit.value = null; showToast('已更新正文，请重新审查当前版本');
           } catch (error) { showToast(error.message); }
         };
         const cancelReview = () => { if (controller) controller.abort(); };
         const exportContract = () => {
           if (resultStale.value) { showToast('审查信息已变更，请重新审查后导出修订稿'); return; }
-          const url = URL.createObjectURL(new Blob([finalizedContractText.value], {type: 'text/plain;charset=utf-8'}));
+          const url = URL.createObjectURL(new Blob([finalizedContractText.value], { type: 'text/plain;charset=utf-8' }));
           const a = document.createElement('a'); a.href = url; a.download = (contractTitle.value || '合同') + '-修订稿.txt'; a.click();
           setTimeout(() => URL.revokeObjectURL(url), 1000);
         };
@@ -1035,15 +1736,17 @@
           setTimeout(() => { toastMessage.value = ""; }, 2500);
         };
 
-        const workspace = reactive(createWorkspaceWorkbench({contractTitle, contractType, contractText, partyRole,
+        const workspace = reactive(createWorkspaceWorkbench({
+          contractTitle, contractType, contractText, partyRole,
           reviewResult, appliedIssueIds, reviewedAt, reviewedInput, saveStatus, isReviewing, showToast,
-          getPreviewExport: () => documentCompare.value && !resultStale.value && workspace.run ? {run:workspace.run.id,scope:revisionScope.value} : null,
-          copyText: (text) => copyText(text), getModel: () => ({...modelConfig.value, model_name: selectedModel.value === 'custom' ? modelConfig.value.model_name : selectedModel.value})}));
+          getPreviewExport: () => documentCompare.value && !resultStale.value && workspace.run ? { run: workspace.run.id, scope: revisionScope.value } : null,
+          copyText: (text) => copyText(text), getModel: () => ({ ...modelConfig.value, model_name: selectedModel.value === 'custom' ? modelConfig.value.model_name : selectedModel.value })
+        }));
 
-        const defaultPipeline = pipelineNodes.value.map(node => ({...node}));
+        const defaultPipeline = pipelineNodes.value.map(node => ({ ...node }));
         watch(() => workspace.conditions.mode, mode => {
-          const labels = mode === 'checklist' ? ['合同条款解析','载入企业清单','逐项核验要求','整理问题与证据','汇总清单结果'] : mode === 'compare' ? ['解析待审合同','载入参考合同','逐条比对差异','整理变更与证据','汇总对比结果'] : null;
-          pipelineNodes.value = defaultPipeline.map((node, index) => labels ? {...node, name: labels[index], description: ''} : {...node});
+          const labels = mode === 'checklist' ? ['合同条款解析', '载入企业清单', '逐项核验要求', '整理问题与证据', '汇总清单结果'] : mode === 'compare' ? ['解析待审合同', '载入参考合同', '逐条比对差异', '整理变更与证据', '汇总对比结果'] : null;
+          pipelineNodes.value = defaultPipeline.map((node, index) => labels ? { ...node, name: labels[index], description: '' } : { ...node });
         });
 
         // 强健的正文行级高亮计算器
@@ -1068,7 +1771,7 @@
                 if (issue.redline && issue.redline.original_text) {
                   const origClean = issue.redline.original_text.replace(/\s+/g, "");
                   const lineClean = trimmedLine.replace(/\s+/g, "");
-                  
+
                   if (lineClean.length >= 5 && origClean.includes(lineClean)) {
                     severity = issue.severity;
                     issueId = issue.id;
@@ -1108,7 +1811,7 @@
         });
 
         const filteredIssues = computed(() => {
-          const rank = {critical: 0, warning: 1, info: 2, favorable: 3};
+          const rank = { critical: 0, warning: 1, info: 2, favorable: 3 };
           return (reviewResult.value?.issues || []).filter(issue =>
             (severityFilter.value === 'all' || issue.severity === severityFilter.value) &&
             (handlingFilter.value === 'all' || (handlingFilter.value === 'applied' ? appliedIssueIds.value.includes(issue.id) : !appliedIssueIds.value.includes(issue.id) && (workspace.decisions[issue.id] || 'pending') === handlingFilter.value)) &&
@@ -1179,18 +1882,20 @@
         const startReview = async () => {
           if (!contractText.value.trim() || isReviewing.value || workspace.loading || workspace.historical) return;
           try { await commitInlineDraft(); await workspace.flush(); } catch (error) { showToast(error.message); return; }
-          reviewBaseline.value = {sourceId:workspace.conditions.source_id, text:contractText.value};
+          const previousComparison={baseline:{...reviewBaseline.value},enabled:documentCompare.value};
+          reviewBaseline.value = { sourceId: workspace.conditions.source_id, text: contractText.value };
           documentCompare.value = true;
-          summaryOpen.value=true;opinionsOpen.value=true;pendingInitialRiskFocus=true;
-          comparisonTexts.original=reviewBaseline.value.text;comparisonTexts.revised=null;comparisonData=null;comparisonSignature='';comparisonGeneration++;
+          summaryOpen.value = true; opinionsOpen.value = true; pendingInitialRiskFocus = true;
+          comparisonTexts.original = reviewBaseline.value.text; comparisonTexts.revised = null; comparisonData = null; comparisonSignature = ''; comparisonGeneration++;
           previewText.value = null;
           const previousResult = reviewResult.value, previousApplied = [...appliedIssueIds.value];
-          
+
           isReviewing.value = true;
           resetNodeStates();
           appliedIssueIds.value = [];
 
           reviewError.value = '';
+          reviewTrace.value = [];
           reviewResult.value = null;
           controller = new AbortController();
           nodeStates.value.segment_contract = 'running';
@@ -1205,13 +1910,14 @@
               model_name: selectedModel.value === 'custom' ? modelConfig.value.model_name : selectedModel.value,
               api_key: modelConfig.value.api_key,
               base_url: modelConfig.value.base_url,
-              temperature: 0.1
+              temperature: 0.1,
+              max_retries: modelConfig.value.max_retries
             }
           };
 
           try {
             const res = await fetch('/api/tasks/' + workspace.taskId + '/review/stream', {
-              method: 'POST', headers: {'Content-Type': 'application/json'},
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload), signal: controller.signal
             });
             if (!res.ok) { const errorData = await res.json(); throw new Error(errorData.detail || '审查请求失败（' + res.status + '）'); }
@@ -1222,38 +1928,47 @@
               const json = block.split('\n').filter(line => line.startsWith('data:')).map(line => line.slice(5).trim()).join('\n');
               if (!json) return;
               const data = JSON.parse(json);
+              if (event === 'progress') {
+                reviewTrace.value.push(data);
+                latestLogMessage.value=data.detail;
+                nextTick(()=>{const list=document.querySelector('[data-review-trace]');if(list)list.scrollTop=list.scrollHeight;});
+              }
               if (event === 'error') throw new Error(data.error || '审查失败');
               if (event === 'node_update') {
+                reviewTrace.value.push({stage:data.node,detail:data.log?.detail || '阶段已完成',time:new Date().toISOString()});
                 nodeStates.value[data.node] = 'completed';
                 const idx = pipelineNodes.value.findIndex(node => node.id === data.node);
-                reviewProgress.value = Math.round((idx + 1) / pipelineNodes.value.length * 100);
+                reviewProgress.value = Math.min(95, Math.round((idx + 1) / pipelineNodes.value.length * 100));
                 if (idx + 1 < pipelineNodes.value.length) nodeStates.value[pipelineNodes.value[idx + 1].id] = 'running';
                 latestLogMessage.value = data.log?.detail || '正在执行下一步…';
               }
               if (event === 'complete') {
                 if (!data.success || !data.data?.summary) throw new Error('未返回有效审查结果');
                 reviewResult.value = data.data; completed = true; completedRunId = data.run_id;
-                reviewedAt.value = new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'});
-                reviewedInput.value = {text: payload.contract_text, title: payload.contract_title, type: payload.contract_type, role: payload.party_role};
+                reviewedAt.value = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+                reviewedInput.value = { text: payload.contract_text, title: payload.contract_title, type: payload.contract_type, role: payload.party_role };
                 reviewProgress.value = 100;
                 showToast('审查完成，共 ' + (data.data.issues || []).length + ' 项意见');
               }
             };
             while (true) {
-              const {value, done} = await reader.read();
-              buffer += decoder.decode(value || new Uint8Array(), {stream: !done}).replace(/\r/g, '');
+              const { value, done } = await reader.read();
+              buffer += decoder.decode(value || new Uint8Array(), { stream: !done }).replace(/\r/g, '');
               let boundary;
               while ((boundary = buffer.indexOf('\n\n')) >= 0) { consume(buffer.slice(0, boundary)); buffer = buffer.slice(boundary + 2); }
               if (done) break;
             }
             if (!completed) throw new Error('连接中断，未收到完整结果，请重试');
             await workspace.refresh(completedRunId);
-            summaryOpen.value=true;opinionsOpen.value=true;fitDocuments();
+            summaryOpen.value = true; opinionsOpen.value = true; fitDocuments();
           } catch (err) {
+            reviewBaseline.value=previousComparison.baseline;documentCompare.value=previousComparison.enabled;
+            comparisonTexts.original=previousComparison.baseline.text;comparisonTexts.revised=null;
+            comparisonData=null;comparisonSignature='';comparisonGeneration++;
             reviewResult.value = previousResult; appliedIssueIds.value = previousApplied;
             reviewError.value = err.name === 'AbortError' ? '已取消本次审查，可重新开始。' : err.message;
             latestLogMessage.value = reviewError.value;
-            try { await workspace.refresh(); } catch {}
+            try { await workspace.refresh(); } catch { }
             for (const key in nodeStates.value) if (nodeStates.value[key] === 'running') nodeStates.value[key] = 'idle';
             showToast(reviewError.value);
           } finally {
@@ -1272,22 +1987,22 @@
           if (viewMode.value === 'original') {
             focusedClauseId.value = issue.segment_id; focusedIssueId.value = issue.id;
             const frame = document.querySelector('iframe[title="合同原件预览"]');
-            const originalText=issue.redline?.original_text || issue.evidence || '';
-            document.querySelector('iframe[title="原始合同文档"]')?.contentWindow?.postMessage({type:'lexis-locate',text:originalText},location.origin);
-            frame?.contentWindow?.postMessage({type:'lexis-locate', text:documentCompare.value && !resultStale.value ? issue.redline?.suggested_text || originalText : originalText}, location.origin);
+            const originalText = issue.redline?.original_text || issue.evidence || '';
+            document.querySelector('iframe[title="原始合同文档"]')?.contentWindow?.postMessage({ type: 'lexis-locate', text: originalText }, location.origin);
+            frame?.contentWindow?.postMessage({ type: 'lexis-locate', text: documentCompare.value && !resultStale.value ? issue.redline?.suggested_text || originalText : originalText }, location.origin);
             return;
           }
           viewMode.value = 'raw';
           focusedClauseId.value = issue.segment_id; focusedIssueId.value = issue.id;
           nextTick(() => {
-          const target = formattedLines.value.find(l => l.issueId === issue.id || (issue.segment_id && l.segmentId === issue.segment_id));
-          if (target) {
-            const lineIdx = formattedLines.value.indexOf(target);
-            const el = document.getElementById("line-" + (lineIdx + 1));
-            if (el) {
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const target = formattedLines.value.find(l => l.issueId === issue.id || (issue.segment_id && l.segmentId === issue.segment_id));
+            if (target) {
+              const lineIdx = formattedLines.value.indexOf(target);
+              const el = document.getElementById("line-" + (lineIdx + 1));
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
             }
-          }
           });
         };
 
@@ -1295,12 +2010,12 @@
           opinionsOpen.value = true;
           focusedIssueId.value = issueId; severityFilter.value = 'all'; handlingFilter.value = 'all'; issueSearch.value = '';
           nextTick(() => {
-          const card = document.getElementById("card-" + issueId);
-          if (card) {
-            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            card.classList.add("ring-2", "ring-blue-600");
-            setTimeout(() => card.classList.remove("ring-2", "ring-blue-600"), 2000);
-          }
+            const card = document.getElementById("card-" + issueId);
+            if (card) {
+              card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              card.classList.add("ring-2", "ring-blue-600");
+              setTimeout(() => card.classList.remove("ring-2", "ring-blue-600"), 2000);
+            }
           });
         };
 
@@ -1346,6 +2061,8 @@
 
         const saveModelConfig = () => {
           localStorage.setItem("LEXIS_API_KEY", modelConfig.value.api_key || "");
+          modelConfig.value.max_retries=Math.max(0,Math.min(10,Math.trunc(Number(modelConfig.value.max_retries)||0)));
+          localStorage.setItem("LEXIS_MAX_RETRIES", String(modelConfig.value.max_retries));
           localStorage.setItem("LEXIS_BASE_URL", modelConfig.value.base_url || "https://api.deepseek.com/v1");
           localStorage.setItem("LEXIS_MODEL_NAME", modelConfig.value.model_name || "deepseek-v4-flash");
           selectedModel.value = modelConfig.value.model_name;
@@ -1385,97 +2102,98 @@
           loadSample("business_cooperation_contract");
         };
 
-        let comparisonData=null, comparisonSignature='', comparisonGeneration=0;
-        let pendingInitialRiskFocus=false;
-        const comparisonTexts={original:null,revised:null};
+        let comparisonData = null, comparisonSignature = '', comparisonGeneration = 0;
+        let pendingInitialRiskFocus = false;
+        const comparisonTexts = { original: null, revised: null };
         let differenceTimer;
-        const scheduleDifferences=()=>{clearTimeout(differenceTimer);comparisonGeneration++;differenceTimer=setTimeout(refreshDocumentDifferences,100);};
-        const refreshDocumentDifferences=async()=>{
-          if(!documentCompare.value || comparisonTexts.original===null || comparisonTexts.revised===null)return;
-          const signature=JSON.stringify(comparisonTexts);
-          if(signature===comparisonSignature && comparisonData)return;
-          comparisonSignature=signature;
-          const generation=++comparisonGeneration;
-          comparisonData=null;
-          try{
-            const response=await fetch('/api/documents/compare',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({original:comparisonTexts.original,revised:comparisonTexts.revised})});
-            if(!response.ok)throw new Error('差异标记加载失败');
-            const data=await response.json();
-            if(generation!==comparisonGeneration)return;
-            comparisonData=data;
-            const issues=(reviewResult.value?.issues||[]).filter(issue=>issue.severity!=='favorable').map(issue=>{
-              const original=issue.redline?.original_text || issue.evidence || '';
-              const start=original?comparisonTexts.original.indexOf(original):-1;
-              let range=null;
-              if(start>=0 && comparisonTexts.original.indexOf(original,start+1)<0){
-                const first=comparisonTexts.original.slice(0,start).split('\n').length-1;
-                const last=comparisonTexts.original.slice(0,start+original.length-1).split('\n').length-1;
-                const mapped=data.original_map.slice(first,last+1);
-                range={original_start:first,original_end:last+1,revised_start:Math.min(...mapped),revised_end:Math.max(...mapped)+1};
+        const scheduleDifferences = () => { clearTimeout(differenceTimer); comparisonGeneration++; differenceTimer = setTimeout(refreshDocumentDifferences, 100); };
+        const refreshDocumentDifferences = async () => {
+          if (!documentCompare.value || comparisonTexts.original === null || comparisonTexts.revised === null) return;
+          const signature = JSON.stringify(comparisonTexts);
+          if (signature === comparisonSignature && comparisonData) return;
+          comparisonSignature = signature;
+          const generation = ++comparisonGeneration;
+          comparisonData = null;
+          try {
+            const response = await fetch('/api/documents/compare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ original: comparisonTexts.original, revised: comparisonTexts.revised }) });
+            if (!response.ok) throw new Error('差异标记加载失败');
+            const data = await response.json();
+            if (generation !== comparisonGeneration) return;
+            comparisonData = data;
+            const issues = (reviewResult.value?.issues || []).filter(issue => issue.severity !== 'favorable').map(issue => {
+              const original = issue.redline?.original_text || issue.evidence || '';
+              const start = original ? comparisonTexts.original.indexOf(original) : -1;
+              let range = null;
+              if (start >= 0 && comparisonTexts.original.indexOf(original, start + 1) < 0) {
+                const first = comparisonTexts.original.slice(0, start).split('\n').length - 1;
+                const last = comparisonTexts.original.slice(0, start + original.length - 1).split('\n').length - 1;
+                const mapped = data.original_map.slice(first, last + 1);
+                range = { original_start: first, original_end: last + 1, revised_start: Math.min(...mapped), revised_end: Math.max(...mapped) + 1 };
               }
-              return {original,revised:issue.redline?.suggested_text || original,range};
+              return { original, revised: issue.redline?.suggested_text || original, range };
             });
-            const focusFirst=pendingInitialRiskFocus && issues.length>0;
-            if(issues.length)pendingInitialRiskFocus=false;
-            for(const [title,side] of [['原始合同文档','original'],['合同原件预览','revised']]) document.querySelector(`iframe[title="${title}"]`)?.contentWindow?.postMessage({type:'lexis-mark-differences',side,changes:data.changes,issues,focusFirst},location.origin);
-          }catch(error){showToast(error.message);}
+            const focusFirst = pendingInitialRiskFocus && issues.length > 0;
+            if (issues.length) pendingInitialRiskFocus = false;
+            for (const [title, side] of [['原始合同文档', 'original'], ['合同原件预览', 'revised']]) document.querySelector(`iframe[title="${title}"]`)?.contentWindow?.postMessage({ type: 'lexis-mark-differences', side, changes: data.changes, charRanges:data[side+'_chars'], text:comparisonTexts[side], issues, focusFirst }, location.origin);
+          } catch (error) { showToast(error.message); }
         };
         window.addEventListener('message', async event => {
           const frame = document.querySelector('iframe[title="合同原件预览"]');
-          const originalFrame=document.querySelector('iframe[title="原始合同文档"]');
-          const isOriginal=event.source===originalFrame?.contentWindow;
-          if(event.origin!==location.origin || (!isOriginal && event.source!==frame?.contentWindow))return;
-          if(event.data?.type==='lexis-document-draft' && !isOriginal && event.data.source===workspace.conditions.source_id){
-            documentDraft.value=event.data.editing?{source:event.data.source,text:event.data.text}:null;
-            if(documentCompare.value){comparisonTexts.revised=event.data.text;scheduleDifferences();}
+          const originalFrame = document.querySelector('iframe[title="原始合同文档"]');
+          const isOriginal = event.source === originalFrame?.contentWindow;
+          if (event.origin !== location.origin || (!isOriginal && event.source !== frame?.contentWindow)) return;
+          if (event.data?.type === 'lexis-document-draft' && !isOriginal && event.data.source === workspace.conditions.source_id) {
+            documentDraft.value = event.data.editing ? { source: event.data.source, text: event.data.text } : null;
+            if (documentCompare.value) { comparisonTexts.revised = event.data.text; scheduleDifferences(); }
             return;
           }
-          if(event.data?.type==='lexis-document-scroll' && documentCompare.value){
-            const target=isOriginal?frame:originalFrame;
-            const map=isOriginal?comparisonData?.original_map:comparisonData?.revised_map;
-            target?.contentWindow?.postMessage({type:'lexis-sync-scroll',ratio:event.data.ratio,index:map?.[event.data.index],fraction:event.data.fraction},location.origin);
+          if (event.data?.type === 'lexis-document-scroll' && documentCompare.value) {
+            const target = isOriginal ? frame : originalFrame;
+            const map = isOriginal ? comparisonData?.original_map : comparisonData?.revised_map;
+            target?.contentWindow?.postMessage({ type: 'lexis-sync-scroll', ratio: event.data.ratio, index: map?.[event.data.index], fraction: event.data.fraction }, location.origin);
             return;
           }
-          if(event.data?.type==='lexis-document-ready' && documentCompare.value){
-            event.source?.postMessage({type:'lexis-set-zoom',scale:summaryOpen.value && opinionsOpen.value ? .8 : 1},location.origin);
-            if(isOriginal && event.data.source===reviewBaseline.value.sourceId)comparisonTexts.original=event.data.text;
-            else if(!isOriginal && event.data.source===workspace.conditions.source_id)comparisonTexts.revised=event.data.text;
-            comparisonSignature='';
+          if (event.data?.type === 'lexis-document-ready' && documentCompare.value) {
+            event.source?.postMessage({ type: 'lexis-set-zoom', scale: summaryOpen.value && opinionsOpen.value ? .8 : 1 }, location.origin);
+            if (isOriginal && event.data.source === reviewBaseline.value.sourceId) comparisonTexts.original = event.data.text;
+            else if (!isOriginal && event.data.source === workspace.conditions.source_id) comparisonTexts.revised = event.data.text;
+            comparisonSignature = '';
             refreshDocumentDifferences();
           }
-          if(isOriginal)return;
-          if(event.data?.type==='lexis-document-ready' && event.data.source===workspace.conditions.source_id)documentDraft.value=null;
+          if (isOriginal) return;
+          if (event.data?.type === 'lexis-document-ready' && event.data.source === workspace.conditions.source_id) documentDraft.value = null;
           if (event.data?.type === 'lexis-document-ready' && documentCompare.value && !resultStale.value && event.data.run === workspace.run?.id) previewText.value = event.data.text;
           if (event.data?.type === 'lexis-document-ready' && pendingEditLocation?.source === event.data.source && workspace.conditions.source_id === event.data.source) {
-            frame.contentWindow.postMessage({type:'lexis-locate-edit', ...pendingEditLocation}, location.origin);
+            frame.contentWindow.postMessage({ type: 'lexis-locate-edit', ...pendingEditLocation }, location.origin);
             pendingEditLocation = null;
           }
           if (event.data?.type === 'lexis-save-document') {
             try {
               if (workspace.historical || workspace.loading || isReviewing.value) throw new Error('当前版本不能编辑');
-              if(event.data.source!==workspace.conditions.source_id)throw new Error('文档版本已变化，请重新打开编辑器');
+              if (event.data.source !== workspace.conditions.source_id) throw new Error('文档版本已变化，请重新打开编辑器');
               await saveFormattedText(event.data.text);
               showToast('文档已保留排版保存，请重新审查');
-            } catch (error) { frame.contentWindow.postMessage({type:'lexis-save-error', message:error.message}, location.origin); }
+            } catch (error) { frame.contentWindow.postMessage({ type: 'lexis-save-error', message: error.message }, location.origin); }
           }
         });
-        document.addEventListener('click', event => { document.querySelectorAll('details.wb-menu[open]').forEach(menu => { if (!menu.contains(event.target)) menu.open=false; }); });
-        document.addEventListener('keydown', event => { if(event.key==='Escape') { document.querySelectorAll('details.wb-menu[open]').forEach(menu=>menu.open=false);  } });
+        document.addEventListener('click', event => { document.querySelectorAll('details.wb-menu[open]').forEach(menu => { if (!menu.contains(event.target)) menu.open = false; }); });
+        document.addEventListener('keydown', event => { if (event.key === 'Escape') { document.querySelectorAll('details.wb-menu[open]').forEach(menu => menu.open = false); } });
         onMounted(() => {
           if (workspace.taskId) workspace.load().then(() => {
+            reviewTrace.value=workspace.run?.audit_trace || reviewResult.value?.audit_trace || [];
             if (resultStale.value && workspace.task?.source_matches) viewMode.value = 'original';
             else if (workspace.conditions.source_id && (workspace.historical || workspace.task?.source_matches !== false)) viewMode.value = 'original';
             if (reviewResult.value) {
               // Restore the comparison from the durable review snapshot, not the
               // latest edited source or transient in-memory UI flags.
-              const snapshot=workspace.run?.input;
-              if(snapshot){
-                reviewBaseline.value={sourceId:snapshot.source_id||null,text:snapshot.text||''};
-                documentCompare.value=true;revisionScope.value='all';
-                summaryOpen.value=true;opinionsOpen.value=true;
-                comparisonTexts.original=reviewBaseline.value.text;comparisonTexts.revised=null;
-                comparisonData=null;comparisonSignature='';comparisonGeneration++;
-                previewText.value=null;pendingInitialRiskFocus=true;
+              const snapshot = workspace.run?.input;
+              if (snapshot) {
+                reviewBaseline.value = { sourceId: snapshot.source_id || null, text: snapshot.text || '' };
+                documentCompare.value = true; revisionScope.value = 'all';
+                summaryOpen.value = true; opinionsOpen.value = true;
+                comparisonTexts.original = reviewBaseline.value.text; comparisonTexts.revised = null;
+                comparisonData = null; comparisonSignature = ''; comparisonGeneration++;
+                previewText.value = null; pendingInitialRiskFocus = true;
               }
               reviewProgress.value = 100; Object.keys(nodeStates.value).forEach(key => nodeStates.value[key] = 'completed');
             }
@@ -1502,6 +2220,8 @@
           testResult,
           toastMessage,
           latestLogMessage,
+          reviewTrace,
+          publicAnalysis,
           modelConfig,
           sampleContracts,
           pipelineNodes,
@@ -1529,4 +2249,5 @@
     }).mount('#app');
   </script>
 </body>
+
 </html>

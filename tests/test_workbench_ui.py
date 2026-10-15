@@ -137,7 +137,7 @@ def test_docx_inline_edit_stays_in_document(isolated_workspace, monkeypatch):
             page.on('pageerror', lambda error: errors.append(str(error)))
             base = f'http://127.0.0.1:{sock.getsockname()[1]}'
             imported = page.request.post(base+'/api/contracts/import', multipart={'file': {'name':'layout.docx','mimeType':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','buffer':data.getvalue()}}).json()
-            task = page.request.post(base+'/api/tasks', data={'title':'Inline edit', 'text':imported['text'], 'source_id':imported['source_id']}).json()
+            task = page.request.post(base+'/api/tasks', data={'title':'Inline edit', 'mode':'quick', 'text':imported['text'], 'source_id':imported['source_id']}).json()
             page.request.post(base+'/api/tasks/'+task['id']+'/review/stream', data={})
             record = workspace_api.repo.get(task['id'], 'task')
             run = workspace_api.repo.get(record['active_run'], 'run')
@@ -256,7 +256,12 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
     monkeypatch.setattr(graph, 'get_llm_client', lambda config: None)
     original_events = workspace_api.review_events
     async def events(inputs, config):
-        await asyncio.sleep(.2)
+        yield 'progress', {'stage':'analysis_summary','detail':'正在核对付款约定','title':'付款约定核对',
+                           'clause':'付款条款','analysis':'付款金额正在结合正文核对，结果尚待完整校验。',
+                           'proposal':'核对金额及付款条件。','time':'2026-10-15T00:00:00+00:00','attempt':1,'provisional':True}
+        for index in range(20):
+            yield 'progress', {'stage':'scope','detail':'条款定位 '+str(index)+'：'+('长条款记录。'*80), 'time':'2026-10-15T00:00:00+00:00'}
+        await asyncio.sleep(2)
         async for kind, data in original_events(inputs, config):
             if kind == 'complete':
                 data['issues'][0]['evidence'] = 'Payment: 100 USD'
@@ -287,7 +292,7 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             page.on('pageerror', lambda error: errors.append(str(error)))
             base=f'http://127.0.0.1:{sock.getsockname()[1]}'
             imported=page.request.post(base+'/api/contracts/import', multipart={'file':{'name':'compare.docx','mimeType':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','buffer':content.getvalue()}}).json()
-            task=page.request.post(base+'/api/tasks', data={'title':'Document comparison','text':imported['text'],'source_id':imported['source_id']}).json()
+            task=page.request.post(base+'/api/tasks', data={'title':'Document comparison','mode':'quick','text':imported['text'],'source_id':imported['source_id']}).json()
             page.goto(base+'/workbench?task='+task['id'])
             left=page.frame_locator('iframe[title="原始合同文档"]')
             right=page.frame_locator('iframe[title="合同原件预览"]')
@@ -307,6 +312,17 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
                     page.get_by_role('button',name='收起审查概览',exact=True).click()
                     page.get_by_role('button',name='收起审查意见与修订清单',exact=True).click()
                 page.get_by_role('button', name=label, exact=True).click()
+                expect(page.locator('[data-public-analysis]')).to_contain_text('付款金额正在结合正文核对')
+                if label=='开始审查':
+                    page.set_viewport_size({'width':1366,'height':600})
+                    page.locator('.review-execution>summary').click()
+                    bounds=page.locator('.review-dialog').bounding_box()
+                    assert bounds['y']>=10 and bounds['y']+bounds['height']<=590
+                    assert page.locator('[data-review-trace]').bounding_box()['height']<=161
+                    page.locator('.review-dialog-body').evaluate('(el)=>el.scrollTop=el.scrollHeight')
+                    expect(page.get_by_role('button',name='取消审查',exact=True)).to_be_in_viewport()
+                    page.screenshot(path='artifacts/review-processing.png')
+                    page.set_viewport_size({'width':1920,'height':1080})
                 expect(page.locator('#review-summary-content')).to_be_visible()
                 expect(page.locator('#review-opinion-content')).to_be_visible()
                 expect(page.get_by_role('button',name='收起审查概览',exact=True).locator('svg')).to_have_count(1)
@@ -344,6 +360,9 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             assert page.request.get(base+'/api/tasks/'+task['id']).json()['run']['id']==record['run']['id']
             expect(left.locator('.lexis-diff-original')).to_have_text('Payment: 100 USD')
             expect(right.locator('.lexis-diff-revised')).to_have_text('Payment: 200 USD')
+            expect(right.locator('mark.lexis-diff-token')).to_have_text('2')
+            expect(left.locator('mark.lexis-diff-token')).to_have_text('1')
+            assert right.locator('article p').nth(21).evaluate('(el)=>getComputedStyle(el).backgroundColor') == 'rgba(0, 0, 0, 0)'
             assert left.locator('html').evaluate('(el)=>getComputedStyle(el).scrollbarWidth') == 'none'
             right.locator('body').evaluate('()=>{window.dispatchEvent(new Event("wheel"));window.scrollTo(0,(document.documentElement.scrollHeight-innerHeight)*.3);}')
             left.locator('body').evaluate('()=>new Promise((resolve,reject)=>{setTimeout(()=>reject(new Error("Scroll synchronization timed out")),5000);const check=()=>scrollY/Math.max(1,document.documentElement.scrollHeight-innerHeight)>.2?resolve():requestAnimationFrame(check);check();})')
@@ -473,6 +492,11 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             expect(right.locator('article p').first).to_have_text('Payment: 500 USD')
             expect(right.locator('article p').nth(2)).to_have_text('Section 1: saved from toolbar')
             expect(right.locator('article p').nth(1)).to_have_text('Section 0: body edit must survive')
+            page.get_by_role('button',name='重新审查',exact=True).click()
+            expect(page.locator('.review-dialog')).to_be_visible()
+            page.get_by_role('button',name='取消审查',exact=True).click()
+            expect(page.locator('.review-dialog')).to_have_count(0)
+            expect(right.locator('article p').first).to_have_text('Payment: 500 USD')
             assert not errors, errors
             browser.close()
     finally:

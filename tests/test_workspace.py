@@ -112,6 +112,14 @@ def test_background_and_scale_reach_graph_prompt(client, monkeypatch):
     assert prompts and all(word in prompts[0] for word in ('强势', '分期交付', '验收条件', '财务确认'))
 
 
+def test_comparison_highlights_only_changed_characters(client):
+    original = '双方依照法律履行本协议。\n验收后30日付款，其余条款保持不变。'
+    revised = '双方依照法律履行本协议。\n验收后60日付款，其余条款保持不变。'
+    result = client.post('/api/documents/compare', json={'original':original,'revised':revised}).json()
+    assert ''.join(original[a:b] for a,b in result['original_chars']) == '3'
+    assert ''.join(revised[a:b] for a,b in result['revised_chars']) == '6'
+
+
 def test_handling_survives_and_is_bound_to_the_correct_run(client):
     sample = SAMPLE_CONTRACTS['business_cooperation_contract']
     task = create_task(client, text=sample['text'])
