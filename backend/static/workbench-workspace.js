@@ -25,7 +25,9 @@ window.createWorkspaceWorkbench = function (refs) {
     const snapshot=run.value.input;
     return ['title','type','text','role'].some(key=>input()[key]!==snapshot[key]) ||
       ['mode','scale','background','focus','reference_text'].some(key=>conditions.value[key]!==snapshot[key]) ||
-      JSON.stringify(conditions.value.references)!==JSON.stringify(snapshot.references);
+      JSON.stringify(conditions.value.references)!==JSON.stringify(snapshot.references) ||
+      (conditions.value.checklist?.id||null)!==(snapshot.checklist?.id||null) ||
+      (conditions.value.source_id||null)!==(snapshot.source_id||null);
   });
   const flush=async()=>{
     clearTimeout(timer);
@@ -44,8 +46,12 @@ window.createWorkspaceWorkbench = function (refs) {
         if(run.value?.status==='completed') {
           const changes=handling(), signature=JSON.stringify(changes);
           if(signature!==lastHandling) {
-            run.value=await api('/api/runs/'+run.value.id+'/handling','PUT',{...changes,revision:run.value.revision});
-            decisions.value=run.value.decisions;lastHandling=JSON.stringify(handling());
+            const saved=await api('/api/runs/'+run.value.id+'/handling','PUT',{...changes,revision:run.value.revision});
+            // Preserve selections made while this request was in flight.
+            const unchanged=JSON.stringify(handling())===signature;
+            run.value=saved;
+            if(unchanged) decisions.value=saved.decisions;
+            lastHandling=JSON.stringify({applied:saved.applied,decisions:saved.decisions,comments:saved.comments});
             if(task.value.status==='completed') task.value=await api('/api/tasks/'+taskId.value);
           }
         }
@@ -97,10 +103,11 @@ window.createWorkspaceWorkbench = function (refs) {
   };
   const save=async()=>{try{await flush();refs.showToast('工作内容已保存');}catch(err){refs.showToast(err.message);}};
   const leaveFor=async(path)=>{try{if(taskId.value) await flush();location.href=path;}catch(err){refs.showToast('保存未完成：'+err.message);}};
-  const setDecision=(issue,state)=>{
-    if(isStale.value||historical.value) return;
+  const setDecision=async(issue,state)=>{
+    if(historical.value||loading.value||refs.isReviewing.value) return;
     if(refs.appliedIssueIds.value.includes(issue.id)){refs.showToast('请先撤销该项采纳，再改变处理状态');return;}
     decisions.value={...decisions.value,[issue.id]:state};
+    try { await flush(); } catch(err) { refs.showToast(err.message); }
   };
   const decisionName=id=>({pending:'待处理',applied:'已采纳',rejected:'不采纳',needs_review:'待复核'})[refs.appliedIssueIds.value.includes(id)?'applied':decisions.value[id]||'pending'];
   const exportWord=async()=>{

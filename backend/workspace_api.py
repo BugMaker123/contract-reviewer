@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 
 from .store import repository as repo, now
@@ -19,9 +20,44 @@ STATIC = Path(__file__).parent / 'static'
 
 
 @router.get('/api/sources/{source_id}')
-def source_info(source_id: str):
+def source_info(source_id: str, include_text: bool = False):
     source = repo.get(source_id, 'source')
-    return {key: source.get(key) for key in ('id', 'name', 'extension')}
+    keys = ('id', 'name', 'extension', 'text') if include_text else ('id', 'name', 'extension')
+    info = {key: source.get(key) for key in keys}
+    if include_text and source['extension'] == '.docx':
+        from docx import Document
+        from .word_export import SOURCES, paragraphs, visible_paragraph_text
+        path = SOURCES / (source_id + '.docx')
+        if path.is_file():
+            info['paragraphs'] = [visible_paragraph_text(p._p) for p in paragraphs(Document(path))]
+    return info
+
+
+class SourceEdit(BaseModel):
+    text: str = Field(min_length=1, max_length=200000)
+
+
+@router.post('/api/sources/{source_id}/edit')
+def edit_source(source_id: str, request: SourceEdit):
+    from docx import Document
+    from .word_export import SOURCES, edit_document_text
+    source = repo.get(source_id, 'source')
+    if source['extension'] != '.docx':
+        raise HTTPException(422, '保留排版编辑仅支持 Word DOCX；PDF 请先转换为 Word')
+    if not request.text.strip():
+        raise HTTPException(422, '正文不能为空')
+    path = SOURCES / (source_id + '.docx')
+    if not path.is_file():
+        raise HTTPException(404, '原件文件缺失，请重新上传')
+    try:
+        document = edit_document_text(Document(path), source['text'], request.text)
+    except ValueError as error:
+        raise HTTPException(422, str(error))
+    output = BytesIO()
+    document.save(output)
+    version = repo.create('source', {'extension': '.docx', 'text': request.text, 'name': source['name']})
+    (SOURCES / (version['id'] + '.docx')).write_bytes(output.getvalue())
+    return {'source_id': version['id'], 'text': request.text}
 
 
 @router.get('/api/sources/{source_id}/file')
@@ -67,6 +103,7 @@ def create_task(request: TaskInput):
 @router.get('/api/tasks/{task_id}')
 def get_task(task_id: str):
     task = repo.get(task_id, 'task')
+    task['source_matches'] = bool(task.get('source_id')) and repo.get(task['source_id'], 'source')['text'] == task['text']
     task['runs'] = [{key: run.get(key) for key in ('id', 'number', 'status', 'created_at', 'error')} for run in repo.list('run', task_id)]
     task['run'] = repo.get(task['active_run'], 'run') if task.get('active_run') else None
     return task

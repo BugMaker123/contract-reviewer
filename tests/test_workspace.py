@@ -294,3 +294,30 @@ def test_original_source_is_served_unchanged(client):
     assert file.headers['content-type'].startswith('application/vnd.openxmlformats')
     assert file.headers['cache-control'] == 'no-store'
     assert client.get('/api/sources/' + '0' * 32 + '/file').status_code == 404
+
+
+def test_formatted_source_edit_preserves_runs_tables_and_original(client):
+    document = Document()
+    document.sections[0].header.paragraphs[0].text = 'Header'
+    p = document.add_paragraph()
+    p.add_run('Amount: ').bold = True
+    p.add_run('100 USD').italic = True
+    document.add_table(rows=1, cols=1).cell(0, 0).text = 'Table text'
+    document.add_paragraph('Special\nsoft break')
+    data = BytesIO()
+    document.save(data)
+    imported = client.post('/api/contracts/import', files={'file': ('layout.docx', data.getvalue())}).json()
+    old = imported['source_id']
+    response = client.post('/api/sources/' + old + '/edit', json={'text': 'Amount: 200 USD\nTable revised\nSpecial\nsoft break'})
+    assert response.status_code == 200, response.text
+    edited = response.json()
+    assert edited['source_id'] != old
+    result = Document(BytesIO(client.get('/api/sources/' + edited['source_id'] + '/file').content))
+    assert result.paragraphs[0].text == 'Amount: 200 USD'
+    assert result.paragraphs[0].runs[0].bold
+    assert result.paragraphs[0].runs[1].italic
+    assert result.tables[0].cell(0, 0).text == 'Table revised'
+    assert result.paragraphs[-1].text == 'Special\nsoft break'
+    assert result.sections[0].header.paragraphs[0].text == 'Header'
+    assert client.get('/api/sources/' + old + '/file').content == data.getvalue()
+    assert client.post('/api/sources/' + old + '/edit', json={'text': 'Merged'}).status_code == 422

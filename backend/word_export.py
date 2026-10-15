@@ -133,3 +133,49 @@ def contract_document(run, final_text, repo, default_builder, tracked=False):
             anchor = targets[0].runs[0] if targets[0].runs else targets[0].add_run('')
             document.add_comment(anchor, text=issue['issue_title'] + '\n' + note, author='内部复核', initials='LG')
     return document, layout
+
+
+def edit_document_text(document, original, updated):
+    """Apply text edits without clearing runs, paragraph properties or table structure."""
+    items = paragraphs(document)
+    before = [visible_paragraph_text(p._p) for p in items]
+    if '\n'.join(before) != original:
+        raise ValueError('文档正文与当前编辑稿不一致，请重新打开文档')
+    lines = updated.split('\n')
+    after, offset = [], 0
+    for old in before:
+        count = len(old.split('\n'))
+        after.append('\n'.join(lines[offset:offset + count]))
+        offset += count
+    # Structural changes across tables cannot safely be inferred from plain text.
+    if offset != len(lines):
+        raise ValueError('请在原排版中修改段落内容，暂不支持增删段落')
+    for paragraph, old, new in zip(items, before, after):
+        if old == new:
+            continue
+        nodes = list(paragraph._p.iter(qn('w:t')))
+        if ''.join(node.text or '' for node in nodes) != old:
+            raise ValueError('该段落包含修订或特殊换行，暂不支持直接编辑，请先在 Word 中处理')
+        offsets, start = [], 0
+        for node in nodes:
+            offsets.append((start, start + len(node.text or ''), node))
+            start += len(node.text or '')
+        if not nodes:
+            paragraph.add_run(new)
+            continue
+        for tag, a, b, c, d in reversed(SequenceMatcher(None, old, new, autojunk=False).get_opcodes()):
+            if tag == 'equal':
+                continue
+            anchor = next((i for i, (left, right, node) in enumerate(offsets) if left <= a < right), len(offsets)-1)
+            for i in range(len(offsets)-1, -1, -1):
+                left, right, node = offsets[i]
+                text = node.text or ''
+                lo, hi = max(a, left)-left, min(b, right)-left
+                if hi > lo:
+                    text = text[:lo] + text[hi:]
+                if i == anchor:
+                    pos = a-left
+                    text = text[:pos] + new[c:d] + text[pos:]
+                node.text = text
+                node.set(qn('xml:space'), 'preserve')
+    return document

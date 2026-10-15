@@ -9,7 +9,7 @@
   <script src="/static/vendor/vue.global.prod.js"></script>
   
   <script src="/static/session.js"></script>
-  <script src="/static/workbench-workspace.js"></script>
+  <script src="/static/workbench-workspace.js?v=20261015-handling-2"></script>
   <link rel="stylesheet" href="/static/vendor/tailwind.css">
 
   <style>
@@ -424,7 +424,7 @@
               <button @click="viewMode = 'raw'" 
                       :class="viewMode === 'raw' ? 'bg-white text-slate-900 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-800'"
                       class="px-3 py-1 rounded-md transition cursor-pointer">
-                审查文本
+                合同正文
               </button>
               <button @click="viewMode = 'redlined'" 
                       :class="viewMode === 'redlined' ? 'bg-white text-emerald-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-800'"
@@ -466,7 +466,7 @@
         <div v-if="workspace.error" class="px-6 py-3 text-xs text-red-700 bg-red-50 border-b border-red-200" role="alert">{{ workspace.error }}</div>
         <div v-if="resultStale || reviewError" class="px-6 py-3 text-xs text-amber-800 bg-amber-50 border-b border-amber-200" role="alert">{{ reviewError || '审查信息已变更，当前结果属于上次版本。请重新审查后处理修订或导出意见书。' }}</div>
         <!-- 正文视窗：大字号 15px、清晰可读、纯正商务卷宗感 -->
-        <div v-if="viewMode==='original'" class="px-6 py-2 text-xs text-slate-500 bg-white border-b border-slate-200">上传原件，未应用正文编辑或采纳修订。Word 排版为近似预览；点击右侧意见可在原件中定位，保留排版。</div>
+        <div v-if="viewMode==='original'" class="px-6 py-2 text-xs text-slate-500 bg-white border-b border-slate-200">合同文档：Word 支持在原排版中编辑并保存；排版为近似预览，保存后请重新审查。已采纳建议仍在修订稿中单独查看。</div>
         <iframe v-if="viewMode==='original' && workspace.conditions.source_id" :src="'/static/document-preview.html?source='+workspace.conditions.source_id" title="合同原件预览" sandbox="allow-scripts allow-same-origin allow-downloads" class="flex-1 w-full border-0" style="min-height:400px"></iframe>
         <div v-else class="flex-1 overflow-y-auto p-8" id="contract-viewer">
           
@@ -643,8 +643,8 @@
             </div>
 
             <div v-if="workspace.run" class="mt-4 pt-3 border-t border-slate-100 space-y-3" @click.stop>
-              <div class="flex gap-2 text-xs"><button @click="workspace.setDecision(issue,'rejected')" :disabled="resultStale || workspace.historical" class="px-2 py-1 border border-slate-200 rounded text-slate-600">不采纳</button><button @click="workspace.setDecision(issue,'needs_review')" :disabled="resultStale || workspace.historical" class="px-2 py-1 border border-slate-200 rounded text-amber-700">待复核</button><button @click="workspace.setDecision(issue,'pending')" :disabled="resultStale || workspace.historical" class="px-2 py-1 text-slate-400">重置状态</button><button @click="openClauseEditor(issue)" :disabled="resultStale || workspace.historical" class="px-2 py-1 text-blue-600">编辑条款</button><button @click="workspace.followupIssue=workspace.followupIssue===issue.id ? null : issue.id" class="ml-auto px-2 py-1 text-blue-600">追问这项意见</button></div>
-              <textarea v-model="workspace.comments[issue.id]" :disabled="workspace.historical || resultStale" placeholder="添加人工备注或处理理由…" aria-label="条目处理备注" class="w-full border border-slate-200 rounded-lg p-2 text-xs leading-relaxed outline-none focus:border-blue-500" rows="2"></textarea>
+              <div class="flex gap-2 text-xs"><button @click="workspace.setDecision(issue,'rejected')" :aria-pressed="workspace.decisionName(issue.id)==='不采纳'" :class="workspace.decisionName(issue.id)==='不采纳' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''" :disabled="workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 border border-slate-200 rounded text-slate-600">不采纳</button><button @click="workspace.setDecision(issue,'needs_review')" :aria-pressed="workspace.decisionName(issue.id)==='待复核'" :class="workspace.decisionName(issue.id)==='待复核' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''" :disabled="workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 border border-slate-200 rounded text-amber-700">待复核</button><button @click="workspace.setDecision(issue,'pending')" :aria-pressed="workspace.decisionName(issue.id)==='待处理'" :class="workspace.decisionName(issue.id)==='待处理' ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold' : ''" :disabled="workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 text-slate-400">重置状态</button><button @click="openClauseEditor(issue)" :disabled="workspace.historical || workspace.loading || isReviewing" class="px-2 py-1 text-blue-600">编辑条款</button><button @click="workspace.followupIssue=workspace.followupIssue===issue.id ? null : issue.id" class="ml-auto px-2 py-1 text-blue-600">追问这项意见</button></div>
+              <textarea v-model="workspace.comments[issue.id]" :disabled="workspace.historical || workspace.loading || isReviewing" placeholder="添加人工备注或处理理由…" aria-label="条目处理备注" class="w-full border border-slate-200 rounded-lg p-2 text-xs leading-relaxed outline-none focus:border-blue-500" rows="2"></textarea>
               <div v-if="workspace.followupIssue===issue.id" class="space-y-3">
                 <div v-for="answer in workspace.followups[issue.id] || []" class="p-3 border border-slate-200 bg-slate-50 rounded-lg text-xs leading-relaxed"><div class="font-semibold text-slate-700">{{ answer.question }}</div><p class="mt-2 whitespace-pre-wrap text-slate-600">{{ answer.answer }}</p><p v-if="answer.suggested_text" class="mt-2 whitespace-pre-wrap text-emerald-800">{{ answer.suggested_text }}</p><button v-if="answer.suggested_text" @click="workspace.previewFollowup(answer)" class="mt-2 text-blue-600">复制替代条款，核对后编辑正文</button></div>
                 <textarea v-model="workspace.question" placeholder="例如：解释这一风险，或提出更温和的修改方案…" class="w-full p-2 text-xs border border-slate-200 rounded-lg" rows="3"></textarea><button @click="workspace.ask(issue)" :disabled="workspace.followupBusy || !workspace.question.trim() || workspace.historical || resultStale" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs">{{ workspace.followupBusy ? '正在回答…' : '发送追问' }}</button>
@@ -819,7 +819,7 @@
                   <span>{{ issue.clause_title }}：{{ issue.issue_title }}</span>
                   <span class="font-bold text-red-600 uppercase">[{{ issue.checklist_status === "needs_review" ? "待人工确认" : issue.diff && !issue.model_assessed ? "变更待评估" : severityLabel(issue.severity) }}]</span>
                 </div>
-                <div class="mt-1 text-blue-700">处理状态：{{ appliedIssueIds.includes(issue.id) ? "已采纳" : "待处理" }}</div>
+                <div class="mt-1 text-blue-700">处理状态：{{ workspace.decisionName(issue.id) }}</div>
                 <div class="text-slate-600 mt-1.5"><strong>法律依据：</strong>{{ issue.legal_basis }}</div>
                 <div class="text-slate-600 mt-1"><strong>风险剖析：</strong>{{ issue.risk_analysis }}</div>
                 <div class="text-amber-800 mt-1"><strong>谈判策略：</strong>{{ issue.negotiation_strategy }}</div>
@@ -917,22 +917,69 @@
           } catch { saveStatus.value = '保存失败，请导出备份'; }
         };
         watch([contractTitle, contractType, partyRole, contractText, reviewResult, appliedIssueIds, reviewedAt], persist, {deep: true});
-        const openEditor = () => { editText.value = contractText.value; editTitle.value = contractTitle.value; editType.value = contractType.value; showEditor.value = true; };
-        const saveEditor = () => {
+        const openEditor = async () => {
+          if (viewMode.value === 'original' && (await (await fetch('/api/sources/'+workspace.conditions.source_id)).json()).extension !== '.txt') { document.querySelector('iframe[title="合同原件预览"]')?.contentWindow.postMessage({type:'lexis-edit'}, location.origin); return; }
+          editText.value = contractText.value; editTitle.value = contractTitle.value; editType.value = contractType.value; showEditor.value = true; };
+        let pendingEditLocation = null;
+        const saveFormattedText = async (text) => {
+          if (!workspace.conditions.source_id) return false;
+          const info = await (await fetch('/api/sources/'+workspace.conditions.source_id)).json();
+          if (info.extension === '.txt') return false;
+          const response = await fetch(`/api/sources/${workspace.conditions.source_id}/edit`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({text})});
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || "文档保存失败");
+          const before = contractText.value.split('\n'), after = data.text.split('\n');
+          const index = after.findIndex((line, i) => line !== before[i]);
+          pendingEditLocation = index >= 0 ? {source: data.source_id, index, text:after[index], scroll:document.querySelector('iframe[title="合同原件预览"]')?.contentWindow.scrollY || 0} : null;
+          workspace.conditions.source_id = data.source_id;
+          contractText.value = data.text;
+          await workspace.flush();
+          viewMode.value = "original";
+          return true;
+        };
+        const saveEditor = async () => {
           if (editText.value.length > 200000) { showToast('正文超过 20 万字，请拆分后审查'); return; }
 
+          try {
+          const formatted = await saveFormattedText(editText.value);
           contractText.value = editText.value; contractTitle.value = editTitle.value; contractType.value = editType.value;
           showEditor.value = false;
+          if (!formatted) viewMode.value = 'raw';
+          showToast('已更新正文，请重新审查当前版本');
+          } catch (error) { showToast(error.message); }
         };
-        const openClauseEditor = (issue) => {
-          const original = issue.redline?.original_text || issue.evidence;
+        const openClauseEditor = async (issue) => {
+          if (workspace.historical || workspace.loading || isReviewing.value) return;
+          let original = issue.redline?.original_text || issue.evidence;
+          {
+            // Resolve the current DOCX paragraphs even when old evidence is still a substring.
+            // Appending text leaves the old quote intact but does not make it the current clause.
+            const baseline = reviewedInput.value?.text;
+            const start = original && baseline?.indexOf(original);
+            if (typeof start === 'number' && start >= 0 && baseline.indexOf(original, start + 1) < 0 && workspace.conditions.source_id) {
+              try {
+                const info = await (await fetch('/api/sources/'+workspace.conditions.source_id)).json();
+                const before = baseline.split('\n'), after = contractText.value.split('\n');
+                if (info.extension === '.docx' && before.length === after.length) {
+                  const first = baseline.slice(0, start).split('\n').length - 1;
+                  const last = baseline.slice(0, start + original.length - 1).split('\n').length - 1;
+                  original = after.slice(first, last + 1).join('\n');
+                }
+              } catch (error) { showToast('无法读取当前文档，请重试'); return; }
+            }
+          }
           if (!original || contractText.value.split(original).length !== 2) { showToast('该项无法唯一定位，请通过编辑正文人工核对'); return; }
           clauseEdit.value = {original, text: original, title: issue.clause_title};
         };
-        const saveClauseEditor = () => {
+        const saveClauseEditor = async () => {
           if (!clauseEdit.value || contractText.value.split(clauseEdit.value.original).length !== 2) { showToast('原文已变更，请重新定位'); return; }
-          contractText.value = contractText.value.replace(clauseEdit.value.original, clauseEdit.value.text);
+          try {
+          const text = contractText.value.replace(clauseEdit.value.original, clauseEdit.value.text);
+          const formatted = await saveFormattedText(text);
+          contractText.value = text;
+          if (!formatted) viewMode.value = 'raw';
           clauseEdit.value = null; showToast('已更新正文，请重新审查当前版本');
+          } catch (error) { showToast(error.message); }
         };
         const cancelReview = () => { if (controller) controller.abort(); };
         const exportContract = () => {
@@ -970,7 +1017,7 @@
         const formattedLines = computed(() => {
           if (!contractText.value) return [];
           const lines = contractText.value.split("\n");
-          const issues = reviewResult.value?.issues || [];
+          const issues = resultStale.value ? [] : reviewResult.value?.issues || [];
 
           return lines.map((line, idx) => {
             let highlightClass = "";
@@ -1221,7 +1268,7 @@
           if (appliedIssueIds.value.includes(issue.id)) {
             const remaining = appliedIssueIds.value.filter(id => id !== issue.id);
             // Removing an earlier edit must not silently invalidate a later edit.
-            let text = contractText.value;
+            let text = reviewedInput.value?.text ?? contractText.value;
             for (const id of remaining) {
               const redline = reviewResult.value.issues.find(i => i.id === id)?.redline;
               if (!redline) continue;
@@ -1230,7 +1277,7 @@
               }
               text = redline.change_type === 'insert' ? text + '\n' + redline.suggested_text : text.replace(redline.original_text, redline.change_type === 'delete' ? '' : redline.suggested_text);
             }
-            appliedIssueIds.value = remaining; showToast('已撤销采纳'); return;
+            appliedIssueIds.value = remaining; viewMode.value = 'redlined'; showToast('已撤销采纳，修订稿已更新'); return;
           }
           const redline = issue.redline, text = finalizedContractText.value;
           if (redline.change_type !== 'insert') {
@@ -1239,7 +1286,8 @@
             if (text.indexOf(original) !== text.lastIndexOf(original)) { showToast('原文存在多处相同内容，请人工核对后编辑'); return; }
           }
           appliedIssueIds.value = [...appliedIssueIds.value, issue.id];
-          showToast('已采纳，可在修订稿中查看或撤销');
+          viewMode.value = 'redlined';
+          showToast('已采纳，左侧已显示修订稿');
         };
 
         const copyText = async (txt) => {
@@ -1294,9 +1342,26 @@
           loadSample("business_cooperation_contract");
         };
 
+        window.addEventListener('message', async event => {
+          const frame = document.querySelector('iframe[title="合同原件预览"]');
+          if (event.origin !== location.origin || event.source !== frame?.contentWindow) return;
+          if (event.data?.type === 'lexis-document-ready' && pendingEditLocation?.source === event.data.source && workspace.conditions.source_id === event.data.source) {
+            frame.contentWindow.postMessage({type:'lexis-locate-edit', ...pendingEditLocation}, location.origin);
+            pendingEditLocation = null;
+          }
+          if (event.data?.type === 'lexis-save-document') {
+            try {
+              if (workspace.historical || workspace.loading || isReviewing.value) throw new Error('当前版本不能编辑');
+              await saveFormattedText(event.data.text);
+              showToast('文档已保留排版保存，请重新审查');
+            } catch (error) { frame.contentWindow.postMessage({type:'lexis-save-error', message:error.message}, location.origin); }
+          }
+        });
         onMounted(() => {
           if (workspace.taskId) workspace.load().then(() => {
-            if (workspace.conditions.source_id) viewMode.value = 'original';
+            if (resultStale.value && workspace.task?.source_matches) viewMode.value = 'original';
+            else if (appliedIssueIds.value.length) viewMode.value = 'redlined';
+            else if (workspace.conditions.source_id && (workspace.historical || workspace.task?.source_matches !== false)) viewMode.value = 'original';
             if (reviewResult.value) { reviewProgress.value = 100; Object.keys(nodeStates.value).forEach(key => nodeStates.value[key] = 'completed'); }
           }); else { workspace.load().then(fetchSamples); }
         });
