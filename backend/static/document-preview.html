@@ -1,199 +1,579 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self'; frame-src blob:; base-uri 'none'; form-action 'none'"><meta name="viewport" content="width=device-width,initial-scale=1"><title>合同原件预览</title><style>
-*{box-sizing:border-box}body{margin:0;background:#f4f6f9;color:#334155;font:13px system-ui}[hidden]{display:none!important}
-body>header{position:sticky;top:0;z-index:2;min-height:44px;background:#fff;border-bottom:1px solid #edf0f5;padding:7px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.pane-identity{display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap}#pane-label{font-size:12px;font-weight:600;color:#334155}#pane-badge{font-size:10px;font-weight:500;color:#64748b;background:#f1f5f9;border-radius:4px;padding:2px 5px}body[data-pane="revised"] #pane-badge{color:#397861;background:#eef7f2}
-#name{display:none}.pane-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
-button,a{font:inherit;color:#64748b}button{cursor:pointer;border:1px solid #e2e8f0;background:#fff;border-radius:5px;padding:4px 8px}button:hover,a:hover{color:#1d4ed8;background:#f8fafc}button:focus-visible,a:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
-#download{display:flex;align-items:center;gap:4px;text-decoration:none;font-size:11px;padding:5px;border-radius:4px}#download svg{width:13px;height:13px}#save-edit{color:#fff;background:#2563eb;border-color:#2563eb;font-size:11px}#cancel-edit{font-size:11px}
-#zoom-controls{display:inline-flex;align-items:center;gap:1px;border-radius:6px;background:#f5f7fa;padding:2px;color:#64748b}#zoom-controls button{border:0;background:transparent;padding:2px 6px;font-size:11px;line-height:18px;border-radius:4px}#zoom-controls button:hover{background:#e8edf5}#zoom-fit[aria-pressed="true"]{background:#fff;color:#475569;box-shadow:0 1px 2px #0f172a0d}#zoom-percent{font-size:10px;min-width:32px;text-align:center;font-variant-numeric:tabular-nums}.zoom-divider{width:1px;height:12px;background:#e2e8f0;margin:0 2px}
-#locate-status{color:#64748b;font-size:11px;flex-basis:100%;overflow-wrap:anywhere}#locate-status:empty{display:none}#locate-status.quiet{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-#status{padding:24px;text-align:center}#viewport{overflow:auto}#pages{transform-origin:top left;width:max-content;min-width:100%}.docx-wrapper{background:transparent!important;padding:16px!important}section.docx article p{overflow-wrap:anywhere}section.docx{box-shadow:0 1px 5px #dbe1e9!important;margin-bottom:24px!important}#pages .lexis-located{outline:none;box-shadow:inset 3px 0 #ef4444!important;background:rgba(254,202,202,.65)!important;border-radius:3px;scroll-margin-top:70px}iframe{width:100%;height:calc(100vh - 44px);border:0}
-@media(max-width:440px){#pane-badge{display:none}body>header{gap:4px;padding:7px 8px}.pane-actions{gap:4px}#zoom-controls button{padding:2px 4px}}
-html.shared-original{scrollbar-width:none}html.shared-original::-webkit-scrollbar{display:none}.lexis-diff-original{background:rgba(253,230,138,.65)!important;box-shadow:inset 3px 0 #e9a526;border-radius:2px}.lexis-diff-revised{background:rgba(254,202,202,.65)!important;box-shadow:inset 3px 0 #ef4444;border-radius:2px}
-#pages .lexis-review-risk{background:rgba(254,202,202,.58)!important;box-shadow:inset 3px 0 #ef4444!important;border-radius:3px;scroll-margin-top:70px}#zoom-controls{position:relative;background:transparent;padding:0}#zoom-percent{min-width:72px;padding:4px 10px!important;text-align:left;font-size:11px!important;border:1px solid #e2e8f0!important;background:#fff!important;color:#475569}#zoom-percent::after{content:"";display:inline-block;width:5px;height:5px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);margin:0 0 3px 10px}#zoom-menu{position:absolute;right:0;top:calc(100% + 6px);min-width:128px;padding:4px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 8px 24px #0f172a18;z-index:10}#zoom-menu button{display:block;width:100%;padding:6px 10px!important;text-align:left}#zoom-menu button[aria-checked="true"]{background:#eff6ff;color:#2563eb;font-weight:600}</style></head><body><header><div class="pane-identity"><span id="pane-label">原始文档</span><span id="pane-badge" hidden></span><span id="name"></span></div><div class="pane-actions"><div id="zoom-controls" role="group" aria-label="文档缩放" hidden><button id="zoom-percent" aria-label="选择文档缩放比例" aria-haspopup="true" aria-expanded="false">80%</button><div id="zoom-menu" role="menu" aria-label="缩放比例" hidden><button role="menuitemradio" data-zoom="fit">适应宽度</button><button role="menuitemradio" data-zoom="0.5">50%</button><button role="menuitemradio" data-zoom="0.8">80%</button><button role="menuitemradio" data-zoom="1">100%</button><button role="menuitemradio" data-zoom="1.25">125%</button><button role="menuitemradio" data-zoom="1.5">150%</button><button role="menuitemradio" data-zoom="2">200%</button></div></div><a id="download" download aria-label="下载文档" title="下载此文档"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg>下载</a><button id="save-edit" hidden>保存正文</button><button id="cancel-edit" hidden>取消编辑</button></div><span id="locate-status" role="status"></span></header><div id="status" role="status">正在加载原件…</div><div id="viewport"><div id="pages"></div></div><script src="/static/vendor/jszip.min.js"></script><script src="/static/vendor/docx-preview.min.js"></script><script>
-(async()=>{
- const params=new URLSearchParams(location.search),id=params.get('source'),run=params.get('run'),scope=params.get('scope')||'current',readOnly=params.get('readonly')==='1';const status=document.querySelector('#status'),pages=document.querySelector('#pages'),zoom={value:'fit'},zoomControls=document.querySelector('#zoom-controls');
- const resize=()=>{
-   const sheets=[...pages.querySelectorAll('section.docx')];if(!sheets.length)return;
-   const width=Math.max(...sheets.map(page=>Math.max(page.offsetWidth,page.scrollWidth)));
-   const available=document.documentElement.clientWidth;
-   const fit=Math.min(1,Math.max(.1,(available-32)/(width+32)));
-   const scale=zoom.value==='fit'?fit:Number(zoom.value);
-   pages.style.zoom=scale;
-   document.querySelector('#zoom-percent').textContent=zoom.value==='fit'?'适应宽度':Math.round(scale*100)+'%';
-   document.querySelectorAll('[data-zoom]').forEach(button=>button.setAttribute('aria-checked',String(button.dataset.zoom===zoom.value)));
- };
- const pane=params.get('pane')==='revised'?'revised':'original';
- document.body.dataset.pane=pane;
- if(params.get('shared')==='1')document.documentElement.classList.add('shared-original');
- const label=document.querySelector('#pane-label'),badge=document.querySelector('#pane-badge');
- label.textContent=pane==='revised'?'修订文档':'原始文档';
- if(readOnly){badge.hidden=false;badge.textContent='只读';}
- if(pane==='revised'){badge.hidden=false;badge.textContent=params.get('edited')==='1'?'编辑稿':'全部建议';badge.title=params.get('edited')==='1'?'当前人工编辑稿':'全部修改建议，未自动采纳';}
- let info, editable=[], anchors=[],documentRendered=false,pendingMarks=null;
- const hint=document.querySelector('#locate-status'),save=document.querySelector('#save-edit'),cancel=document.querySelector('#cancel-edit');
- new MutationObserver(()=>hint.classList.toggle('quiet',/^(已定位|已取消|直接点击)/.test(hint.textContent))).observe(hint,{childList:true,characterData:true,subtree:true});
- let editing=false,draftFrame=0;
- const composeText=()=>{
-   if(!info)return '';
-   if(!editing)return info.text;
-   const lines=info.text.split('\n');
-   editable.forEach(item=>{lines[item.index]=item.element.innerText.replace(/\r/g,'');});
-   return lines.join('\n');
- };
- window.getLexisDocumentSnapshot=()=>({source:id,run,editing,text:composeText(),baseText:info?.text});
- const sendDraft=()=>parent.postMessage({type:'lexis-document-draft',...window.getLexisDocumentSnapshot()},location.origin);
- window.setLexisDocumentSaving=busy=>{save.disabled=cancel.disabled=busy;editable.forEach(item=>{item.element.contentEditable=editing&&!busy?'plaintext-only':'false';});};
- const finish=()=>{editing=false;editable.forEach(item=>{item.element.contentEditable='false';});save.hidden=cancel.hidden=true;};
- cancel.onclick=()=>{editable.forEach(item=>{item.element.innerHTML=item.originalHTML;});finish();sendDraft();hint.textContent='已取消编辑';};
- pages.addEventListener('input',()=>{
-   if(!editing||draftFrame)return;
-   draftFrame=requestAnimationFrame(()=>{draftFrame=0;sendDraft();});
- });
- save.onclick=()=>{const text=composeText();window.setLexisDocumentSaving(true);parent.postMessage({type:'lexis-save-document',source:id,text},location.origin);};
- const fitObserver=new ResizeObserver(()=>resize());fitObserver.observe(document.documentElement);
- let scrollLockUntil=0,scrollFrame=0;
- const headerHeight=()=>document.querySelector('header').offsetHeight;
- const anchorTop=item=>item.element.getBoundingClientRect().top+scrollY;
- const anchorSpan=(item,i)=>Math.max(1,anchors[i+1]?anchorTop(anchors[i+1])-anchorTop(item):item.element.getBoundingClientRect().height);
- window.addEventListener('scroll',()=>{
-   if(performance.now()<scrollLockUntil || scrollFrame)return;
-   scrollFrame=requestAnimationFrame(()=>{
-     scrollFrame=0;
-     const y=scrollY+headerHeight();let i=0;
-     for(let j=0;j<anchors.length;j++){if(anchorTop(anchors[j])<=y)i=j;else break;}
-     const anchor=anchors[i],range=document.documentElement.scrollHeight-innerHeight;
-     parent.postMessage({type:'lexis-document-scroll',ratio:range>0?scrollY/range:0,index:anchor?.index,fraction:anchor?Math.max(0,Math.min(1,(y-anchorTop(anchor))/anchorSpan(anchor,i))):0},location.origin);
-   });
- },{passive:true});
- for(const name of ['wheel','pointerdown','keydown'])window.addEventListener(name,()=>{scrollLockUntil=0;},{passive:true});
- const normalize=text=>(text||'').replace(/\s+/g,'');
- const applyDifferenceMarks=data=>{
-   pages.querySelectorAll('.lexis-diff-original,.lexis-diff-revised,.lexis-review-risk').forEach(el=>el.classList.remove('lexis-diff-original','lexis-diff-revised','lexis-review-risk'));
-   for(const change of data.changes||[]){
-     const start=change[data.side+'_start'],end=change[data.side+'_end'];
-     for(const item of anchors)if(start<end && item.index<end && item.end>start)item.element.classList.add('lexis-diff-'+data.side);
-   }
-   for(const issue of data.issues||[]){
-     const target=normalize(issue[data.side]);
-     let matches=target?anchors.filter(item=>normalize(item.element.textContent).includes(target)):[];
-     if(matches.length!==1){
-       matches=target?anchors.filter(item=>{const text=normalize(item.element.textContent);return text.length>=12 && target.includes(text);}):[];
-       if(matches.some((item,i)=>i && anchors.indexOf(item)!==anchors.indexOf(matches[i-1])+1))matches=[];
-     }
-     if(!matches.length && issue.range){
-       const start=issue.range[data.side+'_start'],end=issue.range[data.side+'_end'];
-       matches=anchors.filter(item=>item.index<end && item.end>start);
-     }
-     matches.forEach(item=>item.element.classList.add('lexis-review-risk'));
-   }
-   if(data.focusFirst){
-     const first=pages.querySelector('.lexis-review-risk');
-     if(first){first.scrollIntoView({behavior:'instant',block:'center'});hint.textContent='已定位到首个审查重点';}
-   }
- };
- window.addEventListener('message',event=>{
-   if(event.origin!==location.origin || event.source!==parent)return;
-   if(event.data?.type==='lexis-fit-width'){zoom.value='fit';resize();return;}
-   if(event.data?.type==='lexis-set-zoom' && Number.isFinite(event.data.scale)){zoom.value=String(Math.max(.3,Math.min(2,event.data.scale)));resize();return;}
-   if(event.data?.type==='lexis-sync-scroll'){
-     const data=event.data,range=Math.max(0,document.documentElement.scrollHeight-innerHeight);
-     let y=(data.ratio||0)*range;
-     if(Number.isInteger(data.index) && data.ratio>0 && data.ratio<.999){
-       const i=anchors.findIndex(item=>data.index>=item.index && data.index<item.end);
-       if(i>=0)y=anchorTop(anchors[i])+(data.fraction||0)*anchorSpan(anchors[i],i)-headerHeight();
-     }
-     scrollLockUntil=performance.now()+100;
-     scrollTo({top:Math.max(0,Math.min(range,y)),behavior:'instant'});
-     return;
-   }
-   if(event.data?.type==='lexis-mark-differences'){
-     if(!documentRendered)pendingMarks=event.data;
-     else applyDifferenceMarks(event.data);
-     return;
-   }
-   if(event.data?.type==='lexis-locate-edit'){
-     const item=anchors.find(item=>event.data.index>=item.index && event.data.index<item.end);
-     const matches=[...pages.querySelectorAll('article p')].filter(p=>normalize(p.textContent)===normalize(event.data.text));
-     const element=item?.element || (matches.length===1 ? matches[0] : null);
-     if(element){
-       pages.querySelectorAll('.lexis-located').forEach(el=>el.classList.remove('lexis-located'));
-       element.classList.add('lexis-located');
-       element.scrollIntoView({behavior:'instant',block:'center'});
-       hint.textContent='已定位到刚修改的位置';
-       setTimeout(()=>element.classList.remove('lexis-located'),5000);
-     }else{scrollTo(0,event.data.scroll||0);hint.textContent='已恢复保存前的阅读位置';}
-     return;
-   }
-   if(event.data?.type==='lexis-save-error'){window.setLexisDocumentSaving(false);hint.textContent=event.data.message;return;}
-   if(event.data?.type==='lexis-edit'){
-     if(readOnly){hint.textContent='左侧原始文档只读，请编辑右侧文档';return;}
-     if(info?.extension!=='.docx'){hint.textContent='保留排版编辑仅支持 Word DOCX；PDF 请先转换为 Word';return;}
-     if(!editable.length){hint.textContent='该文档段落无法安全映射，请在 Word 中编辑后重新上传';return;}
-     if(editing)return;
-     editing=true;
-     editable.forEach(item=>{item.originalHTML=item.element.innerHTML;item.element.contentEditable='plaintext-only';});
-     sendDraft();
-     save.hidden=cancel.hidden=false;hint.textContent='直接点击正文修改，完成后保存；暂不支持增删段落';editable[0].element.focus();return;
-   }
-   if(event.data?.type!=='lexis-locate')return;
-   const target=normalize(event.data.text);
-   pages.querySelectorAll('.lexis-located').forEach(el=>el.classList.remove('lexis-located'));
-   if(!target){hint.textContent='该意见没有可定位的原文证据';return;}
-   const paragraphs=[...pages.querySelectorAll('article p')];
-   let matches=paragraphs.filter(p=>normalize(p.textContent).includes(target));
-   if(!matches.length){
-     matches=paragraphs.filter(p=>{const text=normalize(p.textContent);return text.length>=12 && target.includes(text);});
-   }
-   if(!matches.length){hint.textContent='未能在原件精确定位，可手动切换至审查文本';return;}
-   // Only a unique single-paragraph match or a contiguous multi-paragraph passage is safe to anchor.
-   if(matches.length>1 && (matches.some(p=>normalize(p.textContent).includes(target)) || matches.some((p,i)=>i && paragraphs.indexOf(p)!==paragraphs.indexOf(matches[i-1])+1))){hint.textContent='原文有多处匹配，请在审查文本中核对';return;}
-   matches.forEach(p=>p.classList.add('lexis-located'));
-   matches[0].scrollIntoView({behavior:'smooth',block:'center'});
-   hint.textContent='已定位原文';
- });
- const zoomButton=document.querySelector('#zoom-percent'),zoomMenu=document.querySelector('#zoom-menu');
- window.addEventListener('resize',resize);
- const closeZoom=()=>{zoomMenu.hidden=true;zoomButton.setAttribute('aria-expanded','false');};
- zoomButton.onclick=()=>{zoomMenu.hidden=!zoomMenu.hidden;zoomButton.setAttribute('aria-expanded',String(!zoomMenu.hidden));};
- zoomMenu.onclick=event=>{const option=event.target.closest('[data-zoom]');if(!option)return;zoom.value=option.dataset.zoom;resize();closeZoom();zoomButton.focus();};
- document.addEventListener('click',event=>{if(!zoomControls.contains(event.target))closeZoom();});
- document.addEventListener('keydown',event=>{if(event.key==='Escape'){closeZoom();zoomButton.focus();}});
- try{
- if(!/^[a-f0-9]{32}$/.test(id||''))throw Error('原件标识无效');
- const response=await fetch('/api/sources/'+id+'?include_text=true'+(run?'&run='+encodeURIComponent(run)+'&scope='+encodeURIComponent(scope):''));if(!response.ok)throw Error('原件记录不存在');info=await response.json();document.querySelector('#name').textContent=info.name;label.title=info.name;
- const url=run?'/api/runs/'+encodeURIComponent(run)+'/preview-file?scope='+encodeURIComponent(scope):'/api/sources/'+id+'/file';const link=document.querySelector('#download');link.href=url;link.download=info.name;
- const file=await fetch(url);if(!file.ok)throw Error('原件文件缺失，请重新上传');const blob=await file.blob();
- if(info.extension==='.docx'){
- zoomControls.hidden=false;
- await docx.renderAsync(blob,pages,null,{ignoreLastRenderedPageBreak:false,renderHeaders:true,renderFooters:true,renderAltChunks:false,useBase64URL:true});
- // Original document links must never navigate or load resources outside the internal preview.
- pages.querySelectorAll('a').forEach(a=>{a.removeAttribute('href');a.removeAttribute('target');});
- const elements=[...pages.querySelectorAll('article p')];let cursor=0;
- let index=0;
- for(const text of info.paragraphs || info.text.split('\n')){
-   const end=index+text.split('\n').length;
-   if(text.trim()){
-     const found=elements.findIndex((p,i)=>i>=cursor && normalize(p.textContent)===normalize(text));
-     if(found>=0){
-       const element=elements[found];
-       anchors.push({index,end,element});
-       // Soft breaks and tabs need a richer editor; they must not invalidate other anchors.
-       if(!/[\n\t]/.test(text))editable.push({index,element,original:element.innerText});
-       cursor=found+1;
-     }
-   }
-   index=end;
- }
- resize();
- }else if(info.extension==='.pdf'){zoomControls.hidden=true;const frame=document.createElement('iframe');frame.title='PDF 原件';frame.src=URL.createObjectURL(blob);pages.append(frame);}
- else{zoomControls.hidden=true;pages.style.width='auto';pages.style.whiteSpace='pre-wrap';pages.style.padding='24px';(info.text||'').split('\n').forEach((text,index)=>{const p=document.createElement('p');p.textContent=text||' ';pages.append(p);anchors.push({index,end:index+1,element:p});});}
- status.hidden=true;
- if(info.preview_warnings?.length){hint.textContent=info.preview_warnings.length+' 处建议尚未完整应用，请在意见栏核对';hint.title=info.preview_warnings.join('；');}
- await document.fonts.ready;
- resize();
- documentRendered=true;
- if(pendingMarks){applyDifferenceMarks(pendingMarks);pendingMarks=null;}
- requestAnimationFrame(()=>requestAnimationFrame(()=>parent.postMessage({type:'lexis-document-ready',source:id,run,text:info.text},location.origin)));
- }catch(error){status.textContent='预览失败：'+error.message+'。可切换至审查文本继续核对。';}
-})();</script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self'; frame-src blob:; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>合同原件预览</title>
+  <style>
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      background: #f4f6f9;
+      color: #334155;
+      font: 13px system-ui
+    }
+
+    [hidden] {
+      display: none !important
+    }
+
+    body>header {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      min-height: 44px;
+      background: #fff;
+      border-bottom: 1px solid #edf0f5;
+      padding: 7px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap
+    }
+
+    .pane-identity {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      white-space: nowrap
+    }
+
+    #pane-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155
+    }
+
+    #pane-badge {
+      font-size: 10px;
+      font-weight: 500;
+      color: #64748b;
+      background: #f1f5f9;
+      border-radius: 4px;
+      padding: 2px 5px
+    }
+
+    body[data-pane="revised"] #pane-badge {
+      color: #397861;
+      background: #eef7f2
+    }
+
+    #name {
+      display: none
+    }
+
+    .pane-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto
+    }
+
+    button,
+    a {
+      font: inherit;
+      color: #64748b
+    }
+
+    button {
+      cursor: pointer;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      border-radius: 5px;
+      padding: 4px 8px
+    }
+
+    button:hover,
+    a:hover {
+      color: #1d4ed8;
+      background: #f8fafc
+    }
+
+    button:focus-visible,
+    a:focus-visible {
+      outline: 2px solid #93c5fd;
+      outline-offset: 2px
+    }
+
+    #download {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      text-decoration: none;
+      font-size: 11px;
+      padding: 5px;
+      border-radius: 4px
+    }
+
+    #download svg {
+      width: 13px;
+      height: 13px
+    }
+
+    #save-edit {
+      color: #fff;
+      background: #2563eb;
+      border-color: #2563eb;
+      font-size: 11px
+    }
+
+    #cancel-edit {
+      font-size: 11px
+    }
+
+    #zoom-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 1px;
+      border-radius: 6px;
+      background: #f5f7fa;
+      padding: 2px;
+      color: #64748b
+    }
+
+    #zoom-controls button {
+      border: 0;
+      background: transparent;
+      padding: 2px 6px;
+      font-size: 11px;
+      line-height: 18px;
+      border-radius: 4px
+    }
+
+    #zoom-controls button:hover {
+      background: #e8edf5
+    }
+
+    #zoom-fit[aria-pressed="true"] {
+      background: #fff;
+      color: #475569;
+      box-shadow: 0 1px 2px #0f172a0d
+    }
+
+    #zoom-percent {
+      font-size: 10px;
+      min-width: 32px;
+      text-align: center;
+      font-variant-numeric: tabular-nums
+    }
+
+    .zoom-divider {
+      width: 1px;
+      height: 12px;
+      background: #e2e8f0;
+      margin: 0 2px
+    }
+
+    #locate-status {
+      color: #64748b;
+      font-size: 11px;
+      flex-basis: 100%;
+      overflow-wrap: anywhere
+    }
+
+    #locate-status:empty {
+      display: none
+    }
+
+    #locate-status.quiet {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap
+    }
+
+    #status {
+      padding: 24px;
+      text-align: center
+    }
+
+    #viewport {
+      overflow: auto
+    }
+
+    #pages {
+      transform-origin: top left;
+      width: max-content;
+      min-width: 100%
+    }
+
+    .docx-wrapper {
+      background: transparent !important;
+      padding: 16px !important
+    }
+
+    section.docx article p {
+      overflow-wrap: anywhere
+    }
+
+    section.docx {
+      box-shadow: 0 1px 5px #dbe1e9 !important;
+      margin-bottom: 24px !important
+    }
+
+    #pages .lexis-located {
+      outline: none;
+      box-shadow: inset 3px 0 #ef4444 !important;
+      background: transparent !important;
+      border-radius: 3px;
+      scroll-margin-top: 70px
+    }
+
+    iframe {
+      width: 100%;
+      height: calc(100vh - 44px);
+      border: 0
+    }
+
+    @media(max-width:440px) {
+      #pane-badge {
+        display: none
+      }
+
+      body>header {
+        gap: 4px;
+        padding: 7px 8px
+      }
+
+      .pane-actions {
+        gap: 4px
+      }
+
+      #zoom-controls button {
+        padding: 2px 4px
+      }
+    }
+
+    html.shared-original {
+      scrollbar-width: none
+    }
+
+    html.shared-original::-webkit-scrollbar {
+      display: none
+    }
+
+    mark.lexis-diff-token[data-side="original"] {
+      background: rgba(253, 230, 138, .65) !important;
+      box-shadow: inset 3px 0 #e9a526;
+      border-radius: 2px
+    }
+
+    mark.lexis-diff-token[data-side="revised"] {
+      background: rgba(254, 202, 202, .65) !important;
+      box-shadow: inset 3px 0 #ef4444;
+      border-radius: 2px
+    }
+
+    #pages .lexis-review-risk {
+      background: transparent !important;
+      box-shadow: inset 3px 0 #ef4444 !important;
+      border-radius: 3px;
+      scroll-margin-top: 70px
+    }
+
+    #zoom-controls {
+      position: relative;
+      background: transparent;
+      padding: 0
+    }
+
+    #zoom-percent {
+      min-width: 72px;
+      padding: 4px 10px !important;
+      text-align: left;
+      font-size: 11px !important;
+      border: 1px solid #e2e8f0 !important;
+      background: #fff !important;
+      color: #475569
+    }
+
+    #zoom-percent::after {
+      content: "";
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      border-right: 1.5px solid currentColor;
+      border-bottom: 1.5px solid currentColor;
+      transform: rotate(45deg);
+      margin: 0 0 3px 10px
+    }
+
+    #zoom-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 6px);
+      min-width: 128px;
+      padding: 4px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px #0f172a18;
+      z-index: 10
+    }
+
+    #zoom-menu button {
+      display: block;
+      width: 100%;
+      padding: 6px 10px !important;
+      text-align: left
+    }
+
+    #zoom-menu button[aria-checked="true"] {
+      background: #eff6ff;
+      color: #2563eb;
+      font-weight: 600
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="pane-identity"><span id="pane-label">原始文档</span><span id="pane-badge" hidden></span><span
+        id="name"></span></div>
+    <div class="pane-actions">
+      <div id="zoom-controls" role="group" aria-label="文档缩放" hidden><button id="zoom-percent" aria-label="选择文档缩放比例"
+          aria-haspopup="true" aria-expanded="false">80%</button>
+        <div id="zoom-menu" role="menu" aria-label="缩放比例" hidden><button role="menuitemradio"
+            data-zoom="fit">适应宽度</button><button role="menuitemradio" data-zoom="0.5">50%</button><button
+            role="menuitemradio" data-zoom="0.8">80%</button><button role="menuitemradio"
+            data-zoom="1">100%</button><button role="menuitemradio" data-zoom="1.25">125%</button><button
+            role="menuitemradio" data-zoom="1.5">150%</button><button role="menuitemradio" data-zoom="2">200%</button>
+        </div>
+      </div><a id="download" download aria-label="下载文档" title="下载此文档"><svg viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4" />
+        </svg>下载</a><button id="save-edit" hidden>保存正文</button><button id="cancel-edit" hidden>取消编辑</button>
+    </div><span id="locate-status" role="status"></span>
+  </header>
+  <div id="status" role="status">正在加载原件…</div>
+  <div id="viewport">
+    <div id="pages"></div>
+  </div>
+  <script src="/static/vendor/jszip.min.js"></script>
+  <script src="/static/vendor/docx-preview.min.js"></script>
+  <script>
+    (async () => {
+      const params = new URLSearchParams(location.search), id = params.get('source'), run = params.get('run'), scope = params.get('scope') || 'current', readOnly = params.get('readonly') === '1'; const status = document.querySelector('#status'), pages = document.querySelector('#pages'), zoom = { value: 'fit' }, zoomControls = document.querySelector('#zoom-controls');
+      const resize = () => {
+        const sheets = [...pages.querySelectorAll('section.docx')]; if (!sheets.length) return;
+        const width = Math.max(...sheets.map(page => Math.max(page.offsetWidth, page.scrollWidth)));
+        const available = document.documentElement.clientWidth;
+        const fit = Math.min(1, Math.max(.1, (available - 32) / (width + 32)));
+        const scale = zoom.value === 'fit' ? fit : Number(zoom.value);
+        pages.style.zoom = scale;
+        document.querySelector('#zoom-percent').textContent = zoom.value === 'fit' ? '适应宽度' : Math.round(scale * 100) + '%';
+        document.querySelectorAll('[data-zoom]').forEach(button => button.setAttribute('aria-checked', String(button.dataset.zoom === zoom.value)));
+      };
+      const pane = params.get('pane') === 'revised' ? 'revised' : 'original';
+      document.body.dataset.pane = pane;
+      if (params.get('shared') === '1') document.documentElement.classList.add('shared-original');
+      const label = document.querySelector('#pane-label'), badge = document.querySelector('#pane-badge');
+      label.textContent = pane === 'revised' ? '修订文档' : '原始文档';
+      if (readOnly) { badge.hidden = false; badge.textContent = '只读'; }
+      if (pane === 'revised') { badge.hidden = false; badge.textContent = params.get('edited') === '1' ? '编辑稿' : '全部建议'; badge.title = params.get('edited') === '1' ? '当前人工编辑稿' : '全部修改建议，未自动采纳'; }
+      let info, editable = [], anchors = [], documentRendered = false, pendingMarks = null;
+      const hint = document.querySelector('#locate-status'), save = document.querySelector('#save-edit'), cancel = document.querySelector('#cancel-edit');
+      new MutationObserver(() => hint.classList.toggle('quiet', /^(已定位|已取消|直接点击)/.test(hint.textContent))).observe(hint, { childList: true, characterData: true, subtree: true });
+      let editing = false, draftFrame = 0;
+      const composeText = () => {
+        if (!info) return '';
+        if (!editing) return info.text;
+        const lines = info.text.split('\n');
+        editable.forEach(item => { lines[item.index] = item.element.innerText.replace(/\r/g, ''); });
+        return lines.join('\n');
+      };
+      window.getLexisDocumentSnapshot = () => ({ source: id, run, editing, text: composeText(), baseText: info?.text });
+      const sendDraft = () => parent.postMessage({ type: 'lexis-document-draft', ...window.getLexisDocumentSnapshot() }, location.origin);
+      window.setLexisDocumentSaving = busy => { save.disabled = cancel.disabled = busy; editable.forEach(item => { item.element.contentEditable = editing && !busy ? 'plaintext-only' : 'false'; }); };
+      const finish = () => { editing = false; editable.forEach(item => { item.element.contentEditable = 'false'; }); save.hidden = cancel.hidden = true; };
+      cancel.onclick = () => { editable.forEach(item => { item.element.innerHTML = item.originalHTML; }); finish(); sendDraft(); hint.textContent = '已取消编辑'; };
+      pages.addEventListener('input', () => {
+        if (!editing || draftFrame) return;
+        draftFrame = requestAnimationFrame(() => { draftFrame = 0; sendDraft(); });
+      });
+      save.onclick = () => { const text = composeText(); window.setLexisDocumentSaving(true); parent.postMessage({ type: 'lexis-save-document', source: id, text }, location.origin); };
+      const fitObserver = new ResizeObserver(() => resize()); fitObserver.observe(document.documentElement);
+      let scrollLockUntil = 0, scrollFrame = 0;
+      const headerHeight = () => document.querySelector('header').offsetHeight;
+      const anchorTop = item => item.element.getBoundingClientRect().top + scrollY;
+      const anchorSpan = (item, i) => Math.max(1, anchors[i + 1] ? anchorTop(anchors[i + 1]) - anchorTop(item) : item.element.getBoundingClientRect().height);
+      window.addEventListener('scroll', () => {
+        if (performance.now() < scrollLockUntil || scrollFrame) return;
+        scrollFrame = requestAnimationFrame(() => {
+          scrollFrame = 0;
+          const y = scrollY + headerHeight(); let i = 0;
+          for (let j = 0; j < anchors.length; j++) { if (anchorTop(anchors[j]) <= y) i = j; else break; }
+          const anchor = anchors[i], range = document.documentElement.scrollHeight - innerHeight;
+          parent.postMessage({ type: 'lexis-document-scroll', ratio: range > 0 ? scrollY / range : 0, index: anchor?.index, fraction: anchor ? Math.max(0, Math.min(1, (y - anchorTop(anchor)) / anchorSpan(anchor, i))) : 0 }, location.origin);
+        });
+      }, { passive: true });
+      for (const name of ['wheel', 'pointerdown', 'keydown']) window.addEventListener(name, () => { scrollLockUntil = 0; }, { passive: true });
+      const normalize = text => (text || '').replace(/\s+/g, '');
+      const applyDifferenceMarks = data => {
+        pages.querySelectorAll('mark.lexis-diff-token').forEach(mark=>mark.replaceWith(...mark.childNodes));
+        const lines=(data.text || '').split('\n'),offsets=[0];
+        lines.forEach(line=>offsets.push(offsets.at(-1)+Array.from(line).length+1));
+        pages.querySelectorAll('.lexis-diff-original,.lexis-diff-revised,.lexis-review-risk').forEach(el => el.classList.remove('lexis-diff-original', 'lexis-diff-revised', 'lexis-review-risk'));
+        for (const change of data.changes || []) {
+          const start = change[data.side + '_start'], end = change[data.side + '_end'];
+          for (const item of anchors) if (start < end && item.index < end && item.end > start) item.element.classList.add('lexis-diff-' + data.side);
+        }
+        for(const item of anchors){
+          const raw=Array.from(lines.slice(item.index,item.end).join('\n'));
+          const base=offsets[item.index];
+          const positions=[];let position=0;
+          for(const ch of item.element.textContent){if(!/\s/.test(ch))positions.push([position,position+ch.length]);position+=ch.length;}
+          const ranges=[];
+          for(const [start,end] of data.charRanges || []){
+            if(end<=base || start>=base+raw.length)continue;
+            const a=raw.slice(0,Math.max(0,start-base)).filter(ch=>!/\s/.test(ch)).length;
+            const b=raw.slice(0,Math.min(raw.length,end-base)).filter(ch=>!/\s/.test(ch)).length;
+            if(a<b && positions[a] && positions[b-1])ranges.push([positions[a][0],positions[b-1][1]]);
+          }
+          if(!ranges.length)continue;
+          const walker=document.createTreeWalker(item.element,NodeFilter.SHOW_TEXT),nodes=[];let node,cursor=0;
+          while(node=walker.nextNode()){nodes.push({node,start:cursor,end:cursor+node.length});cursor+=node.length;}
+          for(const part of nodes){
+            const hits=ranges.filter(([a,b])=>a<part.end && b>part.start).map(([a,b])=>[Math.max(0,a-part.start),Math.min(part.node.length,b-part.start)]).sort((a,b)=>a[0]-b[0]);
+            if(!hits.length)continue;
+            const fragment=document.createDocumentFragment();let cursor=0;
+            for(const [a,b] of hits){if(a>cursor)fragment.append(document.createTextNode(part.node.data.slice(cursor,a)));const mark=document.createElement('mark');mark.className='lexis-diff-token';mark.dataset.side=data.side;mark.style.color='inherit';mark.textContent=part.node.data.slice(Math.max(cursor,a),b);fragment.append(mark);cursor=Math.max(cursor,b);}
+            fragment.append(document.createTextNode(part.node.data.slice(cursor)));part.node.replaceWith(fragment);
+          }
+        }
+        for (const issue of data.issues || []) {
+          const target = normalize(issue[data.side]);
+          let matches = target ? anchors.filter(item => normalize(item.element.textContent).includes(target)) : [];
+          if (matches.length !== 1) {
+            matches = target ? anchors.filter(item => { const text = normalize(item.element.textContent); return text.length >= 12 && target.includes(text); }) : [];
+            if (matches.some((item, i) => i && anchors.indexOf(item) !== anchors.indexOf(matches[i - 1]) + 1)) matches = [];
+          }
+          if (!matches.length && issue.range) {
+            const start = issue.range[data.side + '_start'], end = issue.range[data.side + '_end'];
+            matches = anchors.filter(item => item.index < end && item.end > start);
+          }
+          matches.forEach(item => item.element.classList.add('lexis-review-risk'));
+        }
+        if (data.focusFirst) {
+          const first = pages.querySelector('.lexis-review-risk');
+          if (first) { first.scrollIntoView({ behavior: 'instant', block: 'center' }); hint.textContent = '已定位到首个审查重点'; }
+        }
+      };
+      window.addEventListener('message', event => {
+        if (event.origin !== location.origin || event.source !== parent) return;
+        if (event.data?.type === 'lexis-fit-width') { zoom.value = 'fit'; resize(); return; }
+        if (event.data?.type === 'lexis-set-zoom' && Number.isFinite(event.data.scale)) { zoom.value = String(Math.max(.3, Math.min(2, event.data.scale))); resize(); return; }
+        if (event.data?.type === 'lexis-sync-scroll') {
+          const data = event.data, range = Math.max(0, document.documentElement.scrollHeight - innerHeight);
+          let y = (data.ratio || 0) * range;
+          if (Number.isInteger(data.index) && data.ratio > 0 && data.ratio < .999) {
+            const i = anchors.findIndex(item => data.index >= item.index && data.index < item.end);
+            if (i >= 0) y = anchorTop(anchors[i]) + (data.fraction || 0) * anchorSpan(anchors[i], i) - headerHeight();
+          }
+          scrollLockUntil = performance.now() + 100;
+          scrollTo({ top: Math.max(0, Math.min(range, y)), behavior: 'instant' });
+          return;
+        }
+        if (event.data?.type === 'lexis-mark-differences') {
+          if (!documentRendered) pendingMarks = event.data;
+          else applyDifferenceMarks(event.data);
+          return;
+        }
+        if (event.data?.type === 'lexis-locate-edit') {
+          const item = anchors.find(item => event.data.index >= item.index && event.data.index < item.end);
+          const matches = [...pages.querySelectorAll('article p')].filter(p => normalize(p.textContent) === normalize(event.data.text));
+          const element = item?.element || (matches.length === 1 ? matches[0] : null);
+          if (element) {
+            pages.querySelectorAll('.lexis-located').forEach(el => el.classList.remove('lexis-located'));
+            element.classList.add('lexis-located');
+            element.scrollIntoView({ behavior: 'instant', block: 'center' });
+            hint.textContent = '已定位到刚修改的位置';
+            setTimeout(() => element.classList.remove('lexis-located'), 5000);
+          } else { scrollTo(0, event.data.scroll || 0); hint.textContent = '已恢复保存前的阅读位置'; }
+          return;
+        }
+        if (event.data?.type === 'lexis-save-error') { window.setLexisDocumentSaving(false); hint.textContent = event.data.message; return; }
+        if (event.data?.type === 'lexis-edit') {
+          if (readOnly) { hint.textContent = '左侧原始文档只读，请编辑右侧文档'; return; }
+          if (info?.extension !== '.docx') { hint.textContent = '保留排版编辑仅支持 Word DOCX；PDF 请先转换为 Word'; return; }
+          if (!editable.length) { hint.textContent = '该文档段落无法安全映射，请在 Word 中编辑后重新上传'; return; }
+          if (editing) return;
+          editing = true;
+          editable.forEach(item => { item.originalHTML = item.element.innerHTML; item.element.contentEditable = 'plaintext-only'; });
+          sendDraft();
+          save.hidden = cancel.hidden = false; hint.textContent = '直接点击正文修改，完成后保存；暂不支持增删段落'; editable[0].element.focus(); return;
+        }
+        if (event.data?.type !== 'lexis-locate') return;
+        const target = normalize(event.data.text);
+        pages.querySelectorAll('.lexis-located').forEach(el => el.classList.remove('lexis-located'));
+        if (!target) { hint.textContent = '该意见没有可定位的原文证据'; return; }
+        const paragraphs = [...pages.querySelectorAll('article p')];
+        let matches = paragraphs.filter(p => normalize(p.textContent).includes(target));
+        if (!matches.length) {
+          matches = paragraphs.filter(p => { const text = normalize(p.textContent); return text.length >= 12 && target.includes(text); });
+        }
+        if (!matches.length) { hint.textContent = '未能在原件精确定位，可手动切换至审查文本'; return; }
+        // Only a unique single-paragraph match or a contiguous multi-paragraph passage is safe to anchor.
+        if (matches.length > 1 && (matches.some(p => normalize(p.textContent).includes(target)) || matches.some((p, i) => i && paragraphs.indexOf(p) !== paragraphs.indexOf(matches[i - 1]) + 1))) { hint.textContent = '原文有多处匹配，请在审查文本中核对'; return; }
+        matches.forEach(p => p.classList.add('lexis-located'));
+        matches[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        hint.textContent = '已定位原文';
+      });
+      const zoomButton = document.querySelector('#zoom-percent'), zoomMenu = document.querySelector('#zoom-menu');
+      window.addEventListener('resize', resize);
+      const closeZoom = () => { zoomMenu.hidden = true; zoomButton.setAttribute('aria-expanded', 'false'); };
+      zoomButton.onclick = () => { zoomMenu.hidden = !zoomMenu.hidden; zoomButton.setAttribute('aria-expanded', String(!zoomMenu.hidden)); };
+      zoomMenu.onclick = event => { const option = event.target.closest('[data-zoom]'); if (!option) return; zoom.value = option.dataset.zoom; resize(); closeZoom(); zoomButton.focus(); };
+      document.addEventListener('click', event => { if (!zoomControls.contains(event.target)) closeZoom(); });
+      document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeZoom(); zoomButton.focus(); } });
+      try {
+        if (!/^[a-f0-9]{32}$/.test(id || '')) throw Error('原件标识无效');
+        const response = await fetch('/api/sources/' + id + '?include_text=true' + (run ? '&run=' + encodeURIComponent(run) + '&scope=' + encodeURIComponent(scope) : '')); if (!response.ok) throw Error('原件记录不存在'); info = await response.json(); document.querySelector('#name').textContent = info.name; label.title = info.name;
+        const url = run ? '/api/runs/' + encodeURIComponent(run) + '/preview-file?scope=' + encodeURIComponent(scope) : '/api/sources/' + id + '/file'; const link = document.querySelector('#download'); link.href = url; link.download = info.name;
+        const file = await fetch(url); if (!file.ok) throw Error('原件文件缺失，请重新上传'); const blob = await file.blob();
+        if (info.extension === '.docx') {
+          zoomControls.hidden = false;
+          await docx.renderAsync(blob, pages, null, { ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true, renderAltChunks: false, useBase64URL: true });
+          // Original document links must never navigate or load resources outside the internal preview.
+          pages.querySelectorAll('a').forEach(a => { a.removeAttribute('href'); a.removeAttribute('target'); });
+          const elements = [...pages.querySelectorAll('article p')]; let cursor = 0;
+          let index = 0;
+          for (const text of info.paragraphs || info.text.split('\n')) {
+            const end = index + text.split('\n').length;
+            if (text.trim()) {
+              const found = elements.findIndex((p, i) => i >= cursor && normalize(p.textContent) === normalize(text));
+              if (found >= 0) {
+                const element = elements[found];
+                anchors.push({ index, end, element });
+                // Soft breaks and tabs need a richer editor; they must not invalidate other anchors.
+                if (!/[\n\t]/.test(text)) editable.push({ index, element, original: element.innerText });
+                cursor = found + 1;
+              }
+            }
+            index = end;
+          }
+          resize();
+        } else if (info.extension === '.pdf') { zoomControls.hidden = true; const frame = document.createElement('iframe'); frame.title = 'PDF 原件'; frame.src = URL.createObjectURL(blob); pages.append(frame); }
+        else { zoomControls.hidden = true; pages.style.width = 'auto'; pages.style.whiteSpace = 'pre-wrap'; pages.style.padding = '24px'; (info.text || '').split('\n').forEach((text, index) => { const p = document.createElement('p'); p.textContent = text || ' '; pages.append(p); anchors.push({ index, end: index + 1, element: p }); }); }
+        status.hidden = true;
+        if (info.preview_warnings?.length) { hint.textContent = info.preview_warnings.length + ' 处建议尚未完整应用，请在意见栏核对'; hint.title = info.preview_warnings.join('；'); }
+        await document.fonts.ready;
+        resize();
+        documentRendered = true;
+        if (pendingMarks) { applyDifferenceMarks(pendingMarks); pendingMarks = null; }
+        requestAnimationFrame(() => requestAnimationFrame(() => parent.postMessage({ type: 'lexis-document-ready', source: id, run, text: info.text }, location.origin)));
+      } catch (error) { status.textContent = '预览失败：' + error.message + '。可切换至审查文本继续核对。'; }
+    })();</script>
+</body>
+
+</html>

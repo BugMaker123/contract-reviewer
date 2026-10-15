@@ -6,6 +6,7 @@ class ModelConfig(BaseModel):
     api_key: Optional[str] = Field(default=None, description="用户自定义 API Key，若留空则尝试读取环境变量 DEEPSEEK_API_KEY")
     base_url: Optional[str] = Field(default="https://api.deepseek.com/v1", description="API 基础端点")
     temperature: float = Field(default=0.1, description="生成温度")
+    max_retries: int = Field(default=3, ge=0, le=10, description="失败后的最大重试次数，不含首次请求")
 
 class ContractSegment(BaseModel):
     id: str = Field(description="条款唯一标识符，如 sec_1")
