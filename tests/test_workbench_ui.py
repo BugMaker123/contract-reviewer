@@ -1,5 +1,6 @@
 """Browser regression for edits, accepted revisions, and restored previews."""
 import socket
+import re
 import threading
 
 import uvicorn
@@ -260,12 +261,15 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             if kind == 'complete':
                 data['issues'][0]['evidence'] = 'Payment: 100 USD'
                 data['issues'][0]['redline'] = {'change_type':'replace', 'original_text':'Payment: 100 USD', 'suggested_text':'Payment: 200 USD'}
+                data['issues'][1]['evidence']='Section 20: delivery, payment, acceptance and contract obligations.'
+                data['issues'][1]['redline']=None
             yield kind, data
     monkeypatch.setattr(workspace_api, 'review_events', events)
     document = Document()
     document.add_paragraph().add_run('Payment: 100 USD').bold = True
     for index in range(65):
         document.add_paragraph(f'Section {index}: delivery, payment, acceptance and contract obligations.')
+    document.add_paragraph('1'*160)
     content = BytesIO()
     document.save(content)
     sock = socket.socket()
@@ -285,20 +289,40 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             page.goto(base+'/workbench?task='+task['id'])
             left=page.frame_locator('iframe[title="原始合同文档"]')
             right=page.frame_locator('iframe[title="合同原件预览"]')
-            expect(page.get_by_test_id('review-summary')).to_be_hidden()
+            expect(page.get_by_test_id('review-summary')).to_be_visible()
             expect(page.locator('#opinion-drawer')).to_be_visible()
             expect(page.get_by_role('button', name='审查意见面板', exact=True)).to_have_count(0)
             assert page.locator('.wb-toolbar').bounding_box()['height'] <= 60
             expect(page.get_by_test_id('original-document-pane')).to_have_count(0)
             expect(right.locator('article p').first).to_have_text('Payment: 100 USD')
+            held_original=[]
+            def delay_original(route):
+                if not held_original: held_original.append(route)
+                else: route.continue_()
             for label in ['开始审查', '重新审查']:
+                if label=='开始审查':page.route('**/api/sources/*/file',delay_original)
+                else:
+                    page.get_by_role('button',name='收起审查概览',exact=True).click()
+                    page.get_by_role('button',name='收起审查意见与修订清单',exact=True).click()
                 page.get_by_role('button', name=label, exact=True).click()
+                expect(page.locator('#review-summary-content')).to_be_visible()
+                expect(page.locator('#review-opinion-content')).to_be_visible()
+                expect(page.get_by_role('button',name='收起审查概览',exact=True).locator('svg')).to_have_count(1)
+                if label=='开始审查':
+                    expect(right.locator('article p').first).to_have_text('Payment: 200 USD',timeout=30000)
+                    original_response=page.request.fetch(held_original[0].request)
+                    held_original[0].fulfill(response=original_response)
+                    page.unroute('**/api/sources/*/file',delay_original)
                 expect(page.get_by_test_id('original-document-pane')).to_be_visible()
                 expect(left.locator('article p').first).to_have_text('Payment: 100 USD')
                 expect(right.locator('article p').first).to_have_text('Payment: 200 USD', timeout=30000)
                 expect(right.locator('#pane-badge')).to_have_text('全部建议')
                 expect(right.locator('#pane-badge')).to_have_attribute('title', '全部修改建议，未自动采纳')
                 expect(left.locator('#pane-badge')).to_have_text('只读')
+                expect(left.locator('article p').first).to_have_class(re.compile('lexis-review-risk'))
+                expect(right.locator('article p').first).to_have_class(re.compile('lexis-review-risk'))
+                expect(left.locator('article p').nth(21)).to_have_class(re.compile('lexis-review-risk'))
+                expect(right.locator('article p').nth(21)).to_have_class(re.compile('lexis-review-risk'))
                 expect(page.locator('.wb-pane-heading')).to_have_count(0)
                 assert right.locator('header').bounding_box()['height'] <= 48
                 assert left.locator('header').bounding_box()['height'] <= 48
@@ -315,17 +339,26 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             right.locator('body').evaluate('()=>new Promise((resolve,reject)=>{setTimeout(()=>reject(new Error("Scroll synchronization timed out")),5000);const check=()=>scrollY/Math.max(1,document.documentElement.scrollHeight-innerHeight)>.95?resolve():requestAnimationFrame(check);check();})')
             assert right.locator('body').evaluate('()=>scrollY/Math.max(1,document.documentElement.scrollHeight-innerHeight)') > .95
             right.locator('body').evaluate('()=>{window.dispatchEvent(new Event("wheel"));window.scrollTo(0,0);}')
-            expect(page.get_by_test_id('review-summary')).to_be_hidden()
+            expect(page.get_by_test_id('review-summary')).to_be_visible()
             close_opinions(page)
             before = page.get_by_test_id('revised-document-pane').bounding_box()
             open_opinions(page)
             expect(page.locator('#opinion-drawer')).to_be_visible()
-            expect(page.get_by_test_id('review-summary')).to_be_hidden()
+            expect(page.get_by_test_id('review-summary')).to_be_visible()
             revised_box=page.get_by_test_id('revised-document-pane').bounding_box()
             panel_box=page.locator('#opinion-drawer').bounding_box()
             assert revised_box['width'] == before['width']
             assert revised_box['x']+revised_box['width'] <= panel_box['x']
             assert panel_box['x']+panel_box['width'] <= 1920
+            assert page.get_by_test_id('review-summary').bounding_box()['width'] >= 320
+            assert page.locator('#opinion-drawer').bounding_box()['width'] >= 440
+            for panel_name,button_name in [('review-summary-panel','收起审查概览'),('opinion-drawer','收起审查意见与修订清单')]:
+                panel=page.locator('#'+panel_name).bounding_box()
+                handle=page.get_by_role('button',name=button_name,exact=True).bounding_box()
+                assert abs(handle['y']+handle['height']/2-panel['y']-panel['height']/2)<2
+            action_row=page.locator('.wb-issue-actions').first
+            positions=[button.bounding_box()['y'] for button in action_row.get_by_role('button').all()]
+            assert max(positions)-min(positions)<2
             page.screenshot(path='artifacts/workbench-docked-opinions.png')
             for width in [1366, 1920]:
                 page.set_viewport_size({'width':width,'height':1080})
@@ -337,11 +370,20 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
                 for preview in [left, right]:
                     expect(preview.locator('section.docx').first).to_be_visible()
                     assert preview.locator('section.docx').first.evaluate('(el)=>el.getBoundingClientRect().right <= innerWidth + 1')
-            page.get_by_role('button', name='审查概览', exact=True).click()
-            expect(page.get_by_test_id('review-summary')).to_be_visible()
-            expect(page.locator('#opinion-drawer')).to_be_visible()
-            page.get_by_role('button', name='审查概览', exact=True).click()
-            expect(page.get_by_test_id('review-summary')).to_be_hidden()
+            expect(page.get_by_role('button', name='审查概览', exact=True)).to_have_count(0)
+            page.get_by_role('button', name='收起审查概览', exact=True).click()
+            expect(page.locator('#review-summary-content')).to_be_hidden()
+            assert page.get_by_test_id('review-summary').bounding_box()['width'] == 36
+            page.get_by_role('button', name='收起审查意见与修订清单', exact=True).click()
+            expect(page.locator('#review-opinion-content')).to_be_hidden()
+            assert page.locator('#opinion-drawer').bounding_box()['width'] == 36
+            expect(right.get_by_role('button', name='适应文档宽度')).to_have_attribute('aria-pressed','true')
+            page.get_by_role('button', name='展开审查概览', exact=True).click()
+            expect(page.locator('#review-summary-content')).to_be_visible()
+            expect(page.locator('#review-opinion-content')).to_be_hidden()
+            page.get_by_role('button', name='展开审查意见与修订清单', exact=True).click()
+            expect(page.locator('#review-opinion-content')).to_be_visible()
+            expect(page.locator('#review-summary-content')).to_be_visible()
             page.keyboard.press('Escape')
             expect(page.locator('#opinion-drawer')).to_be_visible()
             expect(page.get_by_role('button', name='收起审查意见面板', exact=True)).to_have_count(0)

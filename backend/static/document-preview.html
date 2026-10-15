@@ -7,13 +7,22 @@ button,a{font:inherit;color:#64748b}button{cursor:pointer;border:1px solid #e2e8
 #download{display:flex;align-items:center;gap:4px;text-decoration:none;font-size:11px;padding:5px;border-radius:4px}#download svg{width:13px;height:13px}#save-edit{color:#fff;background:#2563eb;border-color:#2563eb;font-size:11px}#cancel-edit{font-size:11px}
 #zoom-controls{display:inline-flex;align-items:center;gap:1px;border-radius:6px;background:#f5f7fa;padding:2px;color:#64748b}#zoom-controls button{border:0;background:transparent;padding:2px 6px;font-size:11px;line-height:18px;border-radius:4px}#zoom-controls button:hover{background:#e8edf5}#zoom-fit[aria-pressed="true"]{background:#fff;color:#475569;box-shadow:0 1px 2px #0f172a0d}#zoom-percent{font-size:10px;min-width:32px;text-align:center;font-variant-numeric:tabular-nums}.zoom-divider{width:1px;height:12px;background:#e2e8f0;margin:0 2px}
 #locate-status{color:#64748b;font-size:11px;flex-basis:100%;overflow-wrap:anywhere}#locate-status:empty{display:none}#locate-status.quiet{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-#status{padding:24px;text-align:center}#viewport{overflow:auto}#pages{transform-origin:top left;width:max-content;min-width:100%}.docx-wrapper{background:transparent!important;padding:16px!important}section.docx{box-shadow:0 1px 5px #dbe1e9!important;margin-bottom:24px!important}#pages .lexis-located{outline:none;box-shadow:inset 3px 0 #ef4444!important;background:rgba(254,202,202,.65)!important;border-radius:3px;scroll-margin-top:70px}iframe{width:100%;height:calc(100vh - 44px);border:0}
+#status{padding:24px;text-align:center}#viewport{overflow:auto}#pages{transform-origin:top left;width:max-content;min-width:100%}.docx-wrapper{background:transparent!important;padding:16px!important}section.docx article p{overflow-wrap:anywhere}section.docx{box-shadow:0 1px 5px #dbe1e9!important;margin-bottom:24px!important}#pages .lexis-located{outline:none;box-shadow:inset 3px 0 #ef4444!important;background:rgba(254,202,202,.65)!important;border-radius:3px;scroll-margin-top:70px}iframe{width:100%;height:calc(100vh - 44px);border:0}
 @media(max-width:440px){#pane-badge{display:none}body>header{gap:4px;padding:7px 8px}.pane-actions{gap:4px}#zoom-controls button{padding:2px 4px}}
 html.shared-original{scrollbar-width:none}html.shared-original::-webkit-scrollbar{display:none}.lexis-diff-original{background:rgba(253,230,138,.65)!important;box-shadow:inset 3px 0 #e9a526;border-radius:2px}.lexis-diff-revised{background:rgba(167,243,208,.5)!important;box-shadow:inset 3px 0 #34b381;border-radius:2px}
-</style></head><body><header><div class="pane-identity"><span id="pane-label">原始文档</span><span id="pane-badge" hidden></span><span id="name"></span></div><div class="pane-actions"><div id="zoom-controls" role="group" aria-label="文档缩放" hidden><button id="zoom-fit" aria-label="适应文档宽度" aria-pressed="true">↔ 适宽</button><span class="zoom-divider"></span><button id="zoom-out" aria-label="缩小文档">−</button><span id="zoom-percent" aria-live="polite">自动</span><button id="zoom-in" aria-label="放大文档">＋</button></div><a id="download" download aria-label="下载文档" title="下载此文档"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg>下载</a><button id="save-edit" hidden>保存正文</button><button id="cancel-edit" hidden>取消编辑</button></div><span id="locate-status" role="status"></span></header><div id="status" role="status">正在加载原件…</div><div id="viewport"><div id="pages"></div></div><script src="/static/vendor/jszip.min.js"></script><script src="/static/vendor/docx-preview.min.js"></script><script>
+#pages .lexis-review-risk{background:rgba(254,202,202,.58)!important;box-shadow:inset 3px 0 #ef4444!important;border-radius:3px;scroll-margin-top:70px}</style></head><body><header><div class="pane-identity"><span id="pane-label">原始文档</span><span id="pane-badge" hidden></span><span id="name"></span></div><div class="pane-actions"><div id="zoom-controls" role="group" aria-label="文档缩放" hidden><button id="zoom-fit" aria-label="适应文档宽度" aria-pressed="true">↔ 适宽</button><span class="zoom-divider"></span><button id="zoom-out" aria-label="缩小文档">−</button><span id="zoom-percent" aria-live="polite">自动</span><button id="zoom-in" aria-label="放大文档">＋</button></div><a id="download" download aria-label="下载文档" title="下载此文档"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg>下载</a><button id="save-edit" hidden>保存正文</button><button id="cancel-edit" hidden>取消编辑</button></div><span id="locate-status" role="status"></span></header><div id="status" role="status">正在加载原件…</div><div id="viewport"><div id="pages"></div></div><script src="/static/vendor/jszip.min.js"></script><script src="/static/vendor/docx-preview.min.js"></script><script>
 (async()=>{
  const params=new URLSearchParams(location.search),id=params.get('source'),run=params.get('run'),scope=params.get('scope')||'current',readOnly=params.get('readonly')==='1';const status=document.querySelector('#status'),pages=document.querySelector('#pages'),zoom={value:'fit'},zoomControls=document.querySelector('#zoom-controls');
- const resize=()=>{const page=pages.querySelector('section.docx');if(!page)return;const scale=zoom.value==='fit'?Math.min(1,(innerWidth-48)/page.offsetWidth):Number(zoom.value);pages.style.zoom=scale;document.querySelector('#zoom-percent').textContent=Math.round(scale*100)+'%';document.querySelector('#zoom-fit').setAttribute('aria-pressed',String(zoom.value==='fit'));};
+ const resize=()=>{
+   const sheets=[...pages.querySelectorAll('section.docx')];if(!sheets.length)return;
+   const width=Math.max(...sheets.map(page=>Math.max(page.offsetWidth,page.scrollWidth)));
+   const available=document.documentElement.clientWidth;
+   const fit=Math.min(1,Math.max(.1,(available-32)/(width+32)));
+   const scale=zoom.value==='fit'?fit:Number(zoom.value);
+   pages.style.zoom=scale;
+   document.querySelector('#zoom-percent').textContent=Math.round(scale*100)+'%';
+   document.querySelector('#zoom-fit').setAttribute('aria-pressed',String(zoom.value==='fit'));
+ };
  const pane=params.get('pane')==='revised'?'revised':'original';
  document.body.dataset.pane=pane;
  if(params.get('shared')==='1')document.documentElement.classList.add('shared-original');
@@ -21,7 +30,7 @@ html.shared-original{scrollbar-width:none}html.shared-original::-webkit-scrollba
  label.textContent=pane==='revised'?'修订文档':'原始文档';
  if(readOnly){badge.hidden=false;badge.textContent='只读';}
  if(pane==='revised'){badge.hidden=false;badge.textContent=params.get('edited')==='1'?'编辑稿':'全部建议';badge.title=params.get('edited')==='1'?'当前人工编辑稿':'全部修改建议，未自动采纳';}
- let info, editable=[], anchors=[];
+ let info, editable=[], anchors=[],documentRendered=false,pendingMarks=null;
  const hint=document.querySelector('#locate-status'),save=document.querySelector('#save-edit'),cancel=document.querySelector('#cancel-edit');
  new MutationObserver(()=>hint.classList.toggle('quiet',/^(已定位|已取消|直接点击)/.test(hint.textContent))).observe(hint,{childList:true,characterData:true,subtree:true});
  let editing=false,draftFrame=0;
@@ -59,8 +68,33 @@ html.shared-original{scrollbar-width:none}html.shared-original::-webkit-scrollba
  },{passive:true});
  for(const name of ['wheel','pointerdown','keydown'])window.addEventListener(name,()=>{scrollLockUntil=0;},{passive:true});
  const normalize=text=>(text||'').replace(/\s+/g,'');
+ const applyDifferenceMarks=data=>{
+   pages.querySelectorAll('.lexis-diff-original,.lexis-diff-revised,.lexis-review-risk').forEach(el=>el.classList.remove('lexis-diff-original','lexis-diff-revised','lexis-review-risk'));
+   for(const change of data.changes||[]){
+     const start=change[data.side+'_start'],end=change[data.side+'_end'];
+     for(const item of anchors)if(start<end && item.index<end && item.end>start)item.element.classList.add('lexis-diff-'+data.side);
+   }
+   for(const issue of data.issues||[]){
+     const target=normalize(issue[data.side]);
+     let matches=target?anchors.filter(item=>normalize(item.element.textContent).includes(target)):[];
+     if(matches.length!==1){
+       matches=target?anchors.filter(item=>{const text=normalize(item.element.textContent);return text.length>=12 && target.includes(text);}):[];
+       if(matches.some((item,i)=>i && anchors.indexOf(item)!==anchors.indexOf(matches[i-1])+1))matches=[];
+     }
+     if(!matches.length && issue.range){
+       const start=issue.range[data.side+'_start'],end=issue.range[data.side+'_end'];
+       matches=anchors.filter(item=>item.index<end && item.end>start);
+     }
+     matches.forEach(item=>item.element.classList.add('lexis-review-risk'));
+   }
+   if(data.focusFirst){
+     const first=pages.querySelector('.lexis-review-risk');
+     if(first){first.scrollIntoView({behavior:'instant',block:'center'});hint.textContent='已定位到首个审查重点';}
+   }
+ };
  window.addEventListener('message',event=>{
    if(event.origin!==location.origin || event.source!==parent)return;
+   if(event.data?.type==='lexis-fit-width'){zoom.value='fit';resize();return;}
    if(event.data?.type==='lexis-sync-scroll'){
      const data=event.data,range=Math.max(0,document.documentElement.scrollHeight-innerHeight);
      let y=(data.ratio||0)*range;
@@ -73,11 +107,8 @@ html.shared-original{scrollbar-width:none}html.shared-original::-webkit-scrollba
      return;
    }
    if(event.data?.type==='lexis-mark-differences'){
-     pages.querySelectorAll('.lexis-diff-original,.lexis-diff-revised').forEach(el=>el.classList.remove('lexis-diff-original','lexis-diff-revised'));
-     for(const change of event.data.changes||[]){
-       const start=change[event.data.side+'_start'],end=change[event.data.side+'_end'];
-       for(const item of anchors)if(start<end && item.index<end && item.end>start)item.element.classList.add('lexis-diff-'+event.data.side);
-     }
+     if(!documentRendered)pendingMarks=event.data;
+     else applyDifferenceMarks(event.data);
      return;
    }
    if(event.data?.type==='lexis-locate-edit'){
@@ -158,6 +189,8 @@ html.shared-original{scrollbar-width:none}html.shared-original::-webkit-scrollba
  if(info.preview_warnings?.length){hint.textContent=info.preview_warnings.length+' 项建议冲突，未合入预览，请在意见栏核对';hint.title=info.preview_warnings.join('；');}
  await document.fonts.ready;
  resize();
+ documentRendered=true;
+ if(pendingMarks){applyDifferenceMarks(pendingMarks);pendingMarks=null;}
  requestAnimationFrame(()=>requestAnimationFrame(()=>parent.postMessage({type:'lexis-document-ready',source:id,run,text:info.text},location.origin)));
  }catch(error){status.textContent='预览失败：'+error.message+'。可切换至审查文本继续核对。';}
 })();</script></body></html>

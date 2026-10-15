@@ -61,8 +61,8 @@
     header > div { flex-shrink: 0; }
     @media (max-width: 1400px) {
       header { height: auto !important; min-height: 64px; flex-wrap: wrap; gap: 12px; padding: 12px 20px !important; }
-      main > aside[data-testid="review-summary"] { width: 248px !important; }
-      main > aside.wb-opinion-drawer { width: 340px !important; }
+      main > aside[data-testid="review-summary"] { width: 280px !important; }
+      main > aside.wb-opinion-drawer { width: 420px !important; }
       #contract-viewer { padding: 20px !important; }
       #contract-viewer > div { padding: 24px !important; }
     }
@@ -86,8 +86,8 @@
     .wb-popover button,.wb-popover select{max-width:100%}
     .wb-popover .wb-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .wb-risk-area{margin-top:10px;padding:12px;border:1px solid #fecaca;border-left:3px solid #ef4444;border-radius:7px;background:#fff1f2;color:#9f1239}.wb-risk-area h4{color:#991b1b}.wb-risk-area .wb-risk-description{font-size:13px;line-height:1.8;margin-top:7px;color:#9f1239}.wb-risk-area.wb-risk-favorable{background:#f0fdf4;border-color:#bbf7d0;color:#166534}.wb-risk-favorable h4,.wb-risk-favorable .wb-risk-description{color:#166534}
-    .wb-evidence{max-height:92px;overflow:auto;background:#f7f9fc;border-left:2px solid #b9c9dd;line-height:1.7}.wb-issue-actions{flex-wrap:wrap}.wb-issue-actions button{white-space:nowrap}
-    .wb-opinion-drawer{position:relative;flex:0 0 auto;width:360px;max-width:38vw;min-width:300px;background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden}
+    .wb-evidence{max-height:92px;overflow:auto;background:#f7f9fc;border-left:2px solid #b9c9dd;line-height:1.7}.wb-issue-actions{flex-wrap:nowrap;gap:4px}.wb-issue-actions button{white-space:nowrap;flex:0 0 auto;padding:4px 6px;font-size:11px}
+    .wb-opinion-drawer{position:relative;flex:0 0 auto;width:448px;max-width:38vw;min-width:300px;background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden}
     .wb-document-grid{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden;background:#f4f6f9;gap:12px;padding:12px}
     .wb-document-pane{display:flex;flex-direction:column;min-width:0;flex:1;overflow:hidden;background:#fff;border:1px solid #e2e8f0;border-radius:10px}
     .wb-document-pane+.wb-document-pane{border-top:2px solid #86c6ae}
@@ -99,6 +99,18 @@
     .wb-toolbar{background:white;border-bottom:1px solid #e2e8f0;padding:8px 16px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:48px}
     .wb-title{min-width:0;flex:1}.wb-title h1{font-size:13px}.wb-title p{font-size:11px;margin-top:2px}
     .wb-tools{display:flex;align-items:center;flex-shrink:0}
+
+    .wb-sidebar{position:relative;display:flex;flex-direction:column;flex-shrink:0;min-height:0;overflow:hidden;background:#fff}
+    .wb-summary-panel{width:320px;border-right:1px solid #e2e8f0}
+    .wb-sidebar-heading{height:44px;min-height:44px;display:flex;align-items:center;gap:6px;padding:0 10px;border-bottom:1px solid #edf0f5;white-space:nowrap;color:#334155;font-size:12px}
+    .wb-sidebar-toggle{position:absolute;top:50%;transform:translateY(-50%);z-index:3;display:grid;place-items:center;width:18px;height:54px;color:#64748b;background:#f8fafc;border:1px solid #dbe3ee;border-radius:6px;font-size:14px;cursor:pointer}.wb-summary-panel .wb-sidebar-toggle{right:0}.wb-opinion-drawer .wb-sidebar-toggle{left:0}.wb-sidebar.is-collapsed .wb-sidebar-toggle{left:8px;right:auto}
+    .wb-sidebar-toggle svg{width:15px;height:15px;transition:transform .16s ease}.wb-summary-panel.is-collapsed .wb-sidebar-toggle svg,.wb-opinion-drawer:not(.is-collapsed) .wb-sidebar-toggle svg{transform:rotate(180deg)}.wb-sidebar-toggle{box-shadow:0 1px 4px #0f172a0a;border-color:#d3deeb;background:#fff}.wb-sidebar-toggle:hover{background:#f1f5f9;color:#2563eb}
+    .wb-sidebar-toggle:focus-visible{outline:2px solid #93c5fd;outline-offset:1px}
+    .wb-sidebar-count{font-size:10px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:1px 5px;margin-left:4px}
+    .wb-summary-content{flex:1;overflow:auto;min-height:0;padding:14px 24px 14px 14px}
+    .wb-opinion-content{margin-left:14px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+    main>aside.wb-sidebar.is-collapsed{width:36px!important;min-width:36px!important;max-width:36px!important}
+    .wb-sidebar.is-collapsed .wb-sidebar-heading{padding:0 5px}
   </style>
 </head>
 
@@ -204,7 +216,6 @@
         </div>
 
 </section></div></details>
-        <button @click="toggleSummary" :aria-expanded="summaryOpen" aria-controls="review-summary-panel" aria-label="审查概览" class="text-xs text-slate-600 px-3 py-2 rounded-lg border border-slate-200">审查概览</button>
         <!-- 导出/查看法务审查意见书 -->
         <button @click="showReportModal = true" :disabled="!reviewResult" class="flex items-center space-x-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 transition shadow-sm cursor-pointer">
           <svg class="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -237,8 +248,10 @@
     <main class="flex-1 flex overflow-hidden">
 
       <!-- 左栏：合规健康评分、财税4大要件核验、LangGraph工作流状态 -->
-      <aside v-show="summaryOpen" id="review-summary-panel" data-testid="review-summary" class="w-80 bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto p-4 space-y-4">
-        
+      <aside id="review-summary-panel" data-testid="review-summary" class="wb-sidebar wb-summary-panel" :class="{'is-collapsed':!summaryOpen}">
+        <div class="wb-sidebar-heading"><button @click="toggleSummary" :aria-expanded="summaryOpen" aria-controls="review-summary-content" :aria-label="summaryOpen ? '收起审查概览' : '展开审查概览'" :title="summaryOpen ? '收起审查概览' : '展开审查概览'" class="wb-sidebar-toggle"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg></button><strong v-show="summaryOpen">审查概览</strong></div>
+        <div v-show="summaryOpen" id="review-summary-content" class="wb-summary-content space-y-4">
+
         <div v-if="reviewResult" class="text-[11px] text-slate-500 px-1 leading-relaxed">结果来源：{{ reviewSource }}<br>{{ reviewResult.summary.compliance_score == null ? "本模式不计算健康分。" : "评分基于审查原文，采纳修订后不会自动重算。" }}</div>
         <div v-if="reviewResult?.checklist_findings" class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
           <h3 class="text-xs font-semibold text-slate-700">{{ workspace.conditions.checklist?.name }} · v{{ workspace.conditions.checklist?.version }}</h3>
@@ -398,6 +411,7 @@
           </div>
         </div>
 
+        </div>
       </aside>
 
       <!-- 中间栏：合同正文阅卷室 (清晰大字号 15px - 16px、舒适行高、白底黑字、护眼商务) -->
@@ -488,14 +502,11 @@
       </section>
 
       <!-- 右栏：审查意见与条款修订单 (清晰大字号 14px、对比鲜明) -->
-      <aside id="opinion-drawer" role="region" aria-labelledby="opinion-drawer-title" class="wb-opinion-drawer">
+      <aside id="opinion-drawer" role="region" aria-labelledby="opinion-drawer-title" class="wb-sidebar wb-opinion-drawer" :class="{'is-collapsed':!opinionsOpen}">
+        <div class="wb-sidebar-heading"><button @click="toggleOpinions" :aria-expanded="opinionsOpen" aria-controls="review-opinion-content" :aria-label="opinionsOpen ? '收起审查意见与修订清单' : '展开审查意见与修订清单'" :title="opinionsOpen ? '收起审查意见与修订清单' : '展开审查意见与修订清单'" class="wb-sidebar-toggle"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg></button><strong id="opinion-drawer-title" v-show="opinionsOpen">审查意见与修订清单 <span class="wb-sidebar-count">{{ filteredIssues.length }}</span></strong></div>
+        <div v-show="opinionsOpen" id="review-opinion-content" class="wb-opinion-content">
         <!-- 头部 -->
         <div class="border-b border-slate-200 px-4 py-3 flex flex-wrap gap-2 items-center justify-between shrink-0 bg-slate-50/50">
-          <div class="text-sm font-bold text-slate-800 flex items-center space-x-2">
-            <span id="opinion-drawer-title">审查意见与修订清单</span>
-            <span class="text-xs bg-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded-full">{{ filteredIssues.length }}</span>
-          </div>
-
           <div class="w-full text-[11px] text-slate-500">已采纳 {{ appliedIssueIds.length }} 项 · 待处理 {{ (reviewResult?.issues || []).filter(i => !appliedIssueIds.includes(i.id) && !['rejected'].includes(workspace.decisions[i.id])).length }} 项</div>
           <!-- 筛选 -->
           <div class="flex items-center space-x-1 text-xs">
@@ -646,6 +657,7 @@
             <p class="text-xs text-slate-400 mt-1">可调整风险等级、处理状态或搜索条件；此状态不代表合同整体合规</p>
           </div>
 
+        </div>
         </div>
       </aside>
 
@@ -817,10 +829,14 @@
         const isReviewing = ref(false);
         const viewMode = ref("raw");
         const opinionsOpen = ref(true);
-        const summaryOpen = ref(false);
-        const toggleSummary = () => { summaryOpen.value=!summaryOpen.value; };
-        const openOpinions = () => { summaryOpen.value=false; opinionsOpen.value=true; nextTick(()=>document.querySelector('#opinion-drawer button')?.focus({preventScroll:true})); };
-        const closeOpinions = () => { opinionsOpen.value=false; document.querySelector('#document-more-actions')?.focus({preventScroll:true}); };
+        const summaryOpen = ref(true);
+        const fitDocuments=()=>nextTick(()=>requestAnimationFrame(()=>{
+          for(const title of ['原始合同文档','合同原件预览']) document.querySelector(`iframe[title="${title}"]`)?.contentWindow?.postMessage({type:'lexis-fit-width'},location.origin);
+        }));
+        const toggleSummary = () => { summaryOpen.value=!summaryOpen.value;fitDocuments(); };
+        const toggleOpinions = () => { opinionsOpen.value=!opinionsOpen.value;fitDocuments(); };
+        const openOpinions = () => { opinionsOpen.value=true;fitDocuments(); };
+        const closeOpinions = () => { opinionsOpen.value=false;fitDocuments(); };
         const documentCompare = ref(false);
         const reviewBaseline = ref({sourceId:null,text:''});
         const revisionScope = ref('all');
@@ -1156,8 +1172,8 @@
           try { await commitInlineDraft(); await workspace.flush(); } catch (error) { showToast(error.message); return; }
           reviewBaseline.value = {sourceId:workspace.conditions.source_id, text:contractText.value};
           documentCompare.value = true;
+          summaryOpen.value=true;opinionsOpen.value=true;pendingInitialRiskFocus=true;
           comparisonTexts.original=reviewBaseline.value.text;comparisonTexts.revised=null;comparisonData=null;comparisonSignature='';comparisonGeneration++;
-          summaryOpen.value = false;
           previewText.value = null;
           const previousResult = reviewResult.value, previousApplied = [...appliedIssueIds.value];
           
@@ -1223,6 +1239,7 @@
             }
             if (!completed) throw new Error('连接中断，未收到完整结果，请重试');
             await workspace.refresh(completedRunId);
+            summaryOpen.value=true;opinionsOpen.value=true;fitDocuments();
           } catch (err) {
             reviewResult.value = previousResult; appliedIssueIds.value = previousApplied;
             reviewError.value = err.name === 'AbortError' ? '已取消本次审查，可重新开始。' : err.message;
@@ -1360,6 +1377,7 @@
         };
 
         let comparisonData=null, comparisonSignature='', comparisonGeneration=0;
+        let pendingInitialRiskFocus=false;
         const comparisonTexts={original:null,revised:null};
         let differenceTimer;
         const scheduleDifferences=()=>{clearTimeout(differenceTimer);comparisonGeneration++;differenceTimer=setTimeout(refreshDocumentDifferences,100);};
@@ -1376,7 +1394,21 @@
             const data=await response.json();
             if(generation!==comparisonGeneration)return;
             comparisonData=data;
-            for(const [title,side] of [['原始合同文档','original'],['合同原件预览','revised']]) document.querySelector(`iframe[title="${title}"]`)?.contentWindow?.postMessage({type:'lexis-mark-differences',side,changes:data.changes},location.origin);
+            const issues=(reviewResult.value?.issues||[]).filter(issue=>issue.severity!=='favorable').map(issue=>{
+              const original=issue.redline?.original_text || issue.evidence || '';
+              const start=original?comparisonTexts.original.indexOf(original):-1;
+              let range=null;
+              if(start>=0 && comparisonTexts.original.indexOf(original,start+1)<0){
+                const first=comparisonTexts.original.slice(0,start).split('\n').length-1;
+                const last=comparisonTexts.original.slice(0,start+original.length-1).split('\n').length-1;
+                const mapped=data.original_map.slice(first,last+1);
+                range={original_start:first,original_end:last+1,revised_start:Math.min(...mapped),revised_end:Math.max(...mapped)+1};
+              }
+              return {original,revised:issue.redline?.suggested_text || original,range};
+            });
+            const focusFirst=pendingInitialRiskFocus && issues.length>0;
+            if(issues.length)pendingInitialRiskFocus=false;
+            for(const [title,side] of [['原始合同文档','original'],['合同原件预览','revised']]) document.querySelector(`iframe[title="${title}"]`)?.contentWindow?.postMessage({type:'lexis-mark-differences',side,changes:data.changes,issues,focusFirst},location.origin);
           }catch(error){showToast(error.message);}
         };
         window.addEventListener('message', async event => {
@@ -1428,7 +1460,7 @@
         });
 
         return {
-          summaryOpen, toggleSummary, opinionsOpen, openOpinions, closeOpinions, documentCompare, reviewBaseline, revisionScope, workspace, reviewAcceptedDraft, focusedIssueId, clauseEdit, openClauseEditor, saveClauseEditor, issueSearch, handlingFilter, reviewError, reviewedAt, resultStale, saveStatus, severityLabel,
+          summaryOpen, toggleSummary, toggleOpinions, opinionsOpen, openOpinions, closeOpinions, documentCompare, reviewBaseline, revisionScope, workspace, reviewAcceptedDraft, focusedIssueId, clauseEdit, openClauseEditor, saveClauseEditor, issueSearch, handlingFilter, reviewError, reviewedAt, resultStale, saveStatus, severityLabel,
           documentSaving, saveDocument, exportDocument, showEditor, editText, editTitle, editType, openEditor, saveEditor, cancelReview, exportContract,
           contractTitle,
           contractType,
