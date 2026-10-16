@@ -5,12 +5,13 @@ from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 
 from .store import repository as repo, now
-from .workspace_models import (TaskInput, ChecklistInput, RunRequest, HandlingInput, ArchiveInput,
+from .ui import PORTAL_PAGES
+from .workspace_models import (TaskInput, ChecklistInput, CategoryInput, RunRequest, HandlingInput, ArchiveInput,
                                DraftInput, DraftGenerate, DraftRewrite, FollowupInput)
 from .workspace_review import review_events, model_json
 from .graph import ModelCallError
@@ -155,6 +156,12 @@ def task_data(request, existing=None):
             if not checklist['published'] or checklist.get('archived'):
                 raise HTTPException(422, '请选择已发布且未归档的清单')
             data['checklist'] = checklist
+    if request.mode == 'checklist' and request.checklist_item_ids is not None:
+        selected = set(request.checklist_item_ids)
+        available = {item['id'] for item in data['checklist']['items']}
+        if not selected.issubset(available):
+            raise HTTPException(422, '所选要点不属于本次清单版本，请重新选择')
+        data['checklist'] = {**data['checklist'], 'items': [item for item in data['checklist']['items'] if item['id'] in selected]}
     return data
 
 
@@ -295,6 +302,35 @@ def complete_task(task_id: str, request: ArchiveInput):
     return repo.update(task_id, {'status': 'completed'}, request.revision)
 
 
+@router.get('/api/categories')
+def list_categories():
+    return {'items': sorted(repo.list('category'), key=lambda row: (row['sort_order'], row['name']))}
+
+
+def category_data(request, identifier=None):
+    if any(row['id'] != identifier and (row['code'] == request.code or row['name'] == request.name) for row in repo.list('category')):
+        raise HTTPException(409, '分类名称或编码已存在')
+    return request.model_dump(exclude={'revision'})
+
+
+@router.post('/api/categories')
+def create_category(request: CategoryInput):
+    return repo.create('category', category_data(request))
+
+
+@router.put('/api/categories/{identifier}')
+def update_category(identifier: str, request: CategoryInput):
+    repo.get(identifier, 'category')
+    if request.revision is None:
+        raise HTTPException(422, '保存需要记录版本号')
+    return repo.update(identifier, category_data(request, identifier), request.revision)
+
+
+def validate_category(request):
+    if request.category_id:
+        repo.get(request.category_id, 'category')
+
+
 @router.get('/api/checklists')
 def list_checklists():
     return {'items': repo.list('checklist')}
@@ -302,11 +338,13 @@ def list_checklists():
 
 @router.post('/api/checklists')
 def create_checklist(request: ChecklistInput):
+    validate_category(request)
     return repo.create('checklist', {**request.model_dump(exclude={'revision'}), 'version': 1, 'archived': False})
 
 
 @router.put('/api/checklists/{identifier}')
 def update_checklist(identifier: str, request: ChecklistInput):
+    validate_category(request)
     existing = repo.get(identifier, 'checklist')
     if request.revision is None:
         raise HTTPException(422, '保存需要记录版本号')
@@ -583,9 +621,12 @@ def export_draft(identifier: str):
     return download_docx(word_document(draft['title'], draft['text']), draft['title'] + '-草稿')
 
 
-@router.get('/records')
-@router.get('/checklists')
-@router.get('/draft')
-@router.get('/drafts')
-def portal_page():
-    return HTMLResponse((STATIC / 'index.html').read_text(encoding='utf-8'))
+def portal_page(request: Request):
+    from .ui import render_portal
+    return HTMLResponse(render_portal(request.url.path), headers={'Cache-Control': 'no-store'})
+
+
+# Register business pages from the same manifest used by the browser.
+for page_path in PORTAL_PAGES:
+    if page_path != '/':
+        router.add_api_route(page_path, portal_page, methods=['GET'], response_class=HTMLResponse)

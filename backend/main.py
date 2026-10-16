@@ -32,7 +32,7 @@ app.include_router(workspace_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
+    allow_origins=["http://127.0.0.1:8001", "http://localhost:8001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,6 +42,8 @@ app.add_middleware(
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+from .ui import DIST
+app.mount('/assets', StaticFiles(directory=DIST / 'assets', check_dir=False), name='frontend-assets')
 
 @app.post("/api/contracts/import")
 async def import_contract(file: UploadFile = File(...)):
@@ -290,19 +292,20 @@ async def review_contract_stream(req: ContractReviewRequest):
 
 @app.get("/")
 async def serve_index():
-    """返回全新 MARKUP 风格的合同助手首页"""
-    index_file = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index_file):
-        with open(index_file, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read(), media_type="text/html; charset=utf-8")
-    return HTMLResponse("<h1>LexisGraph 服务运行中，正在生成首页资源...</h1>", media_type="text/html; charset=utf-8")
+    from .ui import render_portal
+    return HTMLResponse(render_portal(), headers={'Cache-Control': 'no-store'})
+
 
 @app.get("/workbench")
 @app.get("/workbench.html")
 async def serve_workbench():
-    """返回合同专业审查工作台单页界面"""
-    wb_file = os.path.join(STATIC_DIR, "workbench.html")
-    if os.path.exists(wb_file):
-        with open(wb_file, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read(), media_type="text/html; charset=utf-8", headers={'Cache-Control':'no-store'})
-    return HTMLResponse("<h1>合同审查工作台未找到</h1>", media_type="text/html; charset=utf-8")
+    from .ui import render_workbench
+    return HTMLResponse(render_workbench(), headers={'Cache-Control': 'no-store'})
+
+
+@app.get('/{path:path}')
+async def spa_fallback(path: str):
+    if path.split('/', 1)[0] in {'api', 'static', 'assets'}:
+        raise HTTPException(404, 'Not Found')
+    from .ui import render_portal
+    return HTMLResponse(render_portal(), headers={'Cache-Control': 'no-store'})

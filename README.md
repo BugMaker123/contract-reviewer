@@ -4,13 +4,15 @@
 
 ## 启动
 
+前端已迁移为 Vue 3 单页应用。请先安装 Node.js 和 npm；启动器会按需安装前端依赖并构建。
+
 ```powershell
 uv venv
 uv pip install --python .venv/Scripts/python.exe -r requirements.txt
 .venv/Scripts/python.exe run.py
 ```
 
-访问 http://127.0.0.1:8000。当前默认是仅本机可访问的单个内部实例，尚未接入组织账号、权限和审批流。
+访问 http://127.0.0.1:8001。当前默认是仅本机可访问的单个内部实例，尚未接入组织账号、权限和审批流。
 
 ## 功能
 
@@ -36,7 +38,7 @@ uv pip install --python .venv/Scripts/python.exe -r requirements-dev.txt
 npx --yes tailwindcss@3.4.17 -i ./backend/static/styles.input.css -o ./backend/static/vendor/tailwind.css --minify
 ```
 
-样式和 Vue 均本地加载，正常运行无需外部 CDN 或 Node 构建服务。后端热重载仅监控 `backend/`，避免测试和临时转换工具触发服务重启。
+Vue 和路由通过 Vite 打包后由本机服务提供，运行时无需外部 CDN。前端开发和扩展见 [前端架构说明](FRONTEND.md)。后端热重载仅监控 `backend/`，避免测试和临时转换工具触发服务重启。
 
 ## 主要文件
 
@@ -45,5 +47,6 @@ npx --yes tailwindcss@3.4.17 -i ./backend/static/styles.input.css -o ./backend/s
 - `backend/workspace_api.py`：任务、清单、起草和交付接口。
 - `backend/workspace_review.py`：审查模式、逐项核验与差异分析。
 - `backend/word_export.py`：Word 版式保留、修订标记和批注。
-- `backend/static/index.html` 与 `portal.js`：内部业务入口及记录页面。
-- `backend/static/workbench.html` 与 `workbench-workspace.js`：三栏审查工作台和持久化适配。
+- `frontend/src/views/`、`layouts/` 与 `components/`：Vue 页面、公共布局及业务组件。
+- `frontend/src/composables/`：工作台流程、页面生命周期与持久化适配。
+- `frontend/src/router/`：无刷新路由及页面懒加载。

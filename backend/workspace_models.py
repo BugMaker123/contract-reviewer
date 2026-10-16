@@ -25,8 +25,24 @@ class ChecklistItem(BaseModel):
         return self
 
 
+class CategoryInput(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    code: str = Field(pattern=r'^[A-Z][A-Z0-9_]{1,49}$')
+    description: str = Field(default='', max_length=1000)
+    sort_order: int = Field(default=1, ge=0, le=9999)
+    revision: int | None = None
+
+    @field_validator('name')
+    @classmethod
+    def nonblank(cls, value):
+        if not value.strip():
+            raise ValueError('分类名称不能为空')
+        return value.strip()
+
+
 class ChecklistInput(BaseModel):
     name: str = Field(min_length=1, max_length=200)
+    category_id: str | None = None
     contract_type: str = Field(default='通用合同', max_length=200)
     description: str = Field(default='', max_length=3000)
     items: list[ChecklistItem] = Field(min_length=1, max_length=100)
@@ -51,6 +67,7 @@ class TaskInput(BaseModel):
     focus: str = Field(default='', max_length=10000)
     references: list[ReferenceMaterial] = Field(default_factory=list, max_length=5)
     reference_text: str = Field(default='', max_length=200000)
+    checklist_item_ids: list[str] | None = Field(default=None, min_length=1, max_length=100)
     checklist_id: str | None = None
     source_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
     revision: int | None = None
