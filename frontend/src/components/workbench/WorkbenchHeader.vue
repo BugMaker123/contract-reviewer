@@ -36,6 +36,7 @@ export default {
 
     </div>
     <div class="prototype-nav-right">
+      <button @click="showReportModal = true" :disabled="!reviewResult" class="wb-report-action">审查意见书</button>
       <details class="wb-menu">
         <summary>审查设置 ▾</summary>
         <div class="wb-popover">
@@ -195,45 +196,8 @@ export default {
         导出
       </button>
 
-      <details class="wb-menu prototype-document-menu">
-        <summary aria-label="更多文档操作">···</summary>
-        <div class="wb-popover">
-          <button
-            @click="openEditor"
-            :disabled="
-              documentSaving ||
-              workspace.historical ||
-              workspace.loading ||
-              revisionBusy
-            "
-            class="px-3 py-2 rounded-lg border border-slate-200 text-slate-700"
-          >
-            编辑正文
-          </button>
-          <button
-            @click="workspace.finish"
-            :disabled="
-              workspace.historical ||
-              resultStale ||
-              workspace.saving ||
-              workspace.task?.status !== 'pending_review'
-            "
-            :title="resultStale ? '请先重新审查当前正文' : ''"
-            class="px-3 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-40"
-          >
-            {{
-              workspace.task?.status === "completed" ? "已完成复核" : "完成复核"
-            }}
-          </button>
-
-          <button @click="showReportModal = true" :disabled="!reviewResult">
-            审查意见书
-          </button>
-          <button @click="toggleSummary">
-            {{ summaryOpen ? "收起审查概览" : "展开审查概览" }}
-          </button>
-        </div>
-      </details>
+      <button @click="openEditor" :disabled="documentSaving || workspace.historical || workspace.loading || revisionBusy">编辑正文</button>
+      <button @click="workspace.finish" :disabled="workspace.historical || resultStale || workspace.saving || workspace.task?.status !== 'pending_review'" :title="resultStale ? '请先重新审查当前正文' : ''" class="wb-finish-action">{{ workspace.task?.status === 'completed' ? '已完成审核' : '完成审核' }}</button>
     </div>
   </header>
 </template>

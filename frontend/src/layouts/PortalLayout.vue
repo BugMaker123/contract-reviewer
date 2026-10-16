@@ -21,12 +21,15 @@ export default {
     <header
       class="portal-header h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0"
     >
-      <RouterLink to="/" class="flex items-center gap-3"
+      <div class="portal-header-leading">
+      <RouterLink to="/" class="portal-brand flex items-center gap-3"
         ><span
           class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold"
           >⚖</span
         ><strong class="text-base text-slate-900">LexisGraph</strong>
       </RouterLink>
+      <h1 v-if="page === 'start'" class="portal-page-title">新建合同审查</h1>
+      </div>
       <div class="flex gap-3 items-center">
         <button @click="showModel = true" class="button">⚙ 模型配置</button>
       </div>
@@ -34,7 +37,7 @@ export default {
 
     <div class="flex flex-1 overflow-hidden">
       <aside
-        class="portal-sidebar w-56 bg-white border-r border-slate-200 p-4 flex flex-col shrink-0"
+        class="portal-sidebar bg-white border-r border-slate-200 p-4 flex flex-col shrink-0"
       >
         <nav class="space-y-1">
           <RouterLink
@@ -48,24 +51,24 @@ export default {
             >{{ item.name }}</RouterLink
           >
         </nav>
-        <div class="mt-6 card p-3 bg-slate-50" v-if="recentTasks.length">
-          <div class="text-xs font-semibold mb-2 text-slate-700">最近工作</div>
+        <div class="mt-6 card p-4 bg-slate-50" v-if="recentTasks.length">
+          <div class="text-sm font-semibold mb-2 text-slate-700">最近工作</div>
           <RouterLink
             :to="'/workbench?task=' + recentTasks[0].id"
-            class="text-xs text-slate-700 break-words leading-relaxed block"
+            class="text-sm text-slate-700 break-words leading-relaxed block"
             >{{ recentTasks[0].title }}</RouterLink
           >
-          <div class="mt-2 text-[11px] text-slate-400">
+          <div class="mt-2 text-xs text-slate-500">
             {{ statusName(recentTasks[0].status) }}
           </div>
           <RouterLink
             :to="'/workbench?task=' + recentTasks[0].id"
-            class="block mt-3 text-xs font-semibold text-blue-600"
+            class="block mt-3 text-sm font-semibold text-blue-600"
             >继续处理 →</RouterLink
           >
         </div>
         <div
-          class="mt-auto pt-6 text-[11px] text-slate-400 border-t border-slate-100"
+          class="mt-auto pt-6 text-xs text-slate-500 border-t border-slate-100"
         >
           <button @click="showHelp = true" class="text-slate-500 mb-3">
             操作说明

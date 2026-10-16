@@ -19,9 +19,9 @@ export function createPresentation() {
     { id: "sample", name: "📑 示例合同" },
   ];
   const roles = [
+    { value: "中立审慎", label: "通用审查 · 中立审慎（默认）" },
     { value: "乙方(卖方/开发方/服务方)", label: "乙方 · 供应商/服务方" },
     { value: "甲方(买方/采购方/委托方)", label: "甲方 · 买方/采购方" },
-    { value: "中立审慎", label: "中立审慎" },
   ];
   const taskStatuses = {
     draft: "待审查",

@@ -14,7 +14,7 @@ import { LexisSession } from "../services/session.js";
 export function useWorkbench() {
   const contractTitle = ref("未命名合同");
   const contractType = ref("商务合作协议");
-  const partyRole = ref("乙方(卖方/开发方/服务方)");
+  const partyRole = ref("中立审慎");
   const contractText = ref("");
   const selectedModel = ref(
     localStorage.getItem("LEXIS_MODEL_NAME") || "deepseek-chat",

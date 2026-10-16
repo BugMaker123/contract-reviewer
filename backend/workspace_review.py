@@ -8,6 +8,7 @@ from . import graph
 from .workspace_models import ChecklistItem
 from .models import ReviewIssue
 from .review_progress import emit_progress
+from .review_policy import admit, review_context, requirements_for, build_plan, verify_requirements, snapshot_digest, evidence_loop
 
 
 async def model_json(config, prompt):
@@ -95,7 +96,7 @@ async def assess_differences(snapshot, diffs, config):
         for batch in batches:
             response = await model_json(config, f'''分析合同相对于参考合同的变更对我方的影响，区分文本差异与实际风险。
 返回 {{"findings":[{{"id":"差异原id","severity":"critical/warning/info","explanation":"风险判断和不确定性","basis":"依据，无法确定时说明待核验，不编造法律条文","advice":"处理建议","suggested_text":"可选替代条款"}}]}}，每一处差异必须返回一项。
-条件：{json.dumps({key:snapshot[key] for key in ('type','role','scale','background','focus')}, ensure_ascii=False)}
+条件：{json.dumps(review_context(snapshot), ensure_ascii=False)}
 变更：{json.dumps(batch, ensure_ascii=False)}''')
             parsed = [DifferenceFinding.model_validate(value).model_dump() for value in response['findings']]
             if {item['id'] for item in parsed} != {item['id'] for item in batch} or len(parsed) != len(batch):
@@ -138,7 +139,7 @@ async def evaluate_checklist(snapshot, config):
         try:
             parsed = await model_json(config, f'''按照下面企业清单逐项审查，禁止添加不存在的原文。判断不充分时使用 needs_review。
 返回 {{"findings":[{{"id":"原检查项id","status":"pass/fail/needs_review/not_applicable","evidence":"完整、连续、逐字引用合同原文或空字符串","explanation":"理由"}}]}}。
-审查条件：{json.dumps({k: snapshot[k] for k in ('role', 'scale', 'background', 'focus')}, ensure_ascii=False)}
+审查条件：{json.dumps(review_context(snapshot), ensure_ascii=False)}
 清单：{json.dumps(semantic, ensure_ascii=False)}
 合同：{text}''')
             values = [ChecklistFinding.model_validate(value).model_dump() for value in parsed['findings']]
@@ -233,7 +234,7 @@ async def consolidate_revisions(result, snapshot, config):
             payload = await model_json({**config, '_required_json_arrays': ['revisions'], '_revision_originals': {i['id']: i['evidence'] for i in pending}}, '为合同生成可直接替换原条款的统一改写稿。每项必须同时解决列出的全部问题，保留无关内容、条款编号、原有交易事实与排版换行。'
                                        '采取最小必要修改，不重写无风险内容，不新增主体信息、证照、联系方式等表单字段。不得套用其他合同的金额、税率、主体或期限；保留原有空白，不新增【待确认】占位符。需要用户决定的交易信息留在审查意见中，不填入修订正文。不得将风险分析或操作指令写入合同。'
                                        '返回 {"revisions":[{"id":"问题ID","suggested_text":"完整改写条款"}]}。'
-                                       + json.dumps({'role': snapshot.get('role'), 'background': snapshot.get('background'),
+                                       + json.dumps({'conditions': review_context(snapshot),
                                                      'contract': text, 'clauses': [{'id': i['id'], 'original_text': i['evidence'],
                                                                                    'problems': i['risk_points'], 'advice': i['negotiation_strategy']} for i in pending]}, ensure_ascii=False))
             revisions = {r['id']: r['suggested_text'] for r in payload.get('revisions', [])
@@ -260,11 +261,16 @@ async def consolidate_revisions(result, snapshot, config):
 
 async def review_events(snapshot, config):
     """Yield actual finished stages, then one complete result."""
+    requirements = requirements_for(snapshot)
+    admission = await admit(snapshot, config, model_json)
+    plan = build_plan(snapshot, requirements)
+    emit_progress('plan', '审查计划：' + ' → '.join(item['title'] for item in plan), plan=plan)
     mode = snapshot['mode']
     if mode in ('quick', 'deep'):
         state = {
             'contract_title': snapshot['title'], 'contract_type': snapshot['type'], 'party_role': snapshot['role'],
-            'contract_text': snapshot['text'], 'model_config': config, 'review_focus': [snapshot['focus']] if snapshot['focus'] else [],
+            'contract_text': snapshot['text'], 'model_config': config, 'review_focus': [
+                f"[{('硬性要求' if item['priority'] == 'required' else '优先偏好')} / {item['source']}] {item['text']}" for item in requirements],
             'review_mode': mode, 'review_scale': snapshot['scale'], 'background': snapshot['background'],
             'reference_materials': snapshot['references'], 'segments': [], 'compliance_issues': [], 'balance_issues': [],
             'all_issues': [], 'overall_summary': {}, 'execution_logs': []
@@ -347,6 +353,45 @@ async def review_events(snapshot, config):
         logs.append({'node': 'balance_review', 'detail': '[' + source + '] 已完成检查'})
         result['logs'] = logs
         yield 'node_update', event('synthesize_summary', '已汇总检查结果')
-    if mode in ('quick', 'deep'):
+    findings = await verify_requirements(snapshot, requirements, config, model_json)
+    if snapshot.get('execution') == 'react':
+        result['tool_verification'] = await evidence_loop(snapshot, findings, config, model_json)
+    result['requirement_findings'] = findings
+    requirement_issues = []
+    for finding in findings:
+        if finding['status'] in ('fail', 'needs_review'):
+            requirement_issues.append({'id': 'req-' + finding['id'], 'segment_id': None,
+                'clause_title': '自定义要求', 'severity': 'warning' if finding['status'] == 'fail' and finding['priority'] == 'required' else 'info',
+                'category': '要求核验', 'issue_title': finding['text'][:100], 'legal_basis': finding['source'],
+                'risk_analysis': finding['explanation'], 'negotiation_strategy': '请核对要求与原文；冲突要求须由用户明确后重新审查。',
+                'redline': None, 'evidence': finding['evidence'], 'requirement_id': finding['id']})
+    conflicts = any(item.get('conflict_with') for item in findings)
+    if conflicts:
+        for issue in result['issues']:
+            issue['redline'] = None
+            issue['rewrite_warning'] = '审查要求存在冲突，请先明确要求后重新审查。'
+        result['warning'] = '审查要求存在冲突，本次保留风险意见，暂停生成自动修订。'
+    elif mode in ('quick', 'deep'):
         await consolidate_revisions(result, snapshot, config)
+    result['issues'].extend(requirement_issues)
+    if requirements and any(i.get('redline') for i in result['issues']):
+        from .revisions import revised_text
+        from fastapi import HTTPException
+        try:
+            proposed = revised_text({'input': snapshot, 'result': result}, [i['id'] for i in result['issues'] if i.get('redline')])
+            result['proposed_requirement_findings'] = await verify_requirements(snapshot, requirements, config, model_json, text=proposed)
+        except HTTPException:
+            result['proposed_requirement_findings'] = [{**item, 'status': 'needs_review', 'evidence': '',
+                'explanation': '修订重叠或无法唯一定位，未能生成完整建议稿用于核验。', 'conflict_with': []} for item in requirements]
+        if any(f['status'] in ('fail', 'needs_review') and f['priority'] == 'required' for f in result['proposed_requirement_findings']):
+            result['warning'] = '建议稿仍有未满足或待确认的硬性要求，请逐项核对后采纳。'
+    for severity in ('critical', 'warning', 'info'):
+        result['summary'][severity + '_count'] = sum(i['severity'] == severity for i in result['issues'])
+    result.update(admission=admission, plan=plan, input_digest=snapshot_digest(snapshot),
+                  execution=snapshot.get('execution', 'plan'))
+    result['review_metadata'] = {'mode': mode, 'policy_version': 1,
+        'model_name': config.get('model_name', 'deepseek-v4-flash') if admission['source'] == 'model' else None,
+        'main_review_source': '基础规则' if mode == 'quick' else '参见执行记录与覆盖范围'}
+    if any(item['status'] == 'needs_review' for item in findings) or admission.get('safety_status') == 'needs_review':
+        result['coverage'] += ' 存在待确认项目；请查看准入及要求核验结果。'
     yield 'complete', result

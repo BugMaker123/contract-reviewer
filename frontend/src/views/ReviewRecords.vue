@@ -1,9 +1,10 @@
 <script>
 import { usePortalPage } from "../composables/usePortalPage.js";
 import PageFrame from "../components/PageFrame.vue";
+import ReviewStatistics from "../components/portal/ReviewStatistics.vue";
 
 export default {
-  components: { PageFrame },
+  components: { PageFrame, ReviewStatistics },
   setup() {
     const context = usePortalPage("records");
     return { ...context, context };
@@ -20,8 +21,9 @@ export default {
             每次审查独立留档，可继续处理或查看历史版本
           </p>
         </div>
-        <RouterLink to="/" class="button primary">＋ 新建审查</RouterLink>
+        <div class="flex gap-2"><a href="/api/reports/reviews?format=csv" class="button">导出全部审查报表</a><RouterLink to="/" class="button primary">＋ 新建审查</RouterLink></div>
       </div>
+      <ReviewStatistics />
       <div class="card p-4 flex flex-wrap items-center gap-3">
         <input
           v-model="search"

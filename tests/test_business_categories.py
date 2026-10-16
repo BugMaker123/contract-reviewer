@@ -66,3 +66,48 @@ def test_category_and_checklist_browser(isolated_workspace):
     finally:
         server.should_exit = True
         thread.join(timeout=5)
+
+
+def test_uploaded_contract_opens_workbench(isolated_workspace):
+    import socket
+    import threading
+    import uvicorn
+    from playwright.sync_api import sync_playwright, expect
+
+    sock = socket.socket()
+    sock.bind(('127.0.0.1', 0))
+    server = uvicorn.Server(uvicorn.Config(app, log_level='error'))
+    thread = threading.Thread(target=server.run, kwargs={'sockets': [sock]}, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page(viewport={'width': 1440, 'height': 900})
+            errors = []
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            base = f'http://127.0.0.1:{sock.getsockname()[1]}'
+            page.goto(base + '/')
+            page.locator('input[type="file"]').first.set_input_files({
+                'name': '采购协议.txt', 'mimeType': 'text/plain',
+                'buffer': '第一条 采购价款为100元，验收后付款。'.encode('utf-8'),
+            })
+            expect(page.get_by_role('button', name='预览合同')).to_be_visible()
+            page.get_by_role('button', name='预览合同').click()
+            expect(page.get_by_title('合同原件预览')).to_be_visible()
+            page.get_by_role('button', name='关闭预览').click()
+            page.get_by_label('自定义审查要求（Prompt）', exact=True).fill('核对付款与税费约定')
+            page.evaluate('''() => {
+                const draft = JSON.parse(sessionStorage.getItem('LEXIS_HOME_DRAFT'));
+                draft.type = '';
+                draft.requirements = [{ id: 'custom-empty', text: '', priority: 'required', source: '用户要求' }];
+                sessionStorage.setItem('LEXIS_HOME_DRAFT', JSON.stringify(draft));
+            }''')
+            page.reload()
+            expect(page.get_by_role('button', name='预览合同')).to_be_visible()
+            page.get_by_role('button', name='进入工作台核对合同').click()
+            page.wait_for_url('**/workbench?task=*')
+            assert not errors
+            browser.close()
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)

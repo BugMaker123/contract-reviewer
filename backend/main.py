@@ -168,9 +168,20 @@ async def check_model(req: CheckModelRequest):
     except Exception as e:
         return {"success": False, "message": f"连接失败: {str(e)}"}
 
+async def legacy_admission(req):
+    from .review_policy import admit, AdmissionError
+    from .workspace_review import model_json
+    try:
+        await admit({'text': req.contract_text, 'role': req.party_role, 'focus': '\n'.join(req.review_focus or [])},
+                    req.model_config_data.model_dump(), model_json)
+    except AdmissionError as error:
+        raise HTTPException(422, error.decision)
+
+
 @app.post("/api/review")
 async def review_contract_sync(req: ContractReviewRequest):
     """标准同步审查接口"""
+    await legacy_admission(req)
     initial_state = {
         "contract_title": req.contract_title,
         "contract_type": req.contract_type,
@@ -203,6 +214,7 @@ async def review_contract_stream(req: ContractReviewRequest):
     基于 SSE (Server-Sent Events) 的流式状态机审查接口。
     随着 LangGraph 逐步执行每个节点，实时向前端推送节点状态、进度日志与阶段性审查成果！
     """
+    await legacy_admission(req)
     initial_state = {
         "contract_title": req.contract_title,
         "contract_type": req.contract_type,

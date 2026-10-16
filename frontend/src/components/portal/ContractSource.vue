@@ -1,7 +1,11 @@
 <script>
+import { ref } from "vue";
 export default {
   props: { context: { type: Object, required: true } },
-  setup: (props) => props.context,
+  setup(props) {
+    const previewOpen = ref(false);
+    return { ...props.context, previewOpen };
+  },
 };
 </script>
 
@@ -48,24 +52,11 @@ export default {
           <strong>{{ form.title }}</strong>
           <div class="mt-1 text-slate-500">已提取正文，请核对内容</div>
         </div>
-        <button
-          @click="$refs.contractInput.click()"
-          :disabled="importing"
-          class="button"
-        >
-          重新选择
-        </button>
+        <div class="contract-file-actions">
+          <button type="button" class="button soft" @click="previewOpen = true">预览合同</button>
+          <button type="button" @click="$refs.contractInput.click()" :disabled="importing" class="button">重新选择</button>
+        </div>
       </div>
-      <details>
-        <summary class="text-xs text-blue-600 cursor-pointer">
-          核对或修正提取正文
-        </summary>
-        <textarea
-          v-model="form.text"
-          class="field mt-3 h-48 leading-relaxed"
-          aria-label="提取合同正文"
-        ></textarea>
-      </details>
     </div>
     <textarea
       v-else-if="inputMethod === 'paste'"
@@ -94,6 +85,16 @@ export default {
           >{{ sample.type }} · {{ sample.text.length }} 字</span
         >
       </button>
+    </div>
+    <div v-if="previewOpen" class="modal" @click.self="previewOpen = false">
+      <section class="modal-panel contract-preview" role="dialog" aria-modal="true" aria-labelledby="contract-preview-title" @keydown.esc="previewOpen = false">
+        <header class="contract-preview-header">
+          <div><h2 id="contract-preview-title">合同预览</h2><p>{{ form.title || '未命名合同' }}</p></div>
+          <button type="button" class="button" aria-label="关闭预览" @click="previewOpen = false">关闭</button>
+        </header>
+        <iframe v-if="form.source_id" class="contract-preview-document" :src="'/static/document-preview.html?source=' + encodeURIComponent(form.source_id) + '&readonly=1'" title="合同原件预览" sandbox="allow-scripts allow-same-origin allow-downloads"></iframe>
+        <div v-else class="contract-preview-content">{{ form.text }}</div>
+      </section>
     </div>
   </div>
 </template>

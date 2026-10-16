@@ -434,6 +434,34 @@
   border-right: 1px solid #e2e8f0;
 }
 
+.workbench-view .wb-review-navigation { padding: 16px; background: #f8fafc; }
+.workbench-view .wb-nav-card { padding: 16px; margin-bottom: 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; }
+.workbench-view .wb-nav-section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; color: #334155; font-size: 13px; font-weight: 700; }
+.workbench-view .wb-nav-section-title span { color: #94a3b8; font-size: 12px; font-weight: 500; }
+.workbench-view .wb-nav-empty { color: #64748b; font-size: 12px; line-height: 1.7; }
+.workbench-view .wb-nav-progress-number { display: flex; align-items: baseline; gap: 6px; margin-bottom: 12px; }
+.workbench-view .wb-nav-progress-number strong { color: #1d4ed8; font-size: 25px; line-height: 1; }
+.workbench-view .wb-nav-progress-number span { color: #64748b; font-size: 12px; }
+.workbench-view .wb-nav-progress-track { height: 7px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+.workbench-view .wb-nav-progress-track span { display: block; height: 100%; border-radius: inherit; background: #2563eb; transition: width .2s; }
+.workbench-view .wb-nav-risk-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+.workbench-view .wb-nav-risk-grid > div { display: flex; flex-direction: column; gap: 3px; padding: 9px 4px; border-radius: 8px; background: #f8fafc; }
+.workbench-view .wb-nav-risk-grid strong { color: #334155; font-size: 20px; line-height: 1.2; }
+.workbench-view .wb-nav-risk-grid .wb-nav-critical { color: #dc2626; }
+.workbench-view .wb-nav-risk-grid .wb-nav-warning { color: #d97706; }
+.workbench-view .wb-nav-risk-grid span { color: #64748b; font-size: 11px; }
+.workbench-view .wb-nav-issues { padding: 16px 0 0; }
+.workbench-view .wb-nav-issues > .wb-nav-section-title { padding: 0 4px; }
+.workbench-view .wb-nav-issue { display: flex; align-items: flex-start; width: 100%; gap: 9px; padding: 10px 8px; margin-bottom: 5px; border: 1px solid transparent; border-radius: 8px; text-align: left; color: #334155; }
+.workbench-view .wb-nav-issue:hover, .workbench-view .wb-nav-issue.active { border-color: #bfdbfe; background: #eff6ff; }
+.workbench-view .wb-nav-index { flex: 0 0 20px; color: #94a3b8; font-size: 11px; line-height: 1.5; }
+.workbench-view .wb-nav-issue-copy { flex: 1; min-width: 0; }
+.workbench-view .wb-nav-issue-copy strong { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: #334155; font-size: 12px; font-weight: 600; line-height: 1.5; }
+.workbench-view .wb-nav-issue-copy small { display: block; overflow: hidden; margin-top: 3px; color: #94a3b8; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.workbench-view .wb-nav-dot { flex: 0 0 7px; height: 7px; margin-top: 5px; border-radius: 50%; background: #94a3b8; }
+.workbench-view .wb-nav-dot.is-critical { background: #ef4444; }
+.workbench-view .wb-nav-dot.is-warning { background: #f59e0b; }
+
 .workbench-view .wb-sidebar-heading {
   height: 44px;
   min-height: 44px;

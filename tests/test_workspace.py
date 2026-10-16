@@ -103,6 +103,8 @@ def test_compare_only_reports_changed_clause(client):
 def test_background_and_scale_reach_graph_prompt(client, monkeypatch):
     prompts = []
     class FakeModel:
+        async def ainvoke(self, messages):
+            return type('Response', (), {'content': json.dumps({'status': 'pass', 'reason': '合同审查用途正常'})})()
         def invoke(self, messages):
             prompts.append(messages[-1].content)
             return type('Response', (), {'content': json.dumps({'tax_settlement': {}, 'issues': []})})()
@@ -208,6 +210,8 @@ def test_comparison_model_assesses_only_actual_changes(client, monkeypatch):
     from backend import workspace_review
     seen = []
     async def fake_model(config, prompt):
+        if '执行审查准入判断' in prompt:
+            return {'status': 'pass', 'reason': '合同审查用途正常'}
         seen.append(prompt)
         return {'findings': [{'id': 'diff_1', 'severity': 'warning', 'explanation': '付款账期延长，请核对资金安排', 'basis': '交易要求', 'advice': '确认是否接受新账期', 'suggested_text': '验收后30日付款。'}]}
     monkeypatch.setattr(graph, 'get_llm_client', lambda config: object())
@@ -225,6 +229,8 @@ def test_comparison_model_assesses_only_actual_changes(client, monkeypatch):
 def test_unverified_checklist_evidence_cannot_be_marked_pass(client, monkeypatch):
     from backend import workspace_review
     async def fake_json(config, prompt):
+        if '执行审查准入判断' in prompt:
+            return {'status': 'pass', 'reason': '合同审查用途正常'}
         return {'findings': [{'id': 'balance', 'status': 'pass', 'evidence': '模型编造的原文', 'explanation': '通过'}]}
     monkeypatch.setattr(graph, 'get_llm_client', lambda config: object())
     monkeypatch.setattr(workspace_review, 'model_json', fake_json)
@@ -309,7 +315,7 @@ def test_current_document_download_does_not_require_review(client):
 def test_adopted_document_preview_uses_same_formatted_document(client):
     document = Document()
     paragraph = document.add_paragraph()
-    paragraph.add_run('Amount: 100').bold = True
+    paragraph.add_run('Agreement payment Amount: 100').bold = True
     buffer = BytesIO()
     document.save(buffer)
     imported = client.post('/api/contracts/import', files={'file': ('contract.docx', buffer.getvalue())}).json()
@@ -317,10 +323,10 @@ def test_adopted_document_preview_uses_same_formatted_document(client):
     review(client, task)
     run = client.get('/api/tasks/'+task['id']).json()['run']
     issue = run['result']['issues'][0]
-    issue['redline'] = {'change_type': 'replace', 'original_text': 'Amount: 100', 'suggested_text': 'Amount: 200'}
+    issue['redline'] = {'change_type': 'replace', 'original_text': 'Agreement payment Amount: 100', 'suggested_text': 'Agreement payment Amount: 200'}
     workspace_api.repo.update(run['id'], {'result': run['result'], 'applied': [issue['id']]})
     info = client.get('/api/sources/'+imported['source_id']+'?include_text=true&run='+run['id']).json()
-    assert info['text'] == 'Amount: 200'
+    assert info['text'] == 'Agreement payment Amount: 200'
     file = client.get('/api/runs/'+run['id']+'/export?scope=current')
     preview = Document(BytesIO(file.content))
     assert preview.paragraphs[0].text == info['text']

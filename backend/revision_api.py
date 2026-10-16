@@ -10,6 +10,7 @@ from .store import now
 from .word_export import paragraphs, visible_paragraph_text
 from .workspace_models import RevisionGenerate, RevisionEdit, RevisionRestore
 from .revisions import editable_run, revision_anchor, save_candidate, review_document, revision_plan
+from .review_policy import requirements_for, verify_requirements
 
 
 def create_revision_router(repository, builder):
@@ -32,6 +33,8 @@ def create_revision_router(repository, builder):
         repo = repository()
         run = editable_run(repo, run_id, request.revision)
         issue = issue_for(run, issue_id)
+        if any(item.get('conflict_with') for item in run['result'].get('requirement_findings', [])):
+            raise HTTPException(409, '审查要求存在冲突，请明确要求并重新审查后再生成修订。')
         original, kind = revision_anchor(run, issue)
         prompt = f'''为合同中选定的一处条款重新生成可直接替换的完整修订文本。
 仅返回 JSON {{"suggested_text":"完整替代条款","explanation":"本次调整说明"}}。
@@ -53,8 +56,11 @@ def create_revision_router(repository, builder):
                 raise ValueError('模型未返回有效的新修订')
         except Exception:
             raise HTTPException(502, 'AI 未能生成有效的新修订，请检查模型配置或调整要求后重试。上一版建议已保留。')
+        requirements = requirements_for(run['input'])
+        proposed = run['input']['text'].replace(original, suggested, 1) if original else run['input']['text'] + '\n' + suggested
+        verification = await verify_requirements(run['input'], requirements, request.model_config_data.model_dump(), workspace_review.model_json, text=proposed)
         return save_candidate(repo, run, issue_id, {'original_text': original, 'suggested_text': suggested, 'change_type': kind},
-                              explanation, request.instruction, 'ai', now())
+                              explanation, request.instruction, 'ai', now(), verification=verification)
 
     @router.put('/api/runs/{run_id}/issues/{issue_id}/revision')
     def edit_revision(run_id: str, issue_id: str, request: RevisionEdit):

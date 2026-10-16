@@ -5,20 +5,22 @@ const value = (key) => unref(props.context[key]);
 const running = computed(() => value("isReviewing"));
 const trace = computed(() => value("reviewTrace") || []);
 const steps = [
-  "准备快照",
+  "准入与计划",
   "条款提取",
   "法务研判",
   "边界校验",
   "归并问题",
-  "生成修订",
+  "要求与修订核验",
   "发布结果",
 ];
 const activeStep = computed(() => {
-  if (!running.value) return 7;
+  if (!running.value && value('reviewResult')) return 7;
   let step = 0;
   for (const event of trace.value) {
     const stages = {
       prepare: 0,
+      admission: 0,
+      plan: 0,
       segment: 1,
       scope: 1,
       segment_contract: 2,
@@ -32,6 +34,8 @@ const activeStep = computed(() => {
       aggregate_and_redline: 4,
       synthesize_summary: 4,
       rewrite: 5,
+      requirements: 5,
+      evidence_tool: 5,
     };
     if (event.stage in stages) step = Math.max(step, stages[event.stage]);
     if (event.stage === "retry" || event.stage === "review")

@@ -44,7 +44,6 @@ export default {
         <a href="/" @click.prevent="workspace.leaveFor('/')" title="返回首页"><span>⚖</span><strong>LexisGraph</strong></a>
         <details class="wb-menu"><summary>工作台 ▾</summary><div class="wb-popover workbench-global-menu"><a href="/" @click.prevent="workspace.leaveFor('/')">开始审查</a><a href="/records" @click.prevent="workspace.leaveFor('/records')">审查记录</a><a href="/categories" @click.prevent="workspace.leaveFor('/categories')">业务分类维护</a><a href="/checklists" @click.prevent="workspace.leaveFor('/checklists')">审查清单维护</a></div></details>
       </div>
-      <div class="workbench-global-actions"><span>{{ workspace.modeName }}</span><button @click="showReportModal = true" :disabled="!reviewResult">审查意见书</button></div>
     </header>
     <WorkbenchHeader :context="context" />
     <main class="flex-1 flex overflow-hidden">

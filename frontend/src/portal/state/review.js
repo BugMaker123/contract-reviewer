@@ -17,6 +17,8 @@ export function setup(context) {
     background: "",
     focus: "",
     references: [],
+    requirements: [],
+    execution: "plan",
     reference_text: "",
     checklist_id: "",
     checklist_item_ids: null,

@@ -70,7 +70,7 @@ class ContractReviewRequest(BaseModel):
     contract_title: str = Field(default="商务合作协议")
     contract_type: str = Field(default="商务合作与技术服务合同", description="合同业务类型")
     party_role: Literal["甲方(买方/采购方/委托方)", "乙方(卖方/开发方/服务方)", "中立审慎"] = Field(
-        default="乙方(卖方/开发方/服务方)",
+        default="中立审慎",
         description="审查立场视角，立场不同审查策略截然相反"
     )
     contract_text: str = Field(min_length=1, max_length=200000, description="合同完整原文")

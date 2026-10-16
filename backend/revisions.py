@@ -60,7 +60,9 @@ def editable_run(repo, run_id, revision):
         raise HTTPException(409, '只能修改当前已完成的审查版本')
     if run['revision'] != revision:
         raise HTTPException(409, '修订已在其他页面变更，请刷新后重试')
-    if any(task.get(key) != run['input'].get(key) for key in ('title', 'text', 'role', 'type', 'mode', 'scale', 'background', 'focus', 'reference_text', 'references', 'checklist', 'source_id')):
+    def value(record, key):
+        return (record.get(key) or ('plan' if key == 'execution' else [])) if key in ('execution', 'requirements') else record.get(key)
+    if any(value(task, key) != value(run['input'], key) for key in ('title', 'text', 'role', 'type', 'mode', 'scale', 'background', 'focus', 'reference_text', 'references', 'requirements', 'execution', 'checklist', 'source_id')):
         raise HTTPException(409, '合同或审查条件已改变，请重新审查后再生成修订')
     return run
 
@@ -78,10 +80,13 @@ def revision_anchor(run, issue):
     return original, 'replace'
 
 
-def save_candidate(repo, run, issue_id, redline, explanation, instruction, source, stamp):
+def save_candidate(repo, run, issue_id, redline, explanation, instruction, source, stamp, verification=None):
     editable_run(repo, run['id'], run['revision'])
     result = deepcopy(run['result'])
+    for finding in result.get('proposed_requirement_findings', []):
+        finding.update(status='needs_review', evidence='', explanation='修订建议已变更，原建议稿核验结论已失效，请重新核验。')
     issue = next(item for item in result['issues'] if item['id'] == issue_id)
+    issue['requirement_verification'] = verification
     history = deepcopy(run.get('revision_history', {}))
     versions = history.setdefault(issue_id, [])
     if not versions and issue.get('redline'):
@@ -91,6 +96,8 @@ def save_candidate(repo, run, issue_id, redline, explanation, instruction, sourc
                      'instruction': instruction, 'source': source, 'created_at': stamp})
     issue['redline'] = redline
     issue.pop('rewrite_warning', None)
+    if verification and any(item['priority'] == 'required' and item['status'] in ('fail', 'needs_review') for item in verification):
+        issue['rewrite_warning'] = '本条修订代入原文后仍有未满足或待确认的硬性要求，请核对后采纳。'
     issue['revision_explanation'] = explanation
     applied = [identifier for identifier in run['applied'] if identifier != issue_id]
     candidate = {**run, 'result': result, 'applied': applied}

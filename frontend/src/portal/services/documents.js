@@ -15,6 +15,7 @@ export async function readDocument(file) {
 }
 
 export function appendMaterial(materials, file, data) {
+  if (materials.some(item => item.name === file.name)) throw new Error('已有同名资料，请移除旧版或重命名后上传');
   if (
     materials.length >= 5 ||
     materials.reduce((sum, item) => sum + item.text.length, 0) +
@@ -23,5 +24,5 @@ export function appendMaterial(materials, file, data) {
   ) {
     throw new Error("参考资料最多 5 份，合计不能超过 5 万字");
   }
-  materials.push({ name: file.name, text: data.text });
+  materials.push({ name: file.name, text: data.text, kind: 'reference', confirmed: false });
 }

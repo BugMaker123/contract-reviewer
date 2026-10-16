@@ -41,7 +41,7 @@ export function createContext(page, requiredData) {
       throw new Error(
         typeof data.detail === "string"
           ? data.detail
-          : data.detail?.map((item) => item.msg).join("；") ||
+          : data.detail?.map((item) => `${item.loc?.slice(1).join('.') || '输入'}：${item.msg}`).join("；") ||
             "请求失败，请重试",
       );
     return data;

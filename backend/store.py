@@ -162,7 +162,7 @@ class Repository:
                 raise HTTPException(409, '请先恢复已归档任务')
             task['status'] = 'running'
             identifier, stamp = uuid4().hex, now()
-            snapshot = {key: task.get(key) for key in ('title', 'type', 'text', 'role', 'mode', 'scale', 'background', 'focus', 'references', 'reference_text', 'checklist', 'source_id')}
+            snapshot = {key: task.get(key) for key in ('title', 'type', 'text', 'role', 'mode', 'scale', 'background', 'focus', 'references', 'requirements', 'execution', 'reference_text', 'checklist', 'source_id')}
             count = db.execute("SELECT count(*) FROM objects WHERE kind='run' AND parent=?", (task_id,)).fetchone()[0]
             run = {'task_id': task_id, 'number': count + 1, 'input': snapshot, 'status': 'running',
                    'result': None, 'decisions': {}, 'applied': [], 'comments': {}, 'followups': {}}

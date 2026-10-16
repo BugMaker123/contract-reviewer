@@ -17,6 +17,8 @@ export function createWorkspaceWorkbench(refs) {
     background: "",
     focus: "",
     references: [],
+    requirements: [],
+    execution: "plan",
     reference_text: "",
     checklist: null,
     source_id: null,
@@ -73,6 +75,8 @@ export function createWorkspaceWorkbench(refs) {
     background: conditions.value.background,
     focus: conditions.value.focus,
     references: conditions.value.references,
+    requirements: conditions.value.requirements,
+    execution: conditions.value.execution,
     reference_text: conditions.value.reference_text,
     checklist_id: conditions.value.checklist?.id || null,
     source_id: conditions.value.source_id || null,
@@ -89,9 +93,10 @@ export function createWorkspaceWorkbench(refs) {
       ["title", "type", "text", "role"].some(
         (key) => input()[key] !== snapshot[key],
       ) ||
-      ["mode", "scale", "background", "focus", "reference_text"].some(
-        (key) => conditions.value[key] !== snapshot[key],
+      ["mode", "scale", "background", "focus", "reference_text", "execution"].some(
+        (key) => conditions.value[key] !== (key === 'execution' ? snapshot[key] || 'plan' : snapshot[key]),
       ) ||
+      JSON.stringify(conditions.value.requirements || []) !== JSON.stringify(snapshot.requirements || []) ||
       JSON.stringify(conditions.value.references) !==
         JSON.stringify(snapshot.references) ||
       (conditions.value.checklist?.id || null) !==
@@ -240,6 +245,8 @@ export function createWorkspaceWorkbench(refs) {
           background: record.background,
           focus: record.focus,
           references: record.references,
+          requirements: record.requirements || [],
+          execution: record.execution || "plan",
           reference_text: record.reference_text,
           checklist: record.checklist,
           source_id: record.source_id || null,

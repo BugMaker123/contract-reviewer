@@ -19,6 +19,41 @@ def close_opinions(page):
     expect(page.locator('#opinion-drawer')).to_be_visible()
 
 
+def test_workbench_primary_actions_are_visible(isolated_workspace, monkeypatch):
+    monkeypatch.setattr(graph, 'get_llm_client', lambda config: None)
+    sock = socket.socket()
+    sock.bind(('127.0.0.1', 0))
+    server = uvicorn.Server(uvicorn.Config(app, log_level='error'))
+    thread = threading.Thread(target=server.run, kwargs={'sockets': [sock]}, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page(viewport={'width': 1920, 'height': 900})
+            base = f'http://127.0.0.1:{sock.getsockname()[1]}'
+            task = page.request.post(base + '/api/tasks', data={
+                'title': '工作台按钮布局', 'text': '第一条 双方约定验收后付款。', 'mode': 'quick',
+            }).json()
+            page.request.post(base + '/api/tasks/' + task['id'] + '/review/stream', data={})
+            page.goto(base + '/workbench?task=' + task['id'])
+            expect(page.get_by_role('button', name='审查意见书', exact=True)).to_be_visible()
+            expect(page.get_by_role('button', name='编辑正文', exact=True)).to_be_visible()
+            expect(page.get_by_role('button', name='完成审核', exact=True)).to_be_enabled()
+            expect(page.locator('#review-summary-panel')).to_be_visible()
+            expect(page.get_by_text('处理进度', exact=True)).to_be_visible()
+            if page.locator('.wb-nav-issue').count() > 1:
+                page.locator('.wb-nav-issue').nth(1).click()
+                expect(page.locator('.wb-nav-issue').nth(1)).to_have_class(re.compile(r'active'))
+            expect(page.get_by_label('更多文档操作')).to_have_count(0)
+            page.get_by_role('button', name='审查意见书', exact=True).click()
+            expect(page.get_by_text('合同审查意见书', exact=True)).to_be_visible()
+            page.get_by_role('button', name='关闭意见书').click()
+            browser.close()
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
+
+
 def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
     monkeypatch.setattr(graph, 'get_llm_client', lambda config: None)
     sock = socket.socket()

@@ -266,7 +266,7 @@ def test_adjacent_revisions_keep_soft_breaks_cell_positions_and_font(revision_cl
     client = revision_client
     original = Document()
     paragraph = original.add_paragraph()
-    run = paragraph.add_run('Before\nsoft line')
+    run = paragraph.add_run('Agreement payment\nsoft line')
     run.font.size = Pt(15)
     original.add_table(rows=1, cols=1).cell(0, 0).text = 'Second clause'
     buffer = BytesIO()
@@ -276,13 +276,13 @@ def test_adjacent_revisions_keep_soft_breaks_cell_positions_and_font(revision_cl
     client.post('/api/tasks/'+task['id']+'/review/stream',json={})
     run = client.get('/api/tasks/'+task['id']).json()['run']
     issues = []
-    for identifier, old, new in [('one','Before\nsoft line','Before\nupdated soft line'),('two','Second clause','Second revised')]:
+    for identifier, old, new in [('one','Agreement payment\nsoft line','Agreement payment\nupdated soft line'),('two','Second clause','Second revised')]:
         issues.append({'id':identifier,'evidence':old,'issue_title':'Revision','redline':{'original_text':old,'suggested_text':new,'change_type':'replace'}})
     workspace_api.repo.update(run['id'], {'result':{**run['result'],'issues':issues}})
     response = client.get('/api/runs/'+run['id']+'/review-document')
     assert response.status_code == 200
     _, revised = native_text(response.content)
-    assert visible_paragraph_text(revised.paragraphs[0]._p) == 'Before\nupdated soft line'
+    assert visible_paragraph_text(revised.paragraphs[0]._p) == 'Agreement payment\nupdated soft line'
     assert visible_paragraph_text(revised.tables[0].cell(0,0).paragraphs[0]._p) == 'Second revised'
     assert revised.paragraphs[0].runs[0].font.size.pt == 15
 
