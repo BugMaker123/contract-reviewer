@@ -7,7 +7,6 @@ export default {
 
 <template>
   <div v-if="form.mode === 'checklist'" class="px-6 pb-5">
-    <h2 class="text-sm font-semibold mb-3">配置业务分类与审查清单标准</h2>
     <label
       ><span class="label">业务分类</span
       ><select v-model="categoryFilter" class="field mb-3">
@@ -29,6 +28,7 @@ export default {
         </option>
       </select></label
     >
+    <p v-if="!availableLists.length" class="review-list-empty">当前分类暂无已发布清单。请切换业务分类，或前往清单管理创建并发布。</p>
     <div class="text-xs text-slate-500 mt-2">
       本次任务会固定清单版本。<RouterLink to="/checklists" class="text-blue-600"
         >管理清单 →</RouterLink

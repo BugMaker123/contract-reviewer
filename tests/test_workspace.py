@@ -153,33 +153,8 @@ def test_run_lock_and_restart_recovery(client):
     review(client, saved)
 
 
-def test_draft_failures_preserve_background_and_manual_outline(client):
-    response = client.post('/api/drafts', json={'title': '测试草稿', 'background': '采购合同，不确定金额', 'outline': '第一条 标的\n第二条 付款'})
-    draft = response.json()
-    assert client.post('/api/drafts/' + draft['id'] + '/generate', json={'stage': 'details'}).status_code == 502
-    saved = client.get('/api/drafts/' + draft['id']).json()
-    assert saved['background'] == draft['background']
-    assert saved['outline'] == draft['outline']
-    assert not saved['text']
 
 
-def test_draft_generation_is_staged_and_versions_are_retained(client, monkeypatch):
-    async def fake_json(config, prompt):
-        if '阶段 details' in prompt:
-            return {'details': {'甲方': '待确认', '金额': '待确认'}}
-        if '阶段 outline' in prompt:
-            return {'outline': '第一条 标的\n第二条 付款'}
-        return {'text': '采购合同\n甲方：【待填写】\n金额：【待填写】\n第一条 标的\n采购设备。'}
-    monkeypatch.setattr(workspace_api, 'model_json', fake_json)
-    draft = client.post('/api/drafts', json={'title': '采购合同', 'background': '采购设备，金额未确定'}).json()
-    for stage in ('details', 'outline', 'text'):
-        response = client.post('/api/drafts/' + draft['id'] + '/generate', json={'stage': stage})
-        assert response.status_code == 200, response.text
-        draft = response.json()
-    assert '【待填写】' in draft['text']
-    assert len(client.get('/api/drafts/' + draft['id'] + '/versions').json()['items']) == 3
-    assert client.get('/api/drafts/' + draft['id'] + '/export').status_code == 200
-    assert 'api_key' not in json.dumps(workspace_api.repo.list('draft'))
 
 
 def test_validation_prevents_fake_mode_inputs(client):
@@ -245,20 +220,6 @@ def test_comparison_model_assesses_only_actual_changes(client, monkeypatch):
     assert result['issues'][0]['redline']['original_text'] == '验收后60日付款。'
 
 
-def test_draft_rewrite_is_a_proposal_until_explicitly_saved(client, monkeypatch):
-    async def fake_json(config, prompt):
-        return {'suggested_text': '验收后按约定期限付款。'}
-    monkeypatch.setattr(workspace_api, 'model_json', fake_json)
-    draft = client.post('/api/drafts', json={'title': '采购草稿', 'background': '采购硬件', 'text': '第一条 标的\n硬件产品\n第二条 付款\n验收后30日付款。'}).json()
-    response = client.post('/api/drafts/' + draft['id'] + '/rewrite', json={'original_text': '验收后30日付款。', 'instruction': '改为引用约定期限', 'revision': draft['revision']})
-    assert response.status_code == 200
-    proposal = response.json()
-    saved = client.get('/api/drafts/' + draft['id']).json()
-    assert saved['text'] == draft['text']
-    accepted = client.put('/api/drafts/' + draft['id'], json={**saved, 'text': saved['text'].replace('验收后30日付款。', proposal['suggested_text'])})
-    assert accepted.status_code == 200
-    assert '硬件产品' in accepted.json()['text']
-    assert '30日' not in accepted.json()['text']
 
 
 def test_unverified_checklist_evidence_cannot_be_marked_pass(client, monkeypatch):

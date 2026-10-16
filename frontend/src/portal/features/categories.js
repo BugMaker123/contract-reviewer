@@ -16,7 +16,7 @@ export function setup(context) {
           name: "",
           code: "",
           description: "",
-          sort_order: categories.value.length + 1,
+          sort_order: (context.total?.value ?? categories.value.length) + 1,
         };
   };
   const saveCategory = async () => {

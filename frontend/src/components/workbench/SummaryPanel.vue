@@ -40,16 +40,6 @@ export default {
       class="wb-summary-content space-y-4"
     >
       <div
-        v-if="reviewResult"
-        class="text-[11px] text-slate-500 px-1 leading-relaxed"
-      >
-        结果来源：{{ reviewSource }}<br />{{
-          reviewResult.summary.compliance_score == null
-            ? "本模式不计算健康分。"
-            : "评分基于审查原文，采纳修订后不会自动重算。"
-        }}
-      </div>
-      <div
         v-if="reviewResult?.checklist_findings"
         class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm"
       >
@@ -101,56 +91,13 @@ export default {
         </p>
       </div>
       <div
-        v-if="reviewResult?.coverage"
-        class="text-[11px] text-slate-500 px-1 leading-relaxed"
-      >
-        {{ reviewResult.coverage }}
-      </div>
-
-      <div
         v-if="!['checklist', 'compare'].includes(workspace.conditions.mode)"
         class="border border-slate-200 rounded-xl p-4 bg-slate-50/60 shadow-sm"
       >
-        <div
-          class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2"
-        >
-          合规健康度量化
-        </div>
-
-        <div v-if="reviewResult" class="flex items-baseline space-x-2">
-          <span
-            class="text-4xl font-extrabold font-mono"
-            :class="
-              reviewResult.summary.compliance_score == null
-                ? 'text-slate-400'
-                : getScoreColor(reviewResult.summary.compliance_score)
-            "
-          >
-            {{ reviewResult.summary.compliance_score ?? "—" }}
-          </span>
-          <span class="text-xs text-slate-400 font-medium">{{
-            reviewResult.summary.compliance_score == null
-              ? "不计算健康分"
-              : "/ 100分"
-          }}</span>
-          <span
-            class="ml-auto text-xs font-bold px-2.5 py-0.5 rounded-full"
-            :class="
-              reviewResult.summary.compliance_score == null
-                ? 'bg-slate-100 text-slate-600'
-                : reviewResult.summary.compliance_score < 60
-                  ? 'bg-red-100 text-red-700'
-                  : reviewResult.summary.compliance_score < 80
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-emerald-100 text-emerald-700'
-            "
-          >
-            {{ reviewResult.summary.risk_level }}
-          </span>
-        </div>
-        <div v-else class="text-xs text-slate-400 py-3 text-center">
-          点击右上角【开始审查】计算健康度
-        </div>
+        <div class="text-xs font-semibold text-slate-700">风险概览</div>
+        <p v-if="!reviewResult" class="text-xs text-slate-400 py-3 text-center">
+          审查完成后展示风险统计
+        </p>
 
         <div
           v-if="reviewResult"
@@ -481,5 +428,10 @@ export default {
         </div>
       </div>
     </div>
+    <details v-show="summaryOpen" class="wb-review-usage">
+      <summary>使用说明</summary>
+      <p v-if="reviewResult?.coverage">{{ reviewResult.coverage }}</p>
+      <p>审查建议仅供辅助参考，不替代专业法律意见。签署前请结合交易背景与实际履行情况复核。</p>
+    </details>
   </aside>
 </template>

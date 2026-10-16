@@ -47,8 +47,6 @@ export function usePortalPage(key) {
   onActivated(async () => {
     active = true;
     if (initialized) {
-      if (key === "draft" && context.draft.id && !route.query.id)
-        await router.replace("/draft?id=" + context.draft.id);
       try {
         await context.loadRecords();
       } catch (error) {
@@ -62,7 +60,6 @@ export function usePortalPage(key) {
     () => route.query,
     async () => {
       if (route.meta.page !== key || !initialized) return;
-      if (key === "draft" && route.query.id === context.draft.id) return;
       try {
         await context.initialize?.();
       } catch (error) {
@@ -75,19 +72,6 @@ export function usePortalPage(key) {
     if (!actionNavigation && (context.busy.value || context.importing.value)) {
       context.notify("正在处理，请稍后再切换页面");
       return false;
-    }
-    if (
-      key === "draft" &&
-      context.draft.title.trim() &&
-      context.draft.background.trim() &&
-      context.hasDraftChanges()
-    ) {
-      try {
-        await context.persistDraft(false);
-      } catch (error) {
-        context.error.value = error.message;
-        return false;
-      }
     }
     context.scrollTop = document.querySelector(".portal-main")?.scrollTop || 0;
     active = false;

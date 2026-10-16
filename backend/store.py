@@ -24,6 +24,8 @@ class Repository:
                 data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1,
                 created TEXT NOT NULL, updated TEXT NOT NULL)''')
             db.execute('CREATE INDEX IF NOT EXISTS objects_kind_parent ON objects(kind, parent)')
+            db.execute('CREATE INDEX IF NOT EXISTS objects_kind_updated ON objects(kind, updated DESC, id)')
+            db.execute("CREATE INDEX IF NOT EXISTS objects_checklist_category ON objects(json_extract(data,'$.category_id')) WHERE kind='checklist'")
 
     @contextmanager
     def connect(self):
@@ -57,6 +59,54 @@ class Repository:
             else:
                 rows = db.execute('SELECT * FROM objects WHERE kind=? AND parent=? ORDER BY created DESC', (kind, parent)).fetchall()
         return [self.unpack(row) for row in rows]
+
+    def catalog_page(self, kind, page, page_size, search='', category_id=None, archived=None, published=None):
+        """Filter/count/page in SQLite; list cards never load checklist bodies."""
+        clauses, params = ['o.kind=?'], [kind]
+        if search.strip():
+            fields = ['name', 'code', 'description'] if kind == 'category' else ['name', 'description', 'contract_type']
+            terms = [f"instr(lower(coalesce(json_extract(o.data,'$.{field}'),'')),lower(?))>0" for field in fields]
+            params.extend([search.strip()] * len(fields))
+            if kind == 'checklist':
+                terms.append("EXISTS (SELECT 1 FROM json_each(o.data,'$.items') i WHERE instr(lower(coalesce(json_extract(i.value,'$.title'),'') || ' ' || coalesce(json_extract(i.value,'$.requirement'),'')),lower(?))>0)")
+                params.append(search.strip())
+            clauses.append('(' + ' OR '.join(terms) + ')')
+        if category_id:
+            clauses.append("json_extract(o.data,'$.category_id')=?")
+            params.append(category_id)
+        for field, value in [('archived', archived), ('published', published)]:
+            if value is not None:
+                clauses.append(f"coalesce(json_extract(o.data,'$.{field}'),0)=?")
+                params.append(int(value))
+        where = ' AND '.join(clauses)
+        if kind == 'category':
+            projection = "o.*, (SELECT count(*) FROM objects c WHERE c.kind='checklist' AND json_extract(c.data,'$.category_id')=o.id) AS checklist_count"
+            order = "coalesce(json_extract(o.data,'$.sort_order'),0), json_extract(o.data,'$.name'), o.id"
+        else:
+            projection = "o.id,o.kind,o.parent,json_remove(o.data,'$.items') AS data,o.revision,o.created,o.updated,json_array_length(o.data,'$.items') AS item_count"
+            order = 'o.updated DESC, o.id'
+        with self.connect() as db:
+            total = db.execute('SELECT count(*) FROM objects o WHERE ' + where, params).fetchone()[0]
+            page = min(page, max(1, (total + page_size - 1) // page_size))
+            rows = db.execute(f'SELECT {projection} FROM objects o WHERE {where} ORDER BY {order} LIMIT ? OFFSET ?', [*params, page_size, (page - 1) * page_size]).fetchall()
+        count_key = 'checklist_count' if kind == 'category' else 'item_count'
+        return {'items': [{**self.unpack(row), count_key: row[count_key]} for row in rows],
+                'total': total, 'page': page, 'page_size': page_size}
+
+    def delete_catalog(self, identifier, kind, expected_revision):
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT * FROM objects WHERE id=? AND kind=?', (identifier, kind)).fetchone()
+            if row is None:
+                raise HTTPException(404, '记录不存在')
+            if row['revision'] != expected_revision:
+                raise HTTPException(409, '记录已被修改，请刷新后重试')
+            if kind == 'category' and db.execute("SELECT 1 FROM objects WHERE kind='checklist' AND json_extract(data,'$.category_id')=? LIMIT 1", (identifier,)).fetchone():
+                raise HTTPException(409, '该分类下仍有清单（含已归档清单），请先迁移或删除清单')
+            db.execute('DELETE FROM objects WHERE id=?', (identifier,))
+            if kind == 'checklist':
+                db.execute("DELETE FROM objects WHERE kind='checklist_version' AND parent=?", (identifier,))
+        return {'deleted': identifier}
 
     def create(self, kind, data, parent=None):
         identifier, stamp = uuid4().hex, now()

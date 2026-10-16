@@ -12,12 +12,19 @@ export function setup(context) {
       severity: "warning",
       suggestion: "",
     });
-  const editChecklist = (list) => {
+  const editChecklist = async (list) => {
+    if (list && !list.items) {
+      busy.value = true;
+      try { list = await api('/api/checklists/' + list.id); }
+      catch (err) { context.error.value = err.message; return; }
+      finally { busy.value = false; }
+    }
     modalError.value = "";
     checklistEditor.value = list
       ? JSON.parse(JSON.stringify(list))
       : {
           name: "",
+          category_id: context.categoryFilter.value || null,
           contract_type: "通用合同",
           description: "",
           items: [],
@@ -61,6 +68,7 @@ export function setup(context) {
         body,
       );
       checklistEditor.value = null;
+      context.currentPage.value = 1;
       await loadRecords();
       notify(published ? "清单已发布，历史任务仍使用原版本" : "清单草稿已保存");
     } catch (err) {

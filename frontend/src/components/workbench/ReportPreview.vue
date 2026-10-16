@@ -85,18 +85,9 @@ export default {
           </div>
           <div><strong>合同类型：</strong>{{ contractType }}</div>
           <div><strong>审查时间：</strong>{{ reviewedAt }}</div>
-          <div><strong>结果来源：</strong>{{ reviewSource }}</div>
           <div>
             <strong>修订处理：</strong>已采纳
-            {{ appliedIssueIds.length }} 项（评分基于审查原文）
-          </div>
-          <div>
-            <strong>合规健康分：</strong
-            ><span class="font-bold text-red-600">{{
-              reviewResult?.summary?.compliance_score == null
-                ? "不计算健康分"
-                : reviewResult.summary.compliance_score + " / 100"
-            }}</span>
+            {{ appliedIssueIds.length }} 项
           </div>
           <div>
             <strong>风险评级：</strong

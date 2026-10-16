@@ -14,43 +14,18 @@ export default {
     aria-labelledby="opinion-drawer-title"
     class="wb-sidebar wb-opinion-drawer"
     :class="{
-      'is-collapsed': !opinionsOpen,
       'is-compact-review': revisionMode !== 'compare',
     }"
   >
     <div class="wb-sidebar-heading">
-      <button
-        @click="toggleOpinions"
-        :aria-expanded="opinionsOpen"
-        aria-controls="review-opinion-content"
-        :aria-label="
-          opinionsOpen ? '收起审查意见与修订清单' : '展开审查意见与修订清单'
-        "
-        :title="
-          opinionsOpen ? '收起审查意见与修订清单' : '展开审查意见与修订清单'
-        "
-        class="wb-sidebar-toggle"
-      >
-        <svg
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <path d="m12 5-5 5 5 5" />
-        </svg></button
-      ><strong id="opinion-drawer-title" v-show="opinionsOpen"
-        >AI 审查建议
+      <strong id="opinion-drawer-title">AI 审查建议
         <span class="wb-sidebar-count">{{
           filteredIssues.length
         }}</span></strong
       >
 
       <button
-        v-if="opinionsOpen && reviewReady && revisionMode !== 'compare'"
+        v-if="reviewReady && revisionMode !== 'compare'"
         class="batch-accept"
         :disabled="revisionReadOnly || !pendingApplicableCount"
         @click="acceptAllRevisions"
@@ -59,12 +34,11 @@ export default {
       </button>
     </div>
     <div
-      v-show="opinionsOpen"
       id="review-opinion-content"
       class="wb-opinion-content"
     >
 
-      <details class="opinion-filters" :open="revisionMode === 'compare'">
+      <details class="opinion-filters">
         <summary>
           筛选建议
           <span>已采纳 {{ appliedIssueIds.length }} · 待处理 {{ pendingRevisionCount }}</span>

@@ -1,12 +1,12 @@
 <script>
 export default {
-  props: { context: { type: Object, required: true } },
+  props: { context: { type: Object, required: true }, expanded: Boolean },
   setup: (props) => props.context,
 };
 </script>
 
 <template>
-  <details class="border-t border-slate-200 px-6 py-4">
+  <details :open="expanded" class="border-t border-slate-200 px-6 py-4">
     <summary class="cursor-pointer text-xs font-semibold text-slate-600">
       补充交易背景、重点要求{{ form.mode === "deep" ? "与参考资料" : "" }}
     </summary>

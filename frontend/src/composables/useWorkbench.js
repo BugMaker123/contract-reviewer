@@ -51,18 +51,6 @@ export function useWorkbench() {
     summaryOpen.value = !summaryOpen.value;
     fitDocuments();
   };
-  const toggleOpinions = () => {
-    opinionsOpen.value = !opinionsOpen.value;
-    fitDocuments();
-  };
-  const openOpinions = () => {
-    opinionsOpen.value = true;
-    fitDocuments();
-  };
-  const closeOpinions = () => {
-    opinionsOpen.value = false;
-    fitDocuments();
-  };
   const documentCompare = ref(false);
   const reviewBaseline = ref({ sourceId: null, text: "" });
   const revisionScope = ref("all");
@@ -1357,10 +1345,7 @@ export function useWorkbench() {
   return {
     summaryOpen,
     toggleSummary,
-    toggleOpinions,
     opinionsOpen,
-    openOpinions,
-    closeOpinions,
     documentCompare,
     reviewBaseline,
     revisionScope,

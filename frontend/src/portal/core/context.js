@@ -82,7 +82,6 @@ export function createContext(page, requiredData) {
     const paths = {
       tasks: "/api/tasks",
       lists: "/api/checklists",
-      drafts: "/api/drafts",
       categories: "/api/categories",
       samples: "/api/samples",
     };

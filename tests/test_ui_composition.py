@@ -65,15 +65,15 @@ def test_navigation_keeps_document_layout_forms_and_history(isolated_workspace):
         page.get_by_label('合同正文', exact=True).fill('第一条 验收后付款。')
         page.get_by_placeholder('填写便于识别的合同名称').fill('保留中的审查表单')
         nav = page.locator('.portal-sidebar nav')
-        for name, heading in [('审查记录','审查记录'),('业务分类维护','合同业务分类维护'),('审查清单','企业审查清单'),('起草记录','起草记录')]:
+        for name, heading in [('审查记录','审查记录'),('业务分类维护','合同业务分类维护'),('审查清单','企业审查清单')]:
             nav.get_by_role('link', name=name, exact=True).click()
             expect(page.get_by_role('heading', name=heading, exact=True)).to_be_visible()
             assert page.evaluate('window.spaMarker') == 'same-document'
             assert page.evaluate("window.shellHeader === document.querySelector('.portal-header')")
         page.go_back()
-        expect(page.get_by_role('heading', name='企业审查清单', exact=True)).to_be_visible()
+        expect(page.get_by_role('heading', name='合同业务分类维护', exact=True)).to_be_visible()
         page.go_forward()
-        expect(page.get_by_role('heading', name='起草记录', exact=True)).to_be_visible()
+        expect(page.get_by_role('heading', name='企业审查清单', exact=True)).to_be_visible()
         nav.get_by_role('link', name='开始', exact=True).click()
         expect(page.get_by_label('合同正文', exact=True)).to_have_value('第一条 验收后付款。')
         expect(page.get_by_placeholder('填写便于识别的合同名称')).to_have_value('保留中的审查表单')
@@ -85,23 +85,6 @@ def test_navigation_keeps_document_layout_forms_and_history(isolated_workspace):
         browser.close()
 
 
-def test_draft_autosaves_when_leaving_and_recovers_on_return(isolated_workspace):
-    with live_server() as base, sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        page.goto(base + '/draft')
-        page.get_by_placeholder('填写草稿名称').fill('自动保存的草稿')
-        page.get_by_placeholder('描述合同类型、交易目的、合作安排和我方要求…').fill('技术服务合同')
-        page.evaluate("window.spaMarker = 'draft-session'")
-        page.locator('.portal-sidebar nav').get_by_role('link', name='起草记录', exact=True).click()
-        expect(page.get_by_role('heading', name='起草记录', exact=True)).to_be_visible()
-        expect(page.get_by_role('cell', name='自动保存的草稿', exact=True)).to_be_visible()
-        page.get_by_role('link', name='继续起草', exact=True).click()
-        expect(page.get_by_placeholder('填写草稿名称')).to_have_value('自动保存的草稿')
-        assert page.evaluate('window.spaMarker') == 'draft-session'
-        page.reload()
-        expect(page.get_by_placeholder('填写草稿名称')).to_have_value('自动保存的草稿')
-        browser.close()
 
 
 def test_workbench_enters_leaves_and_switches_tasks_without_reload(isolated_workspace):

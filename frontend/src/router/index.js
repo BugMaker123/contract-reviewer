@@ -7,8 +7,6 @@ const views = {
   records: () => import("../views/ReviewRecords.vue"),
   categories: () => import("../views/BusinessCategories.vue"),
   checklists: () => import("../views/Checklists.vue"),
-  draft: () => import("../views/ContractDraft.vue"),
-  drafts: () => import("../views/DraftRecords.vue"),
 };
 
 export const router = createRouter({
