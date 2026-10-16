@@ -1,5 +1,7 @@
 <script>
+import RevisionRibbon from "./RevisionRibbon.vue";
 export default {
+  components: { RevisionRibbon },
   props: { context: { type: Object, required: true } },
   setup: (props) => props.context,
 };
@@ -7,64 +9,29 @@ export default {
 
 <template>
   <section class="flex-1 min-w-0 flex flex-col bg-slate-100/60 overflow-hidden">
-    <div class="wb-toolbar">
-      <div class="wb-title">
-        <div class="min-w-0">
-          <h1
-            class="font-semibold text-sm text-slate-900 truncate"
-            :title="contractTitle"
-          >
-            {{ contractTitle }}
-          </h1>
-          <p class="mt-1 text-xs text-slate-400">{{ contractType }}</p>
-        </div>
-      </div>
-      <div class="wb-tools">
-        <div class="flex items-center gap-2 text-xs">
-          <button
-            @click="openEditor"
-            :disabled="
-              documentSaving || workspace.historical || workspace.loading
-            "
-            class="px-3 py-2 rounded-lg border border-slate-200 text-slate-700"
-          >
-            编辑正文
-          </button>
-          <button
-            @click="saveDocument"
-            :disabled="
-              documentSaving || workspace.saving || workspace.historical
-            "
-            class="px-3 py-2 text-blue-600"
-          >
-            {{ workspace.saving ? "保存中…" : "保存" }}
-          </button>
-          <button
-            @click="exportDocument"
-            :disabled="
-              documentSaving || workspace.loading || !contractText.trim()
-            "
-            :title="documentCompare ? '导出右侧显示的文档' : '导出当前合同'"
-            class="px-3 py-2 rounded-lg border border-slate-200 text-slate-700"
-          >
-            导出
-          </button>
-          <button
-            @click="workspace.finish"
-            :disabled="
-              workspace.historical ||
-              resultStale ||
-              workspace.saving ||
-              workspace.task?.status !== 'pending_review'
-            "
-            :title="resultStale ? '请先重新审查当前正文' : ''"
-            class="px-3 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-40"
-          >
-            {{
-              workspace.task?.status === "completed" ? "已完成复核" : "完成复核"
-            }}
-          </button>
-        </div>
+    <div v-if="reviewReady" class="wb-document-toolbar">
+      <RevisionRibbon :context="context" />
+      <div v-if="reviewReady" class="prototype-issue-nav">
+        <button
+          @click="moveRevision(-1)"
+          :disabled="!reviewIssues.length"
+          aria-label="上一处修订"
+          title="上一处风险 (Alt+↑)"
+        >
+          ↑
+        </button>
+        <span
+          >{{ reviewIssues.length ? revisionIndex + 1 : 0 }} /
+          {{ reviewIssues.length }}</span
+        >
+        <button
+          @click="moveRevision(1)"
+          :disabled="!reviewIssues.length"
+          aria-label="下一处修订"
+          title="下一处风险 (Alt+↓)"
+        >
+          ↓
+        </button>
       </div>
     </div>
     <div
@@ -92,7 +59,24 @@ export default {
       {{ reviewError }}
     </div>
 
-    <div class="wb-document-grid" :class="{ 'is-comparing': documentCompare }">
+    <div
+      v-if="useRevisionDocument"
+      class="revision-document-surface"
+      data-testid="tracked-document-pane"
+      :aria-busy="!revisionDocumentLoaded"
+      :data-rendered-revision="revisionRenderedVersion"
+    >
+      <iframe
+        :src="revisionDocumentUrl"
+        title="合同修订文档"
+        sandbox="allow-scripts allow-same-origin allow-downloads"
+      ></iframe>
+    </div>
+    <div
+      v-else
+      class="wb-document-grid"
+      :class="{ 'is-comparing': documentCompare }"
+    >
       <div
         v-if="documentCompare"
         class="wb-document-pane"
@@ -230,7 +214,10 @@ export default {
               <button
                 @click="openEditor"
                 :disabled="
-                  documentSaving || workspace.historical || workspace.loading
+                  documentSaving ||
+                  workspace.historical ||
+                  workspace.loading ||
+                  revisionBusy
                 "
                 class="mt-4 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs"
               >

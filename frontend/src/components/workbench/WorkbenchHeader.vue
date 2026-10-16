@@ -4,34 +4,38 @@ export default {
   setup: (props) => props.context,
 };
 </script>
-
 <template>
   <header
-    class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 z-20"
+    class="prototype-navbar"
+    @click="
+      $event.target
+        .closest('button')
+        ?.closest('details.wb-menu')
+        ?.removeAttribute('open')
+    "
   >
-    <div class="flex items-center space-x-3">
+    <div class="prototype-nav-left">
       <a
-        href="/"
-        @click.prevent="workspace.leaveFor('/')"
-        class="flex items-center space-x-2"
-        title="返回首页"
-        ><span
-          class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white"
-          >⚖</span
-        ><strong class="text-slate-900">LexisGraph</strong></a
+        href="/records"
+        @click.prevent="workspace.leaveFor('/records')"
+        class="prototype-back"
+        title="返回审查记录"
+        aria-label="返回审查记录"
+        >←</a
       >
-      <details class="wb-menu">
-        <summary>工作台 ▾</summary>
-        <div class="wb-popover" style="left: 0; right: auto; width: 180px">
-          <a href="/" @click.prevent="workspace.leaveFor('/')">返回首页</a
-          ><a href="/records" @click.prevent="workspace.leaveFor('/records')"
-            >审查记录</a
-          >
-        </div>
-      </details>
-    </div>
+      <h1 :title="contractTitle">{{ contractTitle }}</h1>
+      <span class="prototype-status">{{
+        isReviewing
+          ? "审查中"
+          : workspace.task?.status === "completed"
+            ? "已完成"
+            : reviewReady
+              ? pendingRevisionCount + " 处待复核"
+              : "待审查"
+      }}</span>
 
-    <div class="flex items-center space-x-3">
+    </div>
+    <div class="prototype-nav-right">
       <details class="wb-menu">
         <summary>审查设置 ▾</summary>
         <div class="wb-popover">
@@ -118,31 +122,10 @@ export default {
       </details>
 
       <button
-        @click="showReportModal = true"
-        :disabled="!reviewResult"
-        class="flex items-center space-x-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 transition shadow-sm cursor-pointer"
-      >
-        <svg
-          class="w-4 h-4 text-slate-600"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path
-            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-          ></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-          <line x1="16" y1="13" x2="8" y2="13"></line>
-          <line x1="16" y1="17" x2="8" y2="17"></line>
-        </svg>
-        <span>审查意见书</span>
-      </button>
-
-      <button
         @click="startReview"
         :disabled="
           isReviewing ||
+          revisionBusy ||
           workspace.loading ||
           workspace.historical ||
           workspace.task?.status === 'running' ||
@@ -187,6 +170,70 @@ export default {
           isReviewing ? "正在审查…" : reviewResult ? "重新审查" : "开始审查"
         }}</span>
       </button>
+      <button
+        @click="saveDocument"
+        :disabled="
+          documentSaving ||
+          workspace.saving ||
+          workspace.historical ||
+          revisionBusy
+        "
+        class="px-3 py-2 text-blue-600"
+      >
+        {{ workspace.saving ? "保存中…" : "保存" }}
+      </button>
+      <button
+        @click="
+          reviewReady && revisionMode !== 'compare'
+            ? exportReviewDocument()
+            : exportDocument()
+        "
+        :disabled="documentSaving || workspace.loading || !contractText.trim()"
+        :title="documentCompare ? '导出右侧显示的文档' : '导出当前合同'"
+        class="px-3 py-2 rounded-lg border border-slate-200 text-slate-700"
+      >
+        导出
+      </button>
+
+      <details class="wb-menu prototype-document-menu">
+        <summary aria-label="更多文档操作">···</summary>
+        <div class="wb-popover">
+          <button
+            @click="openEditor"
+            :disabled="
+              documentSaving ||
+              workspace.historical ||
+              workspace.loading ||
+              revisionBusy
+            "
+            class="px-3 py-2 rounded-lg border border-slate-200 text-slate-700"
+          >
+            编辑正文
+          </button>
+          <button
+            @click="workspace.finish"
+            :disabled="
+              workspace.historical ||
+              resultStale ||
+              workspace.saving ||
+              workspace.task?.status !== 'pending_review'
+            "
+            :title="resultStale ? '请先重新审查当前正文' : ''"
+            class="px-3 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-40"
+          >
+            {{
+              workspace.task?.status === "completed" ? "已完成复核" : "完成复核"
+            }}
+          </button>
+
+          <button @click="showReportModal = true" :disabled="!reviewResult">
+            审查意见书
+          </button>
+          <button @click="toggleSummary">
+            {{ summaryOpen ? "收起审查概览" : "展开审查概览" }}
+          </button>
+        </div>
+      </details>
     </div>
   </header>
 </template>

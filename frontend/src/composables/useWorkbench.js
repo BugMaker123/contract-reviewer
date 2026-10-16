@@ -23,6 +23,10 @@ export function useWorkbench() {
   const reviewProgress = ref(0);
 
   const isReviewing = ref(false);
+  const reviewDialogOpen = ref(false);
+  const closeReviewDialog = () => {
+    reviewDialogOpen.value = false;
+  };
   const viewMode = ref("raw");
   const opinionsOpen = ref(true);
   const summaryOpen = ref(true);
@@ -715,6 +719,7 @@ export function useWorkbench() {
     const previousResult = reviewResult.value,
       previousApplied = [...appliedIssueIds.value];
 
+    reviewDialogOpen.value = true;
     isReviewing.value = true;
     resetNodeStates();
     appliedIssueIds.value = [];
@@ -843,6 +848,7 @@ export function useWorkbench() {
       opinionsOpen.value = true;
       fitDocuments();
     } catch (err) {
+      reviewDialogOpen.value = false;
       reviewBaseline.value = previousComparison.baseline;
       documentCompare.value = previousComparison.enabled;
       comparisonTexts.original = previousComparison.baseline.text;
@@ -1401,6 +1407,8 @@ export function useWorkbench() {
     latestLogMessage,
     reviewTrace,
     publicAnalysis,
+    reviewDialogOpen,
+    closeReviewDialog,
     modelConfig,
     sampleContracts,
     pipelineNodes,

@@ -38,7 +38,9 @@ def add_revision(paragraph, old, new, counter, date):
         if not text:
             return
         if kind is None:
-            paragraph.add_run(text)
+            run = paragraph.add_run(text)
+            if properties is not None:
+                run._r.insert(0, deepcopy(properties))
             return
         wrapper = OxmlElement('w:' + kind)
         wrapper.set(qn('w:id'), str(counter[0])); counter[0] += 1
@@ -60,12 +62,12 @@ def add_revision(paragraph, old, new, counter, date):
             append(old[a:b], 'del'); append(new[c:d], 'ins')
 
 
-def contract_document(run, final_text, repo, default_builder, tracked=False):
+def contract_document(run, final_text, repo, default_builder, tracked=False, base_document=None, base_layout=None):
     original = run['input']['text']
     source_id = run['input'].get('source_id')
-    document = None
-    layout = 'reconstructed'
-    if source_id:
+    document = base_document
+    layout = base_layout or 'reconstructed'
+    if document is None and source_id:
         source = repo.get(source_id, 'source')
         if source['extension'] == '.docx' and source['text'] == original:
             document = Document(SOURCES / (source_id + '.docx'))
@@ -81,6 +83,11 @@ def contract_document(run, final_text, repo, default_builder, tracked=False):
             source_paragraphs.insert(0, title_paragraph)
     else:
         source_paragraphs = paragraphs(document)
+        if base_document is not None and layout == 'reconstructed':
+            # The builder sometimes reuses the input's leading title rather than
+            # adding a separate heading. Only skip a genuinely extra heading.
+            if '\n'.join(visible_paragraph_text(p._p) for p in source_paragraphs) != original:
+                source_paragraphs = source_paragraphs[1:]
     before = [visible_paragraph_text(p._p) for p in source_paragraphs]
     # Soft line breaks remain within paragraphs; applying revisions uses a character-to-paragraph mapping.
     if '\n'.join(before) != original:
@@ -89,11 +96,21 @@ def contract_document(run, final_text, repo, default_builder, tracked=False):
         before = [p.text for p in source_paragraphs]
         layout = 'reconstructed'
     after = final_text.split('\n')
+    # Extracted text uses the same newline for soft breaks and paragraph boundaries.
+    # When their count is unchanged, retain the source paragraph grouping (including tables).
+    line_counts = [len(text.split('\n')) for text in before]
+    if sum(line_counts) == len(after):
+        grouped, offset = [], 0
+        for count in line_counts:
+            grouped.append('\n'.join(after[offset:offset + count]))
+            offset += count
+        after = grouped
     ids = [int(value) for value in document.element.xpath('//@w:id') if str(value).isdigit()]
     counter = [max(ids, default=0) + 1]
     stamp = run.get('completed_at', run['created_at'])
     # Reverse iteration keeps the original paragraph anchors stable while inserting new paragraphs.
-    for tag, a, b, c, d in reversed(SequenceMatcher(None, before, after, autojunk=False).get_opcodes()):
+    opcodes = [] if final_text == original else SequenceMatcher(None, before, after, autojunk=False).get_opcodes()
+    for tag, a, b, c, d in reversed(opcodes):
         if tag == 'equal':
             continue
         if tag == 'insert':
@@ -107,9 +124,15 @@ def contract_document(run, final_text, repo, default_builder, tracked=False):
                 else:
                     p.add_run(line)
         else:
-            replacement = '\n'.join(after[c:d])
             for index, p in enumerate(source_paragraphs[a:b]):
-                new = replacement if index == 0 else ''
+                # Adjacent revisions belong to their own paragraph/cell. Do not
+                # combine the full replacement block into its first paragraph.
+                if index >= d - c:
+                    new = ''
+                elif index == b - a - 1:
+                    new = '\n'.join(after[c + index:d])
+                else:
+                    new = after[c + index]
                 if tracked:
                     add_revision(p, before[a + index], new, counter, stamp)
                 else:
@@ -121,7 +144,7 @@ def contract_document(run, final_text, repo, default_builder, tracked=False):
         setting = OxmlElement('w:trackRevisions')
         document.settings.element.append(setting)
     # Native Word comments remain anchored to the relevant current paragraph when it can be matched.
-    for issue in run['result']['issues']:
+    for issue in ([] if base_document is not None else run['result']['issues']):
         note = run.get('comments', {}).get(issue['id'])
         if not note:
             continue

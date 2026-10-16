@@ -138,3 +138,18 @@ class DraftRewrite(RunRequest):
 class FollowupInput(RunRequest):
     issue_id: str
     question: str = Field(min_length=1, max_length=3000)
+
+
+class RevisionGenerate(RunRequest):
+    revision: int = Field(ge=1)
+    instruction: str = Field(default='', max_length=3000)
+
+
+class RevisionEdit(BaseModel):
+    revision: int = Field(ge=1)
+    suggested_text: str = Field(min_length=1, max_length=20000)
+
+
+class RevisionRestore(BaseModel):
+    revision: int = Field(ge=1)
+    version: int = Field(ge=1)

@@ -107,6 +107,7 @@ def stream_public_review(client, messages, attempt):
                           evidence=str(redline.get('original_text', ''))[:800],
                           analysis=analysis[:1500],
                           proposal=str(issue.get('negotiation_strategy', ''))[:1000],
+                          severity=str(issue.get('severity', 'info')),
                           provisional=True, attempt=attempt + 1, index=count)
     return SimpleNamespace(content=content, response_metadata=metadata)
 

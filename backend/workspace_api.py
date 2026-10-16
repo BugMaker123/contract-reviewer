@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field
 from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 
 from .store import repository as repo, now
+from .revisions import revised_text
+from .revision_api import create_revision_router
 from .ui import PORTAL_PAGES
 from .workspace_models import (TaskInput, ChecklistInput, CategoryInput, RunRequest, HandlingInput, ArchiveInput,
                                DraftInput, DraftGenerate, DraftRewrite, FollowupInput)
@@ -248,23 +250,6 @@ async def start_review(task_id: str, request: RunRequest):
 @router.get('/api/runs/{run_id}')
 def get_run(run_id: str):
     return repo.get(run_id, 'run')
-
-
-def revised_text(run, ids=None):
-    text = run['input']['text']
-    issue_map = {issue['id']: issue for issue in run['result']['issues']}
-    for identifier in run['applied'] if ids is None else ids:
-        redline = issue_map[identifier].get('redline')
-        if not redline:
-            raise HTTPException(422, '此项没有可采纳的修订文本')
-        if redline.get('change_type') == 'insert':
-            text += '\n' + redline['suggested_text']
-        else:
-            original = redline.get('original_text')
-            if not original or text.count(original) != 1:
-                raise HTTPException(409, '修订与原文匹配不唯一或存在冲突，请人工核对')
-            text = text.replace(original, '' if redline.get('change_type') == 'delete' else redline['suggested_text'], 1)
-    return text
 
 
 @router.put('/api/runs/{run_id}/handling')
@@ -630,3 +615,6 @@ def portal_page(request: Request):
 for page_path in PORTAL_PAGES:
     if page_path != '/':
         router.add_api_route(page_path, portal_page, methods=['GET'], response_class=HTMLResponse)
+
+
+router.include_router(create_revision_router(lambda: repo, word_document))

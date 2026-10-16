@@ -1,5 +1,7 @@
 <script>
+import RevisionActions from "./RevisionActions.vue";
 export default {
+  components: { RevisionActions },
   props: { context: { type: Object, required: true } },
   setup: (props) => props.context,
 };
@@ -11,7 +13,10 @@ export default {
     role="region"
     aria-labelledby="opinion-drawer-title"
     class="wb-sidebar wb-opinion-drawer"
-    :class="{ 'is-collapsed': !opinionsOpen }"
+    :class="{
+      'is-collapsed': !opinionsOpen,
+      'is-compact-review': revisionMode !== 'compare',
+    }"
   >
     <div class="wb-sidebar-heading">
       <button
@@ -38,122 +43,129 @@ export default {
           <path d="m12 5-5 5 5 5" />
         </svg></button
       ><strong id="opinion-drawer-title" v-show="opinionsOpen"
-        >审查意见与修订清单
+        >AI 审查建议
         <span class="wb-sidebar-count">{{
           filteredIssues.length
         }}</span></strong
       >
+
+      <button
+        v-if="opinionsOpen && reviewReady && revisionMode !== 'compare'"
+        class="batch-accept"
+        :disabled="revisionReadOnly || !pendingApplicableCount"
+        @click="acceptAllRevisions"
+      >
+        一键全部采纳
+      </button>
     </div>
     <div
       v-show="opinionsOpen"
       id="review-opinion-content"
       class="wb-opinion-content"
     >
-      <div
-        class="border-b border-slate-200 px-4 py-3 flex flex-wrap gap-2 items-center justify-between shrink-0 bg-slate-50/50"
-      >
-        <div class="w-full text-[11px] text-slate-500">
-          已采纳 {{ appliedIssueIds.length }} 项 · 待处理
-          {{
-            (reviewResult?.issues || []).filter(
-              (i) =>
-                !appliedIssueIds.includes(i.id) &&
-                !["rejected"].includes(workspace.decisions[i.id]),
-            ).length
-          }}
-          项
+
+      <details class="opinion-filters" :open="revisionMode === 'compare'">
+        <summary>
+          筛选建议
+          <span>已采纳 {{ appliedIssueIds.length }} · 待处理 {{ pendingRevisionCount }}</span>
+        </summary>
+        <div
+          class="border-b border-slate-200 px-4 py-3 flex flex-wrap gap-2 items-center justify-between shrink-0 bg-slate-50/50"
+        >
+          <div class="w-full text-[11px] text-slate-500">
+            已采纳 {{ appliedIssueIds.length }} 项 · 待处理 {{ pendingRevisionCount }} 项
+          </div>
+          <div class="flex items-center space-x-1 text-xs">
+            <button
+              @click="severityFilter = 'all'"
+              :class="
+                severityFilter === 'all'
+                  ? 'text-blue-600 font-bold'
+                  : 'text-slate-500'
+              "
+              class="px-2 py-0.5 cursor-pointer"
+            >
+              全部
+            </button>
+            <span class="text-slate-300">|</span>
+            <button
+              @click="severityFilter = 'critical'"
+              :class="
+                severityFilter === 'critical'
+                  ? 'text-red-600 font-bold'
+                  : 'text-slate-500'
+              "
+              class="px-2 py-0.5 cursor-pointer"
+            >
+              重大
+            </button>
+            <span class="text-slate-300">|</span>
+            <button
+              @click="severityFilter = 'warning'"
+              :class="
+                severityFilter === 'warning'
+                  ? 'text-amber-600 font-bold'
+                  : 'text-slate-500'
+              "
+              class="px-2 py-0.5 cursor-pointer"
+            >
+              一般
+            </button>
+          </div>
         </div>
 
-        <div class="flex items-center space-x-1 text-xs">
-          <button
-            @click="severityFilter = 'all'"
-            :class="
-              severityFilter === 'all'
-                ? 'text-blue-600 font-bold'
-                : 'text-slate-500'
-            "
-            class="px-2 py-0.5 cursor-pointer"
-          >
-            全部
-          </button>
-          <span class="text-slate-300">|</span>
-          <button
-            @click="severityFilter = 'critical'"
-            :class="
-              severityFilter === 'critical'
-                ? 'text-red-600 font-bold'
-                : 'text-slate-500'
-            "
-            class="px-2 py-0.5 cursor-pointer"
-          >
-            重大
-          </button>
-          <span class="text-slate-300">|</span>
-          <button
-            @click="severityFilter = 'warning'"
-            :class="
-              severityFilter === 'warning'
-                ? 'text-amber-600 font-bold'
-                : 'text-slate-500'
-            "
-            class="px-2 py-0.5 cursor-pointer"
-          >
-            一般
-          </button>
+        <div class="px-4 py-2 border-b border-slate-100 space-y-2">
+          <input
+            v-model="issueSearch"
+            placeholder="搜索条款、风险或审查意见"
+            aria-label="搜索审查意见"
+            class="w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-blue-500"
+          />
+          <div class="flex gap-2 text-xs">
+            <select
+              v-model="handlingFilter"
+              class="border border-slate-200 rounded p-1"
+            >
+              <option value="all">全部处理状态</option>
+              <option value="pending">待处理</option>
+              <option value="applied">已采纳</option>
+              <option value="rejected">不采纳</option>
+              <option value="needs_review">待复核</option>
+            </select>
+            <button
+              @click="severityFilter = 'info'"
+              class="text-slate-600"
+              :class="{ 'font-bold text-blue-600': severityFilter === 'info' }"
+            >
+              优化建议
+            </button>
+            <button
+              @click="severityFilter = 'favorable'"
+              class="text-slate-600"
+              :class="{
+                'font-bold text-blue-600': severityFilter === 'favorable',
+              }"
+            >
+              有利条款
+            </button>
+          </div>
         </div>
-      </div>
-
-      <div class="px-4 py-2 border-b border-slate-100 space-y-2">
-        <input
-          v-model="issueSearch"
-          placeholder="搜索条款、风险或审查意见"
-          aria-label="搜索审查意见"
-          class="w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-blue-500"
-        />
-        <div class="flex gap-2 text-xs">
-          <select
-            v-model="handlingFilter"
-            class="border border-slate-200 rounded p-1"
-          >
-            <option value="all">全部处理状态</option>
-            <option value="pending">待处理</option>
-            <option value="applied">已采纳</option>
-            <option value="rejected">不采纳</option>
-            <option value="needs_review">待复核</option>
-          </select>
-          <button
-            @click="severityFilter = 'info'"
-            class="text-slate-600"
-            :class="{ 'font-bold text-blue-600': severityFilter === 'info' }"
-          >
-            优化建议
-          </button>
-          <button
-            @click="severityFilter = 'favorable'"
-            class="text-slate-600"
-            :class="{
-              'font-bold text-blue-600': severityFilter === 'favorable',
-            }"
-          >
-            有利条款
-          </button>
-        </div>
-      </div>
-
+      </details>
       <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
         <div
           v-for="issue in filteredIssues"
           :key="issue.id"
           :id="'card-' + issue.id"
           @click="highlightInContract(issue)"
+          :data-decision="appliedIssueIds.includes(issue.id) ? 'applied' : (workspace.decisions[issue.id] || 'pending')"
           :class="
             focusedIssueId === issue.id
               ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md'
               : 'border-slate-200 hover:border-slate-300 shadow-sm'
           "
-          class="bg-white border rounded-xl p-5 transition cursor-pointer"
+          class="prototype-risk-card bg-white border rounded-xl p-5 transition cursor-pointer"
         >
-          <div class="flex items-center justify-between mb-2">
+          <div class="compact-card-top flex items-center justify-between mb-2">
             <span
               class="text-xs font-bold text-slate-600 truncate max-w-[240px]"
             >
@@ -182,166 +194,119 @@ export default {
             </span>
           </div>
 
-          <div class="mb-2 text-[11px] text-blue-700">
+          <div class="compact-decision mb-2 text-[11px] text-blue-700">
             处理状态：{{ workspace.decisionName(issue.id) }}
           </div>
-          <div v-if="issue.diff" class="text-xs space-y-2 mb-3">
-            <div
-              class="p-3 bg-red-50 text-red-800 border border-red-200 rounded-lg whitespace-pre-wrap"
-            >
-              <strong>参考合同：</strong
-              >{{ issue.diff.original || "（无，此项为新增）" }}
-            </div>
-            <div
-              class="p-3 bg-blue-50 text-blue-900 border border-blue-200 rounded-lg whitespace-pre-wrap"
-            >
-              <strong>待审合同：</strong
-              >{{ issue.diff.current || "（已删除）" }}
-            </div>
-          </div>
-          <div
-            v-else-if="issue.evidence"
-            class="wb-evidence text-xs mb-3 p-3 text-slate-600 rounded-lg whitespace-pre-wrap"
+          <h3 class="prototype-card-title">{{ issue.issue_title }}</h3>
+          <p class="prototype-card-analysis">{{ issue.risk_analysis }}</p>
+          <button
+            class="prototype-locate"
+            @click.stop="selectIssue(issue.id)"
+            :aria-label="'定位条款：' + issue.clause_title"
           >
-            <strong>原文证据：</strong>{{ issue.evidence }}
-          </div>
-
-          <div
-            class="wb-risk-area"
-            :class="issue.severity === 'favorable' ? 'wb-risk-favorable' : ''"
+            ⌖ 定位原文
+          </button>
+          <details
+            class="revision-risk-details"
+            :open="revisionMode === 'compare'"
+            @click.stop
           >
-            <h4 class="text-sm font-bold text-slate-900 leading-snug">
-              {{ issue.issue_title }}
-            </h4>
-
-            <div
-              v-if="issue.risk_points?.length > 1"
-              class="wb-risk-description space-y-3"
-            >
-              <div v-for="(point, index) in issue.risk_points" :key="index">
-                <strong>{{ index + 1 }}. {{ point.title }}</strong>
-                <p class="mt-1">{{ point.analysis }}</p>
-              </div>
-            </div>
-            <div v-else class="wb-risk-description">
-              {{ issue.risk_analysis }}
-            </div>
-          </div>
-          <p
-            v-if="issue.rewrite_warning"
-            class="mt-2 p-2 rounded bg-amber-50 text-amber-800 text-xs"
-          >
-            {{ issue.rewrite_warning }}
-          </p>
-          <p v-else-if="issue.redline" class="mt-2 text-xs text-red-700">
-            统一改写已展示在右侧修订文档，采纳状态单独记录。
-          </p>
-
-          <details class="mt-3 text-xs" @click.stop>
-            <summary class="text-slate-500 cursor-pointer">
-              依据与处理建议
-            </summary>
-
-            <div
-              class="mt-2.5 text-xs text-slate-500 flex items-start space-x-1.5"
-            >
-              <svg
-                class="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
-                <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
-                <path d="M7 21h10" />
-                <path d="M12 3v18" />
-                <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" />
-              </svg>
-              <span class="leading-relaxed">{{ issue.legal_basis }}</span>
-            </div>
-
-            <div
-              class="mt-2 text-xs text-amber-800 bg-amber-50/80 border border-amber-200/60 p-2.5 rounded-lg leading-relaxed"
-            >
-              <strong>谈判策略：</strong>{{ issue.negotiation_strategy }}
-            </div>
-          </details>
-
-          <div
-            v-if="issue.redline"
-            class="mt-3.5 pt-3 border-t border-slate-200"
-          >
-            <div class="text-xs font-semibold text-slate-500 mb-2">
-              条款修订方案对照
-            </div>
-
-            <div class="space-y-2 text-xs">
+            <summary>风险说明与依据</summary>
+            <div v-if="issue.diff" class="text-xs space-y-2 mb-3">
               <div
-                class="bg-red-50/80 border border-red-200 text-red-800 line-through p-2.5 rounded leading-relaxed"
+                class="p-3 bg-red-50 text-red-800 border border-red-200 rounded-lg whitespace-pre-wrap"
               >
-                {{ issue.redline.original_text }}
+                <strong>参考合同：</strong
+                >{{ issue.diff.original || "（无，此项为新增）" }}
               </div>
+              <div
+                class="p-3 bg-blue-50 text-blue-900 border border-blue-200 rounded-lg whitespace-pre-wrap"
+              >
+                <strong>待审合同：</strong
+                >{{ issue.diff.current || "（已删除）" }}
+              </div>
+            </div>
+            <div
+              v-else-if="issue.evidence"
+              class="wb-evidence text-xs mb-3 p-3 text-slate-600 rounded-lg whitespace-pre-wrap"
+            >
+              <strong>原文证据：</strong>{{ issue.evidence }}
+            </div>
+
+            <div
+              class="wb-risk-area"
+              :class="issue.severity === 'favorable' ? 'wb-risk-favorable' : ''"
+            >
+              <h4 class="text-sm font-bold text-slate-900 leading-snug">
+                {{ issue.issue_title }}
+              </h4>
 
               <div
-                class="bg-emerald-50 border border-emerald-200 text-emerald-900 font-medium p-2.5 rounded leading-relaxed"
+                v-if="issue.risk_points?.length > 1"
+                class="wb-risk-description space-y-3"
               >
-                {{ issue.redline.suggested_text }}
+                <div v-for="(point, index) in issue.risk_points" :key="index">
+                  <strong>{{ index + 1 }}. {{ point.title }}</strong>
+                  <p class="mt-1">{{ point.analysis }}</p>
+                </div>
+              </div>
+              <div v-else class="wb-risk-description">
+                {{ issue.risk_analysis }}
               </div>
             </div>
+            <p
+              v-if="issue.rewrite_warning"
+              class="mt-2 p-2 rounded bg-amber-50 text-amber-800 text-xs"
+            >
+              {{ issue.rewrite_warning }}
+            </p>
+            <p v-else-if="issue.redline" class="mt-2 text-xs text-red-700">
+              AI 建议已标记在正文中，采纳后将写入当前稿。
+            </p>
 
-            <div class="mt-3 flex items-center space-x-2">
-              <button
-                @click.stop="applyRedline(issue)"
-                :disabled="resultStale || workspace.historical"
-                class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center space-x-1 cursor-pointer"
-                :class="
-                  appliedIssueIds.includes(issue.id)
-                    ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm active:scale-95'
-                "
+            <details class="mt-3 text-xs" @click.stop>
+              <summary class="text-slate-500 cursor-pointer">
+                依据与处理建议
+              </summary>
+
+              <div
+                class="mt-2.5 text-xs text-slate-500 flex items-start space-x-1.5"
               >
                 <svg
-                  class="w-3.5 h-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-                <span>{{
-                  appliedIssueIds.includes(issue.id)
-                    ? "撤销采纳"
-                    : "采纳此项修订"
-                }}</span>
-              </button>
-              <button
-                @click.stop="copyText(issue.redline.suggested_text)"
-                title="复制修订条款"
-                class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs cursor-pointer"
-              >
-                <svg
-                  class="w-3.5 h-3.5"
+                  class="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
                   stroke-width="2"
                 >
-                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
-                  <path
-                    d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
-                  ></path>
+                  <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+                  <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+                  <path d="M7 21h10" />
+                  <path d="M12 3v18" />
+                  <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" />
                 </svg>
-              </button>
-            </div>
-          </div>
+                <span class="leading-relaxed">{{ issue.legal_basis }}</span>
+              </div>
 
-          <div
+              <div
+                class="mt-2 text-xs text-amber-800 bg-amber-50/80 border border-amber-200/60 p-2.5 rounded-lg leading-relaxed"
+              >
+                <strong>谈判策略：</strong>{{ issue.negotiation_strategy }}
+              </div>
+            </details>
+          </details>
+          <RevisionActions
             v-if="workspace.run"
-            class="mt-4 pt-3 border-t border-slate-100 space-y-3"
+            :context="context"
+            :issue="issue"
+          />
+          <details
+            :open="revisionMode === 'compare'"
+            v-if="workspace.run"
+            class="compact-extra-tools mt-4 pt-3 border-t border-slate-100 space-y-3"
             @click.stop
           >
+            <summary class="revision-more-tools-label">备注与更多处理</summary>
             <div class="wb-issue-actions flex gap-2 text-xs">
               <button
                 @click="workspace.setDecision(issue, 'rejected')"
@@ -352,7 +317,10 @@ export default {
                     : ''
                 "
                 :disabled="
-                  workspace.historical || workspace.loading || isReviewing
+                  workspace.historical ||
+                  workspace.loading ||
+                  isReviewing ||
+                  revisionBusy
                 "
                 class="px-2 py-1 border border-slate-200 rounded text-slate-600"
               >
@@ -366,7 +334,10 @@ export default {
                     : ''
                 "
                 :disabled="
-                  workspace.historical || workspace.loading || isReviewing
+                  workspace.historical ||
+                  workspace.loading ||
+                  isReviewing ||
+                  revisionBusy
                 "
                 class="px-2 py-1 border border-slate-200 rounded text-amber-700"
               >
@@ -380,7 +351,10 @@ export default {
                     : ''
                 "
                 :disabled="
-                  workspace.historical || workspace.loading || isReviewing
+                  workspace.historical ||
+                  workspace.loading ||
+                  isReviewing ||
+                  revisionBusy
                 "
                 class="px-2 py-1 text-slate-400"
               >
@@ -409,7 +383,10 @@ export default {
             <textarea
               v-model="workspace.comments[issue.id]"
               :disabled="
-                workspace.historical || workspace.loading || isReviewing
+                workspace.historical ||
+                workspace.loading ||
+                isReviewing ||
+                revisionBusy
               "
               placeholder="添加人工备注或处理理由…"
               aria-label="条目处理备注"
@@ -459,7 +436,8 @@ export default {
                 {{ workspace.followupBusy ? "正在回答…" : "发送追问" }}
               </button>
             </div>
-          </div>
+          </details>
+
         </div>
 
         <div
