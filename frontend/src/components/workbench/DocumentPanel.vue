@@ -1,7 +1,8 @@
 <script>
+import ChevronIcon from "../ChevronIcon.vue";
 import RevisionRibbon from "./RevisionRibbon.vue";
 export default {
-  components: { RevisionRibbon },
+  components: { ChevronIcon, RevisionRibbon },
   props: { context: { type: Object, required: true } },
   setup: (props) => props.context,
 };
@@ -18,7 +19,7 @@ export default {
           aria-label="上一处修订"
           title="上一处风险 (Alt+↑)"
         >
-          ↑
+          <ChevronIcon direction="up" />
         </button>
         <span
           >{{ reviewIssues.length ? revisionIndex + 1 : 0 }} /
@@ -30,7 +31,7 @@ export default {
           aria-label="下一处修订"
           title="下一处风险 (Alt+↓)"
         >
-          ↓
+          <ChevronIcon />
         </button>
       </div>
     </div>
@@ -243,7 +244,7 @@ export default {
                   }[diff.change_type]
                 }}</strong
                 ><button @click="selectIssue(diff.id)" class="text-blue-600">
-                  查看分析 →
+                  查看分析
                 </button>
               </div>
               <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">

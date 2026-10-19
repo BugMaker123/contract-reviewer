@@ -56,7 +56,7 @@ export default {
           >
         </nav>
         <section v-if="false" class="recent-work" aria-labelledby="recent-work-title">
-          <div class="recent-work-heading"><h2 id="recent-work-title">最近工作</h2><RouterLink to="/records">全部记录 <span aria-hidden="true">→</span></RouterLink></div>
+          <div class="recent-work-heading"><h2 id="recent-work-title">最近工作</h2><RouterLink to="/records">全部记录</RouterLink></div>
           <p v-if="recentError" class="recent-work-empty">{{ recentError }} <button @click="refreshRecent">重试</button></p>
           <p v-else-if="!recentTasks.length" class="recent-work-empty">暂无工作记录</p>
           <article v-for="task in recentTasks" :key="task.id" class="recent-work-item">
@@ -65,7 +65,7 @@ export default {
             </div>
             <div class="recent-work-meta">
               <span class="recent-work-status">{{ statusName(task.status) }}</span>
-              <RouterLink :to="'/workbench?task=' + task.id" class="recent-work-action">{{ recentAction(task.status) }} →</RouterLink>
+              <RouterLink :to="'/workbench?task=' + task.id" class="recent-work-action">{{ recentAction(task.status) }}</RouterLink>
             </div>
           </article>
         </section>

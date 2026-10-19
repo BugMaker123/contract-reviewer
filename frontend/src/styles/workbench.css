@@ -2122,3 +2122,40 @@
 .workbench-view .wb-opinion-secondary { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
 .workbench-view .wb-opinion-secondary .wb-manual-issue { flex:1; min-width:0; padding:8px 0; border:0; }
 .workbench-view .wb-opinion-match-count { flex-shrink:0; padding:8px 0; font-size:11px; color:#475569; }
+
+.workbench-view .wb-priority-review { padding:14px; background:#fff; border:1px solid #bfdbfe; border-top:3px solid #2563eb; border-radius:8px; margin-bottom:16px; color:#334155; }
+.workbench-view .wb-priority-review header { display:flex; align-items:center; justify-content:space-between; gap:10px; white-space:normal; }
+.workbench-view .wb-priority-review h3 { font-size:14px; font-weight:700; color:#1e3a8a; }
+.workbench-view .wb-priority-review h3 span, .workbench-view .wb-priority-review header small { font-size:11px; font-weight:400; color:#64748b; }
+.workbench-view .wb-priority-scope { margin:7px 0 10px; color:#64748b; font-size:11px; line-height:1.7; }
+.workbench-view .wb-priority-counts { display:flex; gap:14px; font-size:11px; padding-bottom:8px; }
+.workbench-view .wb-priority-counts .is-fail { color:#b91c1c; }.workbench-view .wb-priority-counts .is-pending { color:#92400e; }.workbench-view .wb-priority-counts .is-pass { color:#047857; }
+.workbench-view .wb-priority-item { border-top:1px solid #edf2f7; padding:8px 0; font-size:12px; line-height:1.7; }
+.workbench-view .wb-priority-item summary { display:flex; align-items:flex-start; gap:8px; cursor:pointer; list-style:none; }
+.workbench-view .wb-priority-item summary::-webkit-details-marker { display:none; }
+.workbench-view .wb-priority-item summary > span:last-child { flex:1; min-width:0; overflow-wrap:anywhere; }
+.workbench-view .wb-priority-status { flex-shrink:0; font-size:10px; padding:1px 5px; background:#f1f5f9; border-radius:3px; color:#475569; }
+.workbench-view .priority-fail .wb-priority-status { background:#fef2f2; color:#b91c1c; }.workbench-view .priority-needs_review .wb-priority-status { background:#fffbeb; color:#92400e; }.workbench-view .priority-pass .wb-priority-status { background:#ecfdf5; color:#047857; }
+.workbench-view .wb-priority-item p { margin-top:7px; }.workbench-view .wb-priority-source { font-size:10px; color:#64748b; }.workbench-view .wb-priority-item blockquote { border-left:2px solid #cbd5e1; padding-left:8px; margin-top:7px; color:#475569; }
+.workbench-view .wb-priority-rest > summary, .workbench-view .wb-priority-context > summary { cursor:pointer; color:#1d4ed8; font-size:11px; padding:8px 0; }
+.workbench-view .wb-priority-context { border-top:1px solid #edf2f7; font-size:11px; line-height:1.8; }.workbench-view .wb-priority-context summary span { color:#64748b; margin-left:8px; }.workbench-view .wb-priority-context small { color:#64748b; }
+.workbench-view .wb-priority-footnote { font-size:10px; color:#64748b; line-height:1.7; margin-top:8px; }.workbench-view .wb-priority-stale { color:#b45309; font-size:11px; margin:6px 0; }
+.workbench-view .wb-full-analysis-title { display:flex; justify-content:space-between; color:#334155; font-size:13px; font-weight:700; }.workbench-view .wb-full-analysis-title span { color:#64748b; font-size:11px; font-weight:400; }
+.workbench-view .wb-priority-review header { min-height:0 !important; padding:0 !important; }
+
+.workbench-view .wb-priority-item > summary::after { content:"详情"; flex-shrink:0; font-size:10px; color:#64748b; }
+.workbench-view .wb-priority-item[open] > summary::after { content:"收起"; }
+
+.workbench-view .review-current-activity { padding:12px 14px; color:#334155; font-size:12px; line-height:1.8; background:#fff; }
+.workbench-view .review-activity-metrics { display:flex; flex-wrap:wrap; gap:8px 16px; color:#64748b; font-size:11px; margin-top:7px; }
+.workbench-view .review-activity-list { list-style:none; padding:2px 14px 12px; margin:0; background:#fff; }
+.workbench-view .review-activity-list li { display:flex; align-items:baseline; gap:9px; padding:5px 0; font-size:11px; line-height:1.7; color:#64748b; }
+.workbench-view .review-activity-list li > span:nth-child(2) { flex:1; min-width:0; }
+.workbench-view .review-activity-dot { width:5px; height:5px; background:#b8c6d9; border-radius:50%; flex-shrink:0; align-self:center; }
+.workbench-view .review-activity-list .is-latest { color:#1d4ed8; }
+.workbench-view .review-activity-list .is-latest .review-activity-dot { background:#2563eb; animation:review-pulse 1.4s infinite; }
+.workbench-view .review-activity-list time { flex-shrink:0; font-size:10px; color:#94a3b8; font-variant-numeric:tabular-nums; }
+.workbench-view .review-waiting { padding:28px 16px; }
+.workbench-view .review-finding-enter-active { transition:opacity .22s ease, transform .22s ease; }
+.workbench-view .review-finding-enter-from { opacity:0; transform:translateY(6px); }
+@media(prefers-reduced-motion:reduce) { .workbench-view .review-finding-enter-active { transition:none; }.workbench-view .review-activity-list .is-latest .review-activity-dot { animation:none; } }

@@ -17,6 +17,7 @@ const groups = computed(() => [
     <div v-if="workspace.task?.running_run"><p>审查正在后台执行，刷新不会停止任务。</p><button @click="context.startReview(workspace.task.running_run)">重新连接审查进度</button><button @click="context.cancelReview()">取消后台审查</button></div>
     <p v-if="['failed','interrupted'].includes(workspace.task?.status)">上次审查失败或中断，已有结果保留；可点击顶部重新审查。</p>
     <template v-if="result">
+      <p v-if="result.warning" class="wb-functional-warning">{{ result.warning }}</p>
       <p><strong>本轮审查稿件：</strong>{{ workspace.run?.baseline_kind === 'accepted' ? '上一版已采纳修订稿' : '当时保存的正文快照' }}</p>
       <p><strong>准入结论：</strong>{{ result.admission?.reason || '历史版本未记录' }}</p>
       <p><strong>审查总评：</strong>{{ result.summary?.verdict || '未记录' }}</p>

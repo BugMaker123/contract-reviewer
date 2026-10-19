@@ -30,7 +30,7 @@ def test_minimal_checklist_bulk_import_and_default_selection(isolated_workspace)
         assert saved['items'][0]['title']=='付款前必须完成验收'
         assert saved['items'][-1]['requirement']=='1.1 资料清单须完整'
         page.screenshot(path='artifacts/checklists-simple-list.png')
-        row.get_by_role('link',name='使用清单 →',exact=True).click()
+        row.get_by_role('link',name='使用清单',exact=True).click()
         expect(page.get_by_text('已勾选 5 项',exact=True)).to_be_visible()
         expect(page.locator('.checklist-selection')).not_to_have_attribute('open','')
         expect(page.locator('.checklist-option').first).not_to_be_visible()

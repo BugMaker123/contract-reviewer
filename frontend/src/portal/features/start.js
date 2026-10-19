@@ -80,6 +80,7 @@ export function setup(context) {
         ...form,
         type: form.type?.trim() || "商务合同",
         focus: form.mode === "checklist" ? "" : form.focus,
+        checklist_id: form.mode === "checklist" ? form.checklist_id : null,
         references: form.references,
         requirements: form.requirements.filter(item => item.text?.trim() || !item.id?.startsWith('custom-')),
         checklist_item_ids:

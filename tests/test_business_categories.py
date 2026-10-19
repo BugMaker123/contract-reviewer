@@ -56,12 +56,23 @@ def test_category_and_checklist_browser(isolated_workspace):
             expect(page.get_by_text('已勾选 1 项', exact=True)).to_be_visible()
             page.get_by_role('button', name='✍️ 粘贴正文', exact=True).click()
             page.get_by_label('合同正文', exact=True).fill('第一条 付款与验收，验收合格后付款。')
-            page.get_by_placeholder('填写便于识别的合同名称').fill('技术服务合同')
+            page.locator('.review-contract-name input').fill('技术服务合同')
+            expect(page.locator('.review-prompt-field')).to_have_count(0)
+            mode = page.locator('select').filter(has=page.locator('option[value="deep"]'))
+            mode.select_option('deep')
+            expect(page.locator('.checklist-selection')).to_have_count(0)
+            page.locator('.review-prompt-field textarea').fill('重点检查知识产权归属')
+            mode.select_option('checklist')
+            expect(page.locator('.review-prompt-field')).to_have_count(0)
+            mode.select_option('deep')
+            expect(page.locator('.review-prompt-field textarea')).to_have_value('重点检查知识产权归属')
+            mode.select_option('checklist')
             page.get_by_role('button', name='进入工作台核对合同').click()
             page.wait_for_url('**/workbench?task=*')
             task_id = page.url.split('task=')[1]
             task = page.request.get(base + '/api/tasks/' + task_id).json()
             assert len(task['checklist']['items']) == 1
+            assert task['focus'] == ''
             assert not errors
             browser.close()
     finally:

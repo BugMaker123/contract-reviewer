@@ -35,7 +35,7 @@ def review(client, task):
     response = client.post('/api/tasks/' + task['id'] + '/review/stream', json={})
     assert response.status_code == 200, response.text
     blocks = response.text.strip().split('\n\n')
-    assert len([b for b in blocks if b.startswith('event: node_update')]) == 5
+    assert len([b for b in blocks if b.startswith('event: node_update')]) == (6 if task['mode'] == 'checklist' else 5)
     completed = next(block for block in blocks if block.startswith('event: complete'))
     return json.loads(completed.split('data: ', 1)[1])
 
@@ -214,7 +214,10 @@ def test_comparison_model_assesses_only_actual_changes(client, monkeypatch):
             return {'status': 'pass', 'reason': '合同审查用途正常'}
         seen.append(prompt)
         return {'findings': [{'id': 'diff_1', 'severity': 'warning', 'explanation': '付款账期延长，请核对资金安排', 'basis': '交易要求', 'advice': '确认是否接受新账期', 'suggested_text': '验收后30日付款。'}]}
-    monkeypatch.setattr(graph, 'get_llm_client', lambda config: object())
+    class FullReviewModel:
+        def invoke(self, messages):
+            return type('Response', (), {'content': json.dumps({'tax_settlement': {}, 'issues': []})})()
+    monkeypatch.setattr(graph, 'get_llm_client', lambda config: FullReviewModel())
     monkeypatch.setattr(workspace_review, 'model_json', fake_model)
     reference = '第一条 标的\n设备\n第二条 付款\n验收后30日付款。'
     task = create_task(client, mode='compare', text=reference.replace('30日', '60日'), reference_text=reference)
@@ -232,7 +235,10 @@ def test_unverified_checklist_evidence_cannot_be_marked_pass(client, monkeypatch
         if '执行审查准入判断' in prompt:
             return {'status': 'pass', 'reason': '合同审查用途正常'}
         return {'findings': [{'id': 'balance', 'status': 'pass', 'evidence': '模型编造的原文', 'explanation': '通过'}]}
-    monkeypatch.setattr(graph, 'get_llm_client', lambda config: object())
+    class FullReviewModel:
+        def invoke(self, messages):
+            return type('Response', (), {'content': json.dumps({'tax_settlement': {}, 'issues': []})})()
+    monkeypatch.setattr(graph, 'get_llm_client', lambda config: FullReviewModel())
     monkeypatch.setattr(workspace_review, 'model_json', fake_json)
     standard = checklist(client)
     task = create_task(client, mode='checklist', checklist_id=standard['id'])
@@ -359,3 +365,60 @@ def test_document_comparison_marks_replacements_insertions_deletions(client):
     same=client.post('/api/documents/compare',json={'original':'A\nB','revised':'A\nB'}).json()
     assert same['changes']==[]
     assert same['original_map']==[0,1]
+
+
+def test_checklist_adds_full_contract_review_and_keeps_specialized_findings(client, monkeypatch):
+    prompts = []
+    class FullModel:
+        async def ainvoke(self, messages):
+            prompt = messages[-1].content
+            if '本批要求：' in prompt:
+                batch = json.loads(prompt.split('本批要求：',1)[1].split('\n待核验正文：',1)[0])
+                return type('Response', (), {'content': json.dumps({'findings':[{'id':item['id'],'status':'fail','evidence':'','explanation':'合同缺少约定','conflict_with':[]} for item in batch]})})()
+            return type('Response', (), {'content': json.dumps({'status':'pass','reason':'合同审查用途正常'})})()
+        def invoke(self, messages):
+            prompts.append(messages[-1].content)
+            return type('Response', (), {'content': json.dumps({'tax_settlement': {'vat_rate':'未明确税率'}, 'issues': [{
+                'id':'payment-risk','segment_id':None,'clause_title':'付款', 'severity':'critical',
+                'category':'付款条件','issue_title':'付款未约定验收条件','legal_basis':'合同履行约定需明确',
+                'risk_analysis':'付款安排与验收脱节','negotiation_strategy':'明确验收后付款',
+                'redline':{'original_text':'签约即付款。','suggested_text':'验收后付款。','change_type':'replace','diff_explanation':'明确付款节点'},
+            }]})})()
+    monkeypatch.setattr(graph, 'get_llm_client', lambda config: FullModel())
+    standard = client.post('/api/checklists', json={'name':'发票专项','published':True,'items':[
+        {'id':'invoice','title':'发票要求','requirement':'应明确开具专用发票','operator':'contains_any','keywords':['专用发票']}
+    ]}).json()
+    task = create_task(client, mode='checklist', text='第一条 付款\n签约即付款。', checklist_id=standard['id'],
+                       focus='重点核对验收节点', background='采购方要求分批验收',
+                       references=[{'name':'公司付款制度','text':'付款须经财务确认','kind':'policy','confirmed':True}, {'name':'交易说明','text':'采购按季度交付','kind':'reference'}],
+                       requirements=[{'id':'policy-1','text':'付款须经财务确认','priority':'required','source':'公司付款制度','evidence':'付款须经财务确认'}])
+    result = review(client, task)['data']
+    assert any(issue['category'] == '付款条件' for issue in result['issues'])
+    assert any(issue['category'] == '企业清单' for issue in result['issues'])
+    assert any('验收后付款。' in issue.get('redline', {}).get('suggested_text', '') for issue in result['issues'] if issue.get('redline'))
+    assert result['checklist_findings'][0]['status'] == 'fail'
+    assert result['tax_settlement']['vat_rate'] == '未明确税率'
+    assert prompts and '主体、标的、交付验收' in prompts[0] and '应明确开具专用发票' in prompts[0]
+    assert all(text in prompts[0] for text in ['重点核对验收节点','采购方要求分批验收','付款须经财务确认','采购按季度交付'])
+    assert {item['origin'] for item in result['requirement_findings']} == {'custom','reference','checklist'}
+    assert result['priority_review']['total'] == 3
+    assert len(result['priority_review']['references']) == 2
+    saved = client.get('/api/tasks/' + task['id']).json()['run']
+    verified = client.post('/api/runs/' + saved['id'] + '/verify-current', json={'revision':saved['revision']}).json()
+    assert len(verified['current_verification']['findings']) == 3
+    assert any(item.get('checklist_item_id') == 'invoice' for item in verified['current_verification']['findings'])
+    assert '清单专项核验' in result['summary']['verdict']
+    assert '清单不限制全文风险检查范围' in result['coverage']
+    assert '未进行模型语义审查' not in result['summary']['verdict']
+
+
+def test_checklist_without_model_keeps_full_rule_review_and_discloses_limit(client):
+    standard = client.post('/api/checklists', json={'name':'发票专项','published':True,'items':[
+        {'id':'invoice','title':'发票要求','requirement':'应明确开具专用发票','operator':'contains_any','keywords':['专用发票']}
+    ]}).json()
+    task = create_task(client, mode='checklist', text='第一条 解除\n甲方可单方无偿解除合同。', checklist_id=standard['id'])
+    result = review(client, task)['data']
+    assert any('合同解除与退出机制' in issue['category'] for issue in result['issues']), result['issues']
+    assert result['checklist_findings'][0]['status'] == 'fail'
+    assert '未完成深度语义研判' in result['warning']
+    assert '基础规则' in result['coverage']

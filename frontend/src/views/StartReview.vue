@@ -74,23 +74,24 @@ export default {
             </div>
           </div>
           <div class="review-requirement-panel">
-            <div v-if="form.mode !== 'checklist'" class="review-prompt-field">
-              <label class="block"><span class="label">自定义审查要求（Prompt）</span><textarea v-model="form.focus"
-                  class="field" rows="5"
-                  placeholder="例如：重点审查付款与验收条款；指出单方解除权及责任不对等的风险；修改建议应保留合理的协商空间。"></textarea></label>
-              <p>可填写关注重点、不可接受的条件和修改偏好；留空则按通用标准审查。</p>
-            </div>
-            <template v-else>
+            <template v-if="form.mode === 'checklist'">
               <ChecklistConfig :context="context" />
               <ChecklistSelection :context="context" />
             </template>
+            <div v-else class="review-prompt-field">
+              <label class="block"><span class="label">自定义审查要求（Prompt）</span><textarea v-model="form.focus"
+                  class="field" rows="5"
+                  placeholder="例如：重点审查付款与验收条款；指出单方解除权及责任不对等的风险；修改建议应保留合理的协商空间。"></textarea></label>
+              <p>可填写关注重点、不可接受的条件和修改偏好；留空按通用标准审查，重点要求不替代全文风险审查。</p>
+            </div>
+
           </div>
         </div>
         <ReviewBackground :context="context" :expanded="false" hide-focus />
       </section>
       <footer class="review-submit">
         <button @click="createTask" :disabled="!!readiness" class="button primary">{{ busy ? '正在保存…' : '进入工作台核对合同' }}
-          <span aria-hidden="true">→</span></button>
+</button>
         <div><strong>{{ error ? '创建任务失败' : readiness ? '完成准备后，开始合同审查' : '准备就绪，可以进入审查工作台' }}</strong>
           <p :role="error ? 'alert' : 'status'" :class="{ 'review-submit-error': error }">{{ error || readiness ||
             '合同正文及审查条件已准备' }}</p>

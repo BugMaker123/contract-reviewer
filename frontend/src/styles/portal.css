@@ -574,7 +574,7 @@ a:focus-visible {
 .checklist-detail { max-width:760px; padding:24px; }.checklist-detail > header { display:flex; align-items:center; justify-content:space-between; gap:16px; }.checklist-detail h2 { font-size:18px; font-weight:700; }.checklist-detail header p { font-size:12px; color:#94a3b8; margin-top:5px; }.checklist-detail header > button { font-size:12px; color:#64748b; }.checklist-detail-description { margin-top:14px; font-size:13px; color:#64748b; }
 .checklist-detail-items { margin-top:18px; }.checklist-detail-items li { display:flex; gap:12px; padding:14px 0; border-bottom:1px solid #edf2f7; }.checklist-detail-items li > span { flex:none; color:#94a3b8; font-size:12px; }.checklist-detail-items li p { font-size:13px; line-height:1.7; white-space:pre-wrap; }.checklist-detail-items li strong { display:block; margin-bottom:4px; font-size:13px; }.checklist-detail-rules { font-size:12px; color:#64748b; margin-top:18px; }.checklist-detail-rules summary { cursor:pointer; }.checklist-detail-rules p { margin-top:10px; }
 .checklist-selection > .checklist-selection-summary { display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; list-style:none; font-size:12px; }
-.checklist-selection-summary::-webkit-details-marker { display:none; }.checklist-selection-summary::before { content:'›'; color:#64748b; font-size:18px; }.checklist-selection[open] > .checklist-selection-summary::before { transform:rotate(90deg); }.checklist-selection-summary strong { flex:1; font-weight:500; }
+.checklist-selection-summary::-webkit-details-marker { display:none; }.checklist-selection-summary strong { flex:1; font-weight:500; }
 .checklist-selection > .selection-heading { margin-top:14px; font-size:12px; color:#64748b; }
 .checklist-selection .checklist-options { display:flex; flex-direction:column; gap:8px; margin-top:10px; max-height:320px; overflow-y:auto; }.checklist-selection .checklist-option { padding:10px; }.checklist-selection .checklist-option strong { font-size:12px; }.checklist-selection .checklist-option p { font-size:12px; line-height:1.6; margin-top:0; }
 @media (max-width:800px) {
@@ -624,3 +624,13 @@ a:focus-visible {
 .manual-content li { font-size:13px; line-height:1.95; margin-bottom:9px; }
 .manual-dialog button:focus-visible, .portal-help-button:focus-visible { outline:2px solid #60a5fa; outline-offset:2px; }
 @media(max-width:650px) { .manual-dialog { width:calc(100vw - 24px); height:calc(100dvh - 32px); } .manual-header { padding:16px; } .manual-header p { font-size:11px; } .manual-layout { flex-direction:column; } .manual-directory { width:auto; max-height:142px; border-right:0; border-bottom:1px solid #e2e8f0; display:grid; grid-template-columns:1fr 1fr; padding:8px; } .manual-directory button { padding:8px; } .manual-content { padding:20px; } }
+
+.review-conditions-first .checklist-selection + .review-prompt-field { margin-top:16px; }
+
+/* Outline chevrons replace font-dependent arrows and filled disclosure markers. */
+details:not(.wb-menu):not(.wb-priority-item) > summary { list-style:none; }
+details:not(.wb-menu):not(.wb-priority-item) > summary::-webkit-details-marker { display:none; }
+details:not(.wb-menu):not(.wb-priority-item) > summary::marker { content:''; }
+details:not(.wb-menu):not(.wb-priority-item) > summary::before { content:''; display:inline-block; box-sizing:border-box; width:6px; height:6px; flex-shrink:0; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:rotate(-45deg); vertical-align:2px; margin-right:9px; opacity:.65; transition:transform .15s; }
+details[open]:not(.wb-menu):not(.wb-priority-item) > summary::before { transform:rotate(45deg); vertical-align:3px; }
+select:not([multiple]) { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2364748b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 8 5 5 5-5'/%3E%3C/svg%3E") !important; background-repeat:no-repeat !important; background-position:right 10px center !important; background-size:14px 14px !important; padding-right:30px !important; }

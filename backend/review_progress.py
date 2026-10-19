@@ -42,7 +42,9 @@ async def observable_events(events, snapshot, config):
         token = _observer.set(observe)
         cancel_token = _cancelled.set(stopped)
         try:
-            emit_progress('prepare', f"已接收合同，共 {len(snapshot.get('text', ''))} 字；正在解析原文与审查条件。")
+            emit_progress('prepare', f"已接收合同，共 {len(snapshot.get('text', ''))} 字；正在解析原文与审查条件。",
+                          contract_chars=len(snapshot.get('text', '')), reference_count=len(snapshot.get('references') or []),
+                          priority_count=len(snapshot.get('requirements') or []) + len([line for line in (snapshot.get('focus') or '').splitlines() if line.strip()]) + len((snapshot.get('checklist') or {}).get('items', [])))
             async for item in events(snapshot, config):
                 await queue.put(item)
         except Exception as error:

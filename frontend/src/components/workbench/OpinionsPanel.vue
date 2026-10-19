@@ -1,8 +1,9 @@
 <script>
+import PriorityReview from "./PriorityReview.vue";
 import ManualIssue from "./ManualIssue.vue";
 import RevisionActions from "./RevisionActions.vue";
 export default {
-  components: { RevisionActions, ManualIssue },
+  components: { RevisionActions, ManualIssue, PriorityReview },
   props: { context: { type: Object, required: true } },
   setup: (props) => props.context,
 };
@@ -58,6 +59,8 @@ export default {
         </div>
       </section>
       <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
+        <PriorityReview v-if="reviewResult && !isReviewing" :context="context" :result="reviewResult" />
+        <h3 v-if="reviewResult && !isReviewing" class="wb-full-analysis-title">全文风险分析 <span>{{ filteredIssues.length }} 项意见</span></h3>
         <div
           v-for="issue in filteredIssues"
           :key="issue.id"

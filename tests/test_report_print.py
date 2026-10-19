@@ -21,7 +21,7 @@ def test_report_pdf_has_visible_directory_and_no_blank_pages(client):
         page = browser.new_page(viewport={'width': 1536, 'height': 800})
         page.goto(base + '/workbench?task=' + task['id'])
         page.get_by_role('button', name='审查意见书', exact=True).click()
-        expect(page.locator('.wb-report-directory a')).to_have_count(23)
+        expect(page.locator('.wb-report-directory a')).to_have_count(26)
         original_title = page.title()
         page.evaluate("window.print = () => { window.dispatchEvent(new Event('beforeprint')); window.capturedPrintTitle = document.title; window.dispatchEvent(new Event('afterprint')); }")
         page.get_by_role('button', name='打印 / 存为 PDF', exact=True).click()

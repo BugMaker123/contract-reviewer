@@ -1,5 +1,7 @@
 <script setup>
 import { computed, unref, ref, watch, onUnmounted } from "vue";
+import { reviewActivities } from "../../workbench/reviewActivity.js";
+import PriorityReview from "./PriorityReview.vue";
 const props = defineProps({ context: { type: Object, required: true } });
 const value = (key) => unref(props.context[key]);
 const running = computed(() => value("isReviewing"));
@@ -54,11 +56,10 @@ const activeStep = computed(() => {
       synthesize_summary: 4,
       rewrite: 5,
       requirements: 5,
+      checklist: 5,
       evidence_tool: 5,
     };
     if (event.stage in stages) step = Math.max(step, stages[event.stage]);
-    if (event.stage === "retry" || event.stage === "review")
-      step = stages[event.stage] ?? 2;
   }
   return step;
 });
@@ -73,6 +74,28 @@ const items = computed(() => {
     severity: item.severity,
   }));
 });
+const phaseDescriptions = [
+  '正在整理合同、审查立场、重点要求及背景资料，确认本轮审查范围。',
+  '正在整理条款结构，定位付款、履约、责任及其他合同约定。',
+  '正在结合我方立场与重点要求，分析合同主体、履约、价款、责任及相关财税安排。',
+  '正在核对分析意见是否有原文依据，检查修订是否超出原条款范围。',
+  '正在归并同一条款的问题，整理风险说明与修订建议。',
+  '正在核验自定义与清单要求、参考资料证据及修订内容，保留需人工确认的项目。',
+  '正在汇总重点要求结论与全文意见，准备本轮审查结果。',
+];
+const activity = computed(() => reviewActivities(trace.value, running.value ? items.value.length : 0));
+const phaseDescription = computed(() => running.value ? phaseDescriptions[Math.min(activeStep.value,6)] : value('reviewError') ? '本次处理已停止，已有结果会保留。' : '重点要求与全文分析已整理完成，可进入工作台逐项复核。');
+const metrics = computed(() => {
+  const prepare = trace.value.find(item => item.stage === 'prepare') || {};
+  const segment = [...trace.value].reverse().find(item => Number.isInteger(item.segment_count));
+  return [segment ? `已整理 ${segment.segment_count} 个条款` : null, Number.isInteger(prepare.priority_count) ? `${prepare.priority_count} 条重点要求` : null, prepare.reference_count ? `${prepare.reference_count} 份参考资料` : null].filter(Boolean);
+});
+const activityTime = (time) => {
+  const stamp = Date.parse(time);
+  if (!Number.isFinite(stamp)) return '';
+  const seconds = Math.max(0,Math.floor((stamp - startedAt.value)/1000));
+  return seconds >= 60 ? `${Math.floor(seconds/60)}分${seconds%60}秒` : `${seconds}秒`;
+};
 const severityName = (severity) =>
   ({ high: "高风险", critical: "高风险", medium: "中风险", warning: "中风险", low: "低风险", info: "优化建议", favorable: "有利条款" })[
     severity
@@ -126,20 +149,27 @@ const severityName = (severity) =>
             <span>{{ running ? '正在处理：' + steps[activeStep] : value('reviewError') ? '本次审查已停止' : '审查完成，意见和修订建议已生成。' }}</span>
             <time class="review-elapsed" aria-label="累计处理用时">已用时 {{ elapsed }}</time>
           </div>
+          <div class="review-current-activity"><p>{{ phaseDescription }}</p><div v-if="metrics.length" class="review-activity-metrics"><span v-for="metric in metrics" :key="metric">{{ metric }}</span></div></div>
+          <ol v-if="activity.length" class="review-activity-list" aria-label="审查动态" aria-live="polite" aria-relevant="additions text">
+            <li v-for="(entry,index) in activity" :key="entry.id" :class="{'is-latest':index === activity.length - 1 && running}"><span class="review-activity-dot" aria-hidden="true"></span><span>{{ entry.text }}</span><time>{{ activityTime(entry.time) }}</time></li>
+          </ol>
         </section>
+        <PriorityReview v-if="!running && value('reviewResult')" :context="context" :result="value('reviewResult')" />
         <div class="review-analysis-heading">
-          <h4>条款审查意见清单（已识别 {{ items.length }} 项）</h4>
+          <h4>全文风险分析（已识别 {{ items.length }} 项）</h4>
           <span>{{ running ? "实时更新 · 待最终校验" : "已完成校验" }}</span>
         </div>
         <div v-if="!items.length" class="review-waiting">
           <div v-if="running" class="review-waiting-line"></div>
-          <h4>{{ running ? "正在分析合同条款" : "本次未识别出审查问题" }}</h4>
+          <h4>{{ running ? "正在形成条款意见" : "本次未识别出审查问题" }}</h4>
           <p v-if="running">
-            审查正在进行，完成的条款意见将在下方逐项展示。
+            完成的条款意见将逐项出现在这里，初步意见仍需后续校验。
           </p>
         </div>
-        <div
+        <TransitionGroup
           v-else
+          name="review-finding"
+          tag="div"
           data-public-analysis
           class="review-analysis-list"
           aria-live="polite"
@@ -169,7 +199,7 @@ const severityName = (severity) =>
               <span>修改方向：</span>{{ item.proposal }}
             </p>
           </article>
-        </div>
+        </TransitionGroup>
       </div>
       <footer class="review-dialog-footer">
         <span>{{

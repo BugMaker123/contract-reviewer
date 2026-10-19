@@ -30,8 +30,8 @@ export default {
     >
     <p v-if="!availableLists.length" class="review-list-empty">当前分类暂无可用清单。可切换分类，或创建一份清单。</p>
     <div class="text-xs text-slate-500 mt-2">
-      选中后默认检查全部要求。<RouterLink to="/checklists" class="text-blue-600"
-        >管理清单 →</RouterLink
+      全文审查 + 清单专项核验，默认勾选全部要求。<RouterLink to="/checklists" class="text-blue-600"
+        >管理清单</RouterLink
       >
     </div>
   </div>

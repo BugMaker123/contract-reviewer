@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from backend import graph, workspace_api, workspace_review
 from backend.main import app
-from backend.review_policy import admit, AdmissionError, verify_requirements, evidence_loop
+from backend.review_policy import admit, AdmissionError, verify_requirements, evidence_loop, requirements_for
 
 
 TEXT = '第一条 设备交付。\n第二条 验收后30日付款。'
@@ -140,3 +140,29 @@ def test_policy_upload_confirmation_and_snapshot_in_browser(monkeypatch):
         assert saved['requirements'][0]['text'] == REQ['text']
         assert not errors
         browser.close()
+
+
+def test_all_priority_sources_are_retained_and_namespaced():
+    snapshot = {'focus':'优先核对付款期限','requirements':[{**REQ,'source':'公司制度.txt'}],
+                'background':'分批验收、分期付款','references':[{'name':'公司制度.txt','kind':'policy','confirmed':True}],
+                'checklist':{'name':'发票清单','items':[{'id':'r1','requirement':'应约定开具专用发票'}]}}
+    requirements = requirements_for(snapshot)
+    assert len(requirements) == 3
+    assert {item['origin'] for item in requirements} == {'reference','custom','checklist'}
+    assert len({item['id'] for item in requirements}) == 3
+    assert any(item['text'] == '应约定开具专用发票' for item in requirements)
+
+
+def test_background_references_and_all_requirements_reach_every_verification_batch(monkeypatch):
+    monkeypatch.setattr(graph, 'get_llm_client', lambda config: object())
+    snapshot = {'text':TEXT,'focus':'优先核对付款期限','background':'分批验收、分期付款',
+                'references':[{'name':'交易说明.txt','text':'付款须经确认','kind':'reference'}],
+                'checklist':{'name':'专项清单','items':[{'id':'vat','requirement':'应明确发票类型'}]}}
+    requirements = requirements_for(snapshot)
+    prompts=[]
+    async def model(config,prompt):
+        prompts.append(prompt)
+        return {'findings':[{'id':item['id'],'status':'needs_review','evidence':'','explanation':'须人工核对','conflict_with':[]} for item in requirements]}
+    findings = asyncio.run(verify_requirements(snapshot, requirements, {}, model))
+    assert len(findings) == 2
+    assert all(text in prompts[0] for text in ['分批验收、分期付款','交易说明.txt','付款须经确认','优先核对付款期限','应明确发票类型'])

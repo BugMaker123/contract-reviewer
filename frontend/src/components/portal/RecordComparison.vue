@@ -22,7 +22,7 @@ watch([before,after],load);
   <div class="modal" @click.self="emit('close')"><section class="modal-panel record-comparison" role="dialog" aria-modal="true" aria-label="审核前后对比">
     <header class="flex items-center justify-between"><h2 class="font-semibold">{{ task.title }} · 审核前后对比</h2><button class="button" @click="emit('close')">关闭对比</button></header>
     <div class="flex flex-wrap gap-3 my-4">
-      <label>比较基准<select v-model="before" class="field"><option value="">本轮审查原文 → 当前采纳稿</option><option v-for="v in versions" :key="v.id" :value="v.id">第 {{ v.number }} 次审查输入快照</option></select></label>
+      <label>比较基准<select v-model="before" class="field"><option value="">本轮审查原文与当前采纳稿</option><option v-for="v in versions" :key="v.id" :value="v.id">第 {{ v.number }} 次审查输入快照</option></select></label>
       <label>目标版本<select v-model="after" class="field"><option v-for="v in versions" :key="v.id" :value="v.id">第 {{ v.number }} 次审查</option></select></label>
       <a :href="`/api/runs/${after}/export?scope=report`" class="button">导出此版意见书</a>
       <RouterLink :to="`/workbench?task=${task.id}&run=${after}`" class="button">打开此版本</RouterLink>

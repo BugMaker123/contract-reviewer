@@ -96,6 +96,7 @@ def test_report_preview_and_word_share_content_and_export_options(client):
     result = run['result']
     result['tax_settlement'] = {'vat_rate':'6%','vat_rate_evaluation':'核对交易适用税率','invoice_detail':'核对发票类型','settlement_method':'银行转账'}
     result['summary']['key_dealbreakers'] = ['付款条件需确认']
+    result['requirement_findings'] = [{**REQ,'status':'needs_review','explanation':'请核对付款条款','evidence':'','conflict_with':[]}]
     run = workspace_api.repo.update(run['id'], {'result': result}, run['revision'])
     run = verify(client,run).json()
     content = client.get('/api/runs/'+run['id']+'/report-content').json()['paragraphs']
@@ -104,6 +105,9 @@ def test_report_preview_and_word_share_content_and_export_options(client):
     word = Document(BytesIO(response.content))
     assert [p['text'] for p in content] == [p.text for p in word.paragraphs if p.text]
     assert any('风险等级说明' == p['text'] for p in content)
+    titles = [p['text'] for p in content]
+    assert titles.index('重点要求核验（本轮原文）') < titles.index('全文审查结论')
+    assert next(i for i,text in enumerate(titles) if REQ['text'] in text) < titles.index('全文审查结论')
     assert any(p['text'].startswith('严重程度：重大风险') for p in content)
     assert any(p['text'].startswith('重大风险 · 1 项') for p in content)
     assert any(p['text'].startswith('【重大风险】') for p in content)
@@ -174,6 +178,10 @@ def test_functional_workbench_in_browser(isolated_workspace, monkeypatch):
         task = page.request.post(base+'/api/tasks',data={'title':'完整功能浏览器验收','text':TEXT,'mode':'quick','requirements':[REQ]}).json()
         page.request.post(base+'/api/tasks/'+task['id']+'/review/stream',data={})
         page.goto(base+'/workbench?task='+task['id'])
+        expect(page.locator('.wb-priority-review')).to_be_visible()
+        expect(page.locator('.wb-priority-review')).to_contain_text(REQ['text'])
+        assert page.locator('.wb-priority-review').bounding_box()['y'] < page.locator('.wb-full-analysis-title').bounding_box()['y']
+        page.locator('.wb-functional-overview > summary').click()
         expect(page.get_by_role('button',name='核验当前稿',exact=True)).to_be_enabled()
         page.get_by_role('button',name='核验当前稿',exact=True).click()
         expect(page.get_by_text('当前稿核验有效',exact=True)).to_be_visible()
@@ -199,6 +207,7 @@ def test_functional_workbench_in_browser(isolated_workspace, monkeypatch):
         saved = page.request.get(base+'/api/tasks/'+task['id']).json()['run']
         manual = next(issue for issue in saved['result']['issues'] if issue.get('source') == 'manual')
         page.locator('#card-'+manual['id']).get_by_role('button',name='采纳',exact=True).click()
+        page.locator('.wb-functional-overview > summary').click()
         expect(page.get_by_text('当前稿未核验或核验已失效',exact=True)).to_be_visible()
         for issue in saved['result']['issues']:
             if issue['id'] != manual['id']:
@@ -211,10 +220,11 @@ def test_functional_workbench_in_browser(isolated_workspace, monkeypatch):
         page.goto(base+'/workbench?task='+task['id'])
         expect(page.get_by_role('button',name='已完成审核',exact=True)).to_be_visible()
         page.reload()
+        page.locator('.wb-functional-overview > summary').click()
         expect(page.get_by_placeholder('说明处理方式、确认依据或接受风险的理由')).to_have_value('已人工核对当前采纳稿付款期限符合要求')
         expect(page.frame_locator('iframe[title="合同修订文档"]').locator('article')).to_contain_text('验收后15日付款。')
         page.screenshot(path='artifacts/functional-workbench.png')
-        page.get_by_text('审查设置 ▾',exact=True).click()
+        page.get_by_text('审查设置',exact=True).click()
         page.get_by_role('button',name='修改审查条件',exact=True).click()
         expect(page.get_by_role('button',name='添加资料',exact=True)).to_be_visible()
         page.get_by_role('button',name='添加要求',exact=True).click()
@@ -245,6 +255,7 @@ def test_browser_refresh_can_reconnect_background_review(isolated_workspace, mon
         page.get_by_role('button',name='开始审查',exact=True).click()
         expect(page.get_by_role('button',name='取消审查',exact=True)).to_be_visible()
         page.reload()
+        page.locator('.wb-functional-overview > summary').click()
         page.get_by_role('button',name='重新连接审查进度',exact=True).click()
         page.get_by_role('button',name='查看审查修订稿',exact=True).click()
         expect(page.get_by_role('button',name='重新审查',exact=True)).to_be_enabled()

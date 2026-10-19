@@ -21,7 +21,7 @@ const content = computed(() => paragraphs.value.slice(8));
 const directory = computed(() => content.value.map((paragraph,index) => ({ ...paragraph, id: 'report-section-' + index })).filter(paragraph => paragraph.heading));
 const jumpTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 const splitField = (text) => { const index = text.indexOf('：'); return { label: text.slice(0,index), value: text.slice(index + 1) }; };
-const riskClass = (text) => text.startsWith('【重大风险】') || text.startsWith('重大风险 ·') ? 'report-risk-high' : text.startsWith('【一般风险】') || text.startsWith('一般风险 ·') ? 'report-risk-medium' : text.startsWith('【优化建议】') || text.startsWith('优化建议 ·') ? 'report-risk-low' : text.startsWith('【有利条款】') || text.startsWith('有利条款 ·') ? 'report-risk-favorable' : '';
+const riskClass = (text) => text.startsWith('【未满足】') || text.startsWith('【重大风险】') || text.startsWith('重大风险 ·') ? 'report-risk-high' : text.startsWith('【待确认】') || text.startsWith('【一般风险】') || text.startsWith('一般风险 ·') ? 'report-risk-medium' : text.startsWith('【优化建议】') || text.startsWith('优化建议 ·') ? 'report-risk-low' : text.startsWith('【符合】') || text.startsWith('【有利条款】') || text.startsWith('有利条款 ·') ? 'report-risk-favorable' : '';
 let previousTitle = null, printingTitle = '';
 const preparePrintTitle = () => {
   if (!props.context.showReportModal.value) return;

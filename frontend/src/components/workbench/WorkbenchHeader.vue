@@ -1,5 +1,7 @@
 <script>
+import ChevronIcon from "../ChevronIcon.vue";
 export default {
+  components: { ChevronIcon },
   props: { context: { type: Object, required: true } },
   setup: (props) => props.context,
 };
@@ -31,7 +33,7 @@ export default {
       <button @click="openEditor" :disabled="documentSaving || workspace.historical || workspace.loading || revisionBusy" class="wb-edit-action">编辑正文</button>
       <button @click="showReportModal = true" :disabled="!reviewResult" class="wb-report-action">审查意见书</button>
       <details class="wb-menu">
-        <summary>审查设置 ▾</summary>
+        <summary>审查设置 <ChevronIcon /></summary>
         <div class="wb-popover">
           <section>
             <h3>本次审查立场</h3>
@@ -177,7 +179,7 @@ export default {
         {{ workspace.saving ? "保存中…" : "保存" }}
       </button>
       <details class="wb-menu wb-export-menu">
-        <summary class="wb-export-action">导出 ▾</summary>
+        <summary class="wb-export-action">导出 <ChevronIcon /></summary>
         <div class="wb-popover">
           <p class="text-xs text-slate-500 p-2">{{ contractTitle }} · {{ workspace.run ? '第 ' + workspace.run.number + ' 次审查' : '待审正文' }}</p>
           <button @click="workspace.exportDocument(true)" :disabled="documentSaving || workspace.loading">待审正文</button>

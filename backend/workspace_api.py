@@ -658,13 +658,39 @@ def export_run(run_id: str, scope: str = 'current'):
 
 
 def report_document(run, scope='report'):
+    from docx.shared import RGBColor
     document = word_document('合同审查意见书', '\n'.join([
         '合同名称：' + run['input']['title'], '审查版本：第 ' + str(run['number']) + ' 次',
         '合同类型：' + run['input']['type'], '我方立场：' + run['input']['role'], '审查尺度：' + run['input']['scale'],
         '审查时间：' + display_time(run.get('completed_at', run['created_at'])),
-        '导出范围：' + ('仅已采纳意见' if scope == 'applied_report' else '全部审查意见'),
-        run['result']['summary']['verdict'], run['result'].get('coverage', '')
+        '导出范围：' + ('仅已采纳意见' if scope == 'applied_report' else '全部审查意见')
     ]))
+    priority_findings = run['result'].get('requirement_findings') or [{**item, 'text':item['requirement'], 'source':'历史清单核验记录'} for item in run['result'].get('checklist_findings', [])]
+    document.add_heading('重点要求核验（本轮原文）', level=1)
+    if not priority_findings:
+        document.add_paragraph('本轮未设置专项要求或历史版本未记录重点核验结果。')
+    else:
+        names = {'pass':'符合', 'fail':'未满足', 'needs_review':'待确认', 'not_applicable':'不适用'}
+        rank = {'fail':0, 'needs_review':1, 'pass':2, 'not_applicable':3}
+        for item in sorted(priority_findings, key=lambda value: rank.get(value['status'], 1)):
+            paragraph = document.add_paragraph()
+            title = paragraph.add_run(f"【{names.get(item['status'], '待确认')}】{item['text']}")
+            title.bold = True
+            title.font.color.rgb = RGBColor.from_string({'fail':'B91C1C','needs_review':'9A3412','pass':'047857'}.get(item['status'],'334155'))
+            document.add_paragraph('要求来源：' + item.get('source', '用户要求'))
+            document.add_paragraph('核验结论：' + item['explanation'])
+            if item.get('evidence'):
+                document.add_paragraph('原文证据：' + item['evidence'])
+            if item.get('conflict_with'):
+                document.add_paragraph('冲突要求：' + '、'.join(item['conflict_with']))
+    document.add_paragraph('以上针对本轮原文；全部建议稿及当前采纳稿核验结果分别列示，不代表原文已满足。')
+    document.add_heading('审查依据', level=1)
+    document.add_paragraph('交易背景：' + (run['input'].get('background') or '未填写'))
+    for ref in run['input'].get('references') or []:
+        document.add_paragraph(('公司制度：' if ref.get('kind') == 'policy' else '参考资料：') + ref['name'])
+    document.add_heading('全文审查结论', level=1)
+    document.add_paragraph(run['result']['summary']['verdict'])
+    document.add_paragraph(run['result'].get('coverage', ''))
     severity_levels = {
         'critical': ('重大风险', '可能严重影响合同效力、核心权益或造成重大损失，建议签署前优先解决。', 'B91C1C'),
         'high': ('重大风险', '可能严重影响合同效力、核心权益或造成重大损失，建议签署前优先解决。', 'B91C1C'),
@@ -700,14 +726,13 @@ def report_document(run, scope='report'):
             for value in values:
                 document.add_paragraph(str(value))
     document.add_paragraph('输入快照校验值：' + run['result'].get('input_digest', '历史记录未生成'))
-    document.add_paragraph('交易背景：' + (run['input'].get('background') or '未填写'))
     document.add_paragraph('准入检查：' + run['result'].get('admission', {}).get('reason', '历史记录未执行'))
     metadata = run['result'].get('review_metadata', {})
     document.add_paragraph('模型来源：' + (metadata.get('model_name') or '未记录或未使用模型'))
     for ref in run['input'].get('references') or []:
         document.add_paragraph('参考资料：' + ref['name'] + '；内容校验值：' + snapshot_digest(ref))
     status_names = {'pass': '符合', 'fail': '不符合', 'needs_review': '待确认', 'not_applicable': '不适用'}
-    for key, title in [('requirement_findings', '原文要求核验'), ('proposed_requirement_findings', '全部建议稿要求核验（不等于当前采纳稿）')]:
+    for key, title in [('proposed_requirement_findings', '全部建议稿要求核验（不等于当前采纳稿）')]:
         findings = run['result'].get(key) or []
         if findings:
             document.add_heading(title, level=1)

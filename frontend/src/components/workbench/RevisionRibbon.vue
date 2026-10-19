@@ -1,5 +1,7 @@
 <script>
+import ChevronIcon from "../ChevronIcon.vue";
 export default {
+  components: { ChevronIcon },
   props: { context: { type: Object, required: true } },
   setup: (props) => props.context,
 };
@@ -23,7 +25,7 @@ export default {
         {{ mode.name }}
       </button>
       <details class="wb-menu">
-        <summary aria-label="更多文档视图">⌄</summary>
+        <summary aria-label="更多文档视图"><ChevronIcon /></summary>
         <div class="wb-popover">
           <button
             role="tab"
