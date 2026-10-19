@@ -1,6 +1,5 @@
-import asyncio
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from io import BytesIO, StringIO
 import csv
 from pathlib import Path
@@ -12,16 +11,15 @@ from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 from fastapi.responses import Response
 
 from .store import repository as repo, now
-from .revisions import revised_text
+from .revisions import revised_text, editable_run
 from .revision_api import create_revision_router
 from .ui import PORTAL_PAGES
 from .workspace_models import (TaskInput, ChecklistInput, CategoryInput, RunRequest, HandlingInput, ArchiveInput,
-                               FollowupInput)
+                               FollowupInput, VerifyCurrentInput, CompleteInput, ManualIssueInput, StartReviewInput)
 from .workspace_review import review_events, model_json
-from .graph import ModelCallError
-from .review_progress import observable_events
+from . import review_jobs
 from .word_export import contract_document
-from .review_policy import AdmissionError, snapshot_digest
+from .review_policy import AdmissionError, snapshot_digest, requirements_for, verify_requirements
 from .workspace_models import ReferenceMaterial, ReviewRequirement
 from .models import ModelConfig
 
@@ -201,8 +199,16 @@ def task_data(request, existing=None):
 
 
 @router.get('/api/tasks')
-def list_tasks():
-    return {'items': repo.summaries('task')}
+def list_tasks(page: int = Query(1, ge=1), page_size: int = Query(10, ge=1, le=100),
+               q: str = Query('', max_length=200), mode: str | None = None, status: str | None = None,
+               archived: bool | None = None, from_date: date | None = None, to_date: date | None = None):
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(422, '开始日期不能晚于结束日期')
+    def stamp(day):
+        return datetime.combine(day, datetime.min.time(), timezone(timedelta(hours=8))).astimezone(timezone.utc).isoformat()
+    return repo.task_page(page, page_size, q, mode, status, archived,
+                          stamp(from_date) if from_date else None,
+                          stamp(to_date + timedelta(days=1)) if to_date else None)
 
 
 @router.get('/api/reports/reviews')
@@ -241,8 +247,9 @@ def create_task(request: TaskInput):
 def get_task(task_id: str):
     task = repo.get(task_id, 'task')
     task['source_matches'] = bool(task.get('source_id')) and repo.get(task['source_id'], 'source')['text'] == task['text']
-    task['runs'] = [{key: run.get(key) for key in ('id', 'number', 'status', 'created_at', 'error')} for run in repo.list('run', task_id)]
-    task['run'] = repo.get(task['active_run'], 'run') if task.get('active_run') else None
+    task['runs'] = [{key: run.get(key) for key in ('id', 'number', 'status', 'created_at', 'error', 'baseline_kind', 'parent_run_id')} for run in repo.list('run', task_id)]
+    task['running_run'] = next((r['id'] for r in task['runs'] if r['status'] == 'running'), None)
+    task['run'] = run_view(repo.get(task['active_run'], 'run')) if task.get('active_run') else None
     return task
 
 
@@ -267,50 +274,69 @@ def archive_task(task_id: str, request: ArchiveInput):
 
 
 @router.post('/api/tasks/{task_id}/review/stream')
-async def start_review(task_id: str, request: RunRequest):
-    run = repo.start_run(task_id)
-    async def stream():
-        finished = False
-        progress = []
-        trace = []
-        try:
-            yield 'event: init\ndata: ' + json.dumps({'run_id': run['id'], 'number': run['number']}) + '\n\n'
-            async for kind, data in observable_events(review_events, run['input'], request.model_config_data.model_dump()):
-                if kind == 'progress':
-                    trace.append(data)
-                    repo.update(run['id'], {'audit_trace': trace})
-                if kind == 'node_update':
-                    progress.append(data['log'])
-                    trace.append({'stage':data['node'], 'detail':data['log']['detail'], 'time':now()})
-                    repo.update(run['id'], {'progress_log': progress, 'last_node': data['node'], 'audit_trace':trace})
-                if kind == 'complete':
-                    data['audit_trace'] = trace
-                    repo.update(run['id'], {'status': 'completed', 'result': data, 'completed_at': now()})
-                    repo.update(task_id, {'status': 'pending_review', 'active_run': run['id'], 'error': None})
-                    data = {'success': True, 'data': data, 'run_id': run['id'], 'number': run['number']}
-                    finished = True
-                yield 'event: ' + kind + '\ndata: ' + json.dumps(data, ensure_ascii=False) + '\n\n'
-        except asyncio.CancelledError:
-            raise
-        except Exception as error:
-            message = str(error) if isinstance(error, (ModelCallError, TimeoutError)) else '审查执行失败，请检查模型连接后重试'
-            failure = {'stage':'failed', 'detail':message, 'time':now()}
-            trace.append(failure)
-            repo.update(run['id'], {'status': 'failed', 'error': message, 'audit_trace':trace,
-                                   **({'admission': error.decision} if isinstance(error, AdmissionError) else {})})
-            repo.update(task_id, {'status': 'failed', 'error': '审查执行失败，上次完成的结果已保留'})
-            yield 'event: progress\ndata: ' + json.dumps(failure, ensure_ascii=False) + '\n\n'
-            yield 'event: error\ndata: ' + json.dumps({'error': message + '；上次完成的结果已保留'}, ensure_ascii=False) + '\n\n'
-        finally:
-            if not finished and repo.get(run['id'], 'run')['status'] == 'running':
-                repo.update(run['id'], {'status': 'interrupted', 'error': '审查连接已中断'})
-                repo.update(task_id, {'status': 'interrupted', 'error': '审查连接已中断，上次结果已保留'})
-    return StreamingResponse(stream(), media_type='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+async def start_review(task_id: str, request: StartReviewInput):
+    baseline_data = None
+    if request.baseline == 'accepted':
+        from .word_export import SOURCES
+        task = repo.get(task_id, 'task')
+        if request.task_revision is None or request.run_revision is None or not task.get('active_run'):
+            raise HTTPException(422, '请提供当前任务与审查版本，才能审查已采纳修订稿')
+        previous = editable_run(repo, task['active_run'], request.run_revision)
+        text = revised_text(previous)
+        document, layout = contract_document(previous, text, repo, word_document)
+        if layout == 'reconstructed':
+            from .word_export import paragraphs, visible_paragraph_text
+            values = paragraphs(document)
+            if values and '\n'.join(visible_paragraph_text(p._p) for p in values) == task['title'] + '\n' + text:
+                values[0]._p.getparent().remove(values[0]._p)
+        source = repo.create('source', {'extension': '.docx', 'text': text, 'name': task['title'] + '-采纳稿.docx'})
+        SOURCES.mkdir(parents=True, exist_ok=True)
+        output = BytesIO(); document.save(output)
+        (SOURCES / (source['id'] + '.docx')).write_bytes(output.getvalue())
+        baseline_data = {'text': text, 'source_id': source['id']}
+    run = repo.start_run(task_id, request.baseline, baseline_data, request.task_revision, request.run_revision)
+    review_jobs.launch(repo, run, request.model_config_data.model_dump(), review_events)
+    return StreamingResponse(review_jobs.subscribe(repo, run['id']), media_type='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+
+@router.get('/api/runs/{run_id}/stream')
+async def resume_review(run_id: str):
+    repo.get(run_id, 'run')
+    return StreamingResponse(review_jobs.subscribe(repo, run_id), media_type='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+
+@router.post('/api/runs/{run_id}/cancel')
+async def cancel_review(run_id: str):
+    run = repo.get(run_id, 'run')
+    await review_jobs.cancel(repo, run_id)
+    return repo.get(run_id, 'run')
 
 
 @router.get('/api/runs/{run_id}')
 def get_run(run_id: str):
-    return repo.get(run_id, 'run')
+    return run_view(repo.get(run_id, 'run'))
+
+
+@router.get('/api/tasks/{task_id}/comparison')
+def compare_task_versions(task_id: str, before_run: str | None = None, after_run: str | None = None):
+    task = repo.get(task_id, 'task')
+    identifier = after_run or task.get('active_run')
+    if not identifier:
+        raise HTTPException(409, '此任务尚无审查结果')
+    after = repo.get(identifier, 'run')
+    before = repo.get(before_run, 'run') if before_run else after
+    if any(run['task_id'] != task_id for run in (before, after)):
+        raise HTTPException(422, '只能对比同一任务的历史版本')
+    if before['status'] != 'completed' or after['status'] != 'completed':
+        raise HTTPException(409, '请选择已完成的审查版本')
+    original = before['input']['text']
+    revised = after['input']['text'] if before_run else revised_text(after)
+    diff = compare_documents(DocumentComparison(original=original, revised=revised))
+    return {'title': task['title'], 'before_run': before['id'], 'after_run': after['id'],
+            'before_number': before['number'], 'after_number': after['number'],
+            'kind': 'versions' if before_run else 'accepted', 'original': original, 'revised': revised,
+            'changes': [{**change, 'original': '\n'.join(original.split('\n')[change['original_start']:change['original_end']]),
+                         'revised': '\n'.join(revised.split('\n')[change['revised_start']:change['revised_end']])} for change in diff['changes']]}
 
 
 @router.get('/api/runs/{run_id}/audit')
@@ -323,8 +349,12 @@ def export_audit(run_id: str):
 @router.put('/api/runs/{run_id}/handling')
 def save_handling(run_id: str, request: HandlingInput):
     run = repo.get(run_id, 'run')
-    if run['status'] != 'completed':
-        raise HTTPException(409, '只能处理已完成的结果')
+    task = repo.get(run['task_id'], 'task')
+    if run['status'] != 'completed' or task.get('active_run') != run_id or task['status'] == 'running':
+        raise HTTPException(409, '只能处理当前已完成的审查结果，历史版本只读')
+    # Decisions/notes still describe this fixed review input even when a new draft is being edited.
+    if run['revision'] != request.revision:
+        raise HTTPException(409, '记录已在其他页面修改，请重新打开后再保存')
     identifiers = {issue['id'] for issue in run['result']['issues']}
     if len(set(request.applied)) != len(request.applied) or not (set(request.applied) | set(request.decisions) | set(request.comments)).issubset(identifiers):
         raise HTTPException(422, '处理条目不属于此审查版本')
@@ -341,18 +371,87 @@ def save_handling(run_id: str, request: HandlingInput):
     task = repo.get(run['task_id'], 'task')
     if task.get('active_run') == run_id and task['status'] == 'completed':
         repo.update(task['id'], {'status': 'pending_review'})
-    return result
+    return run_view(result)
+
+
+def run_view(run):
+    if run.get('current_verification'):
+        run['current_verification_valid'] = run['current_verification'].get('digest') == current_digest(run)
+    return run
+
+
+def current_digest(run):
+    return snapshot_digest({'text': revised_text(run), 'requirements': requirements_for(run['input'])})
+
+
+@router.post('/api/runs/{run_id}/verify-current')
+async def verify_current(run_id: str, request: VerifyCurrentInput):
+    run = editable_run(repo, run_id, request.revision)
+    findings = await verify_requirements(run['input'], requirements_for(run['input']),
+                                        request.model_config_data.model_dump(), model_json, text=revised_text(run))
+    # Recheck task and run after the model call: do not attach results to changed inputs.
+    editable_run(repo, run_id, request.revision)
+    verification = {'digest': current_digest(run), 'findings': findings, 'verified_at': now()}
+    saved = repo.update(run_id, {'current_verification': verification, 'completion_confirmations': {}}, request.revision)
+    task = repo.get(run['task_id'], 'task')
+    if task['status'] == 'completed':
+        repo.update(task['id'], {'status': 'pending_review'}, task['revision'])
+    return run_view(saved)
+
+
+@router.post('/api/runs/{run_id}/issues')
+def add_manual_issue(run_id: str, request: ManualIssueInput):
+    from uuid import uuid4
+    from copy import deepcopy
+    run = editable_run(repo, run_id, request.revision)
+    if not request.title.strip() or not request.analysis.strip():
+        raise HTTPException(422, '意见标题和风险说明不能为空')
+    if request.evidence and run['input']['text'].count(request.evidence) != 1:
+        raise HTTPException(422, '原文证据必须能在合同中唯一定位')
+    result = deepcopy(run['result'])
+    issue = {'id': 'manual_' + uuid4().hex, 'clause_title': '人工补充', 'segment_id': None,
+             'issue_title': request.title.strip(), 'severity': request.severity, 'category': '人工审查',
+             'legal_basis': '人工补充意见', 'risk_analysis': request.analysis.strip(),
+             'negotiation_strategy': request.suggestion, 'evidence': request.evidence, 'source': 'manual', 'redline': None}
+    if request.suggestion.strip():
+        issue['redline'] = {'original_text': request.evidence, 'suggested_text': request.suggestion,
+                           'change_type': 'replace' if request.evidence else 'insert', 'diff_explanation': '人工补充修订'}
+    result['issues'].append(issue)
+    if issue['redline']:
+        for finding in result.get('proposed_requirement_findings', []):
+            finding.update(status='needs_review', evidence='', explanation='新增人工修订后，全部建议稿核验已失效。')
+    saved = repo.update(run_id, {'result': result}, request.revision)
+    task = repo.get(run['task_id'], 'task')
+    if task['status'] == 'completed':
+        repo.update(task['id'], {'status': 'pending_review'}, task['revision'])
+    return run_view(saved)
 
 
 @router.post('/api/tasks/{task_id}/complete')
-def complete_task(task_id: str, request: ArchiveInput):
+def complete_task(task_id: str, request: CompleteInput):
     task = repo.get(task_id, 'task')
     if not task.get('active_run') or task['status'] != 'pending_review':
         raise HTTPException(409, '请先完成审查并复核结果')
     run = repo.get(task['active_run'], 'run')
+    editable_run(repo, run['id'], run['revision'])
     if any(run['decisions'].get(issue['id'], 'pending') in ('pending', 'needs_review') for issue in run['result']['issues']):
         raise HTTPException(409, '还有待处理或待复核条目')
-    return repo.update(task_id, {'status': 'completed'}, request.revision)
+    requirements = requirements_for(run['input'])
+    verification = run.get('current_verification') or {}
+    if requirements:
+        if verification.get('digest') != current_digest(run):
+            raise HTTPException(409, '请先核验当前采纳稿；原文及全部建议稿核验不能替代当前稿核验')
+        findings = verification.get('findings', [])
+        if len(findings) != len(requirements) or {f['id'] for f in findings} != {r['id'] for r in requirements}:
+            raise HTTPException(409, '当前稿要求核验不完整，请重新核验')
+        if any(f.get('conflict_with') for f in findings):
+            raise HTTPException(409, '要求存在冲突，请修改审查条件并重新审查')
+        pending = [f for f in findings if f['status'] not in ('pass', 'not_applicable')]
+        if any(not 5 <= len(request.confirmations.get(f['id'], '').strip()) <= 3000 for f in pending):
+            raise HTTPException(409, '未满足或待确认的要求必须逐项填写人工确认理由（5至3000字）')
+    if task['revision'] != request.revision:
+        raise HTTPException(409, '记录已被修改，请刷新后重试')
+    return repo.complete_review(task_id, request.revision, run['id'], run['revision'], request.confirmations)
 
 
 @router.get('/api/categories')
@@ -442,7 +541,8 @@ def archive_checklist(identifier: str, request: ArchiveInput):
 
 @router.post('/api/runs/{run_id}/followup')
 async def followup(run_id: str, request: FollowupInput):
-    run = repo.get(run_id, 'run')
+    current = repo.get(run_id, 'run')
+    run = editable_run(repo, run_id, current['revision'])
     if run['status'] != 'completed':
         raise HTTPException(409, '结果尚未完成')
     issue = next((i for i in run['result']['issues'] if i['id'] == request.issue_id), None)
@@ -459,10 +559,10 @@ async def followup(run_id: str, request: FollowupInput):
             raise ValueError('无效回答')
     except Exception:
         raise HTTPException(502, '追问失败，请检查模型配置。合同和原意见未改变。')
-    latest = repo.get(run_id, 'run')
+    latest = editable_run(repo, run_id, run['revision'])
     history = latest['followups']
     history.setdefault(request.issue_id, []).append({'question': request.question, **data, 'created_at': now()})
-    return repo.update(run_id, {'followups': history}, latest['revision'])
+    return run_view(repo.update(run_id, {'followups': history}, latest['revision']))
 
 
 def word_document(title, text):
@@ -554,13 +654,51 @@ def export_run(run_id: str, scope: str = 'current'):
         text = revised_text(run, ids)
         document, layout = contract_document(run, text, repo, word_document, tracked=scope in ('tracked', 'all'))
         return download_docx(document, run['input']['title'] + ('-当前修订稿' if scope in ('current', 'tracked') else '-全部建议稿'), layout)
+    return download_docx(report_document(run, scope), run['input']['title'] + '-审查意见书')
+
+
+def report_document(run, scope='report'):
     document = word_document('合同审查意见书', '\n'.join([
         '合同名称：' + run['input']['title'], '审查版本：第 ' + str(run['number']) + ' 次',
-        '我方立场：' + run['input']['role'], '审查尺度：' + run['input']['scale'],
+        '合同类型：' + run['input']['type'], '我方立场：' + run['input']['role'], '审查尺度：' + run['input']['scale'],
         '审查时间：' + display_time(run.get('completed_at', run['created_at'])),
         '导出范围：' + ('仅已采纳意见' if scope == 'applied_report' else '全部审查意见'),
         run['result']['summary']['verdict'], run['result'].get('coverage', '')
     ]))
+    severity_levels = {
+        'critical': ('重大风险', '可能严重影响合同效力、核心权益或造成重大损失，建议签署前优先解决。', 'B91C1C'),
+        'high': ('重大风险', '可能严重影响合同效力、核心权益或造成重大损失，建议签署前优先解决。', 'B91C1C'),
+        'medium': ('一般风险', '存在履约、责任或争议风险，建议协商修改并明确处理安排。', '9A3412'),
+        'warning': ('一般风险', '存在履约、责任或争议风险，建议协商修改并明确处理安排。', '9A3412'),
+        'low': ('优化建议', '主要涉及表述清晰度、条款完整性与执行便利性，可结合交易情况完善。', '1D4ED8'),
+        'info': ('优化建议', '主要涉及表述清晰度、条款完整性与执行便利性，可结合交易情况完善。', '1D4ED8'),
+        'favorable': ('有利条款', '对我方权益具有保护作用，建议在协商中保留。', '047857'),
+    }
+    from docx.shared import RGBColor
+    document.add_heading('风险等级说明', level=1)
+    selected_issues = [issue for issue in run['result']['issues'] if scope != 'applied_report' or issue['id'] in run['applied']]
+    for key in ('high', 'medium', 'low', 'favorable'):
+        label, explanation, color = severity_levels[key]
+        count = sum(severity_levels.get(issue.get('severity'), ('待确认', '', '334155'))[0] == label for issue in selected_issues)
+        paragraph = document.add_paragraph()
+        badge = paragraph.add_run(f'{label} · {count} 项  ')
+        badge.bold = True
+        badge.font.color.rgb = RGBColor.from_string(color)
+        paragraph.add_run(explanation)
+    document.add_paragraph('等级按本次导出范围统计；风险等级反映潜在影响，不代表意见已处理或合同已合规。')
+    tax = run['result'].get('tax_settlement') or run['result'].get('summary', {}).get('tax_settlement')
+    if tax:
+        document.add_heading('财税与结算检查', level=1)
+        for field, label in [('vat_amount_detail', '价税拆分'), ('vat_rate', '税率'), ('vat_rate_evaluation', '税率评价'),
+                             ('invoice_detail', '发票'), ('settlement_method', '结算方式'), ('settlement_condition_analysis', '结算条件')]:
+            if tax.get(field):
+                document.add_paragraph(label + '：' + str(tax[field]))
+    for field, title in [('key_dealbreakers', '关键否决项'), ('action_advice', '签署前处理建议')]:
+        values = run['result'].get('summary', {}).get(field) or []
+        if values:
+            document.add_heading(title, level=1)
+            for value in values:
+                document.add_paragraph(str(value))
     document.add_paragraph('输入快照校验值：' + run['result'].get('input_digest', '历史记录未生成'))
     document.add_paragraph('交易背景：' + (run['input'].get('background') or '未填写'))
     document.add_paragraph('准入检查：' + run['result'].get('admission', {}).get('reason', '历史记录未执行'))
@@ -580,10 +718,27 @@ def export_run(run_id: str, scope: str = 'current'):
                 document.add_paragraph('原文证据：' + finding['evidence'])
             if finding.get('conflict_with'):
                 document.add_paragraph('冲突要求：' + '、'.join(finding['conflict_with']))
-    for issue in issues:
+    verification = run.get('current_verification') or {}
+    document.add_heading('当前采纳稿要求核验', level=1)
+    valid = verification.get('digest') == current_digest(run)
+    document.add_paragraph('核验时间：' + verification.get('verified_at', '未核验') + ('；当前有效' if valid else '；未核验或已失效'))
+    if valid:
+        for finding in verification.get('findings', []):
+            document.add_paragraph(status_names.get(finding['status'], '待确认') + '：' + finding['text'])
+            document.add_paragraph(finding.get('explanation', ''))
+            if finding.get('evidence'):
+                document.add_paragraph('原文证据：' + finding['evidence'])
+            reason = run.get('completion_confirmations', {}).get(finding['id'])
+            if reason:
+                document.add_paragraph('人工确认理由：' + reason)
+    for issue in run['result']['issues']:
         if scope == 'applied_report' and issue['id'] not in run['applied']:
             continue
-        document.add_heading(issue['issue_title'], level=2)
+        label, explanation, color = severity_levels.get(issue.get('severity'), ('待确认', '风险程度尚未确定，需人工判断。', '334155'))
+        heading = document.add_heading('【' + label + '】' + issue['issue_title'], level=2)
+        for text_run in heading.runs:
+            text_run.font.color.rgb = RGBColor.from_string(color)
+        document.add_paragraph('严重程度：' + label + '；' + explanation)
         handling_name = {'pending': '待处理', 'applied': '已采纳', 'rejected': '不采纳', 'needs_review': '待复核'}
         for label, value in [('处理状态', handling_name[run['decisions'].get(issue['id'], 'pending')]), ('风险说明', issue['risk_analysis']),
                              ('依据', issue['legal_basis']), ('谈判建议', issue['negotiation_strategy']), ('备注', run['comments'].get(issue['id'], ''))]:
@@ -597,7 +752,18 @@ def export_run(run_id: str, scope: str = 'current'):
             original_paragraph.paragraph_format.keep_together = True
             original_paragraph.paragraph_format.keep_with_next = True
             document.add_paragraph('建议：' + issue['redline']['suggested_text']).paragraph_format.keep_together = True
-    return download_docx(document, run['input']['title'] + '-审查意见书')
+    return document
+
+
+@router.get('/api/runs/{run_id}/report-content')
+def report_content(run_id: str, scope: str = 'report'):
+    if scope not in ('report', 'applied_report'):
+        raise HTTPException(422, '无效意见书范围')
+    run = repo.get(run_id, 'run')
+    if run['status'] != 'completed':
+        raise HTTPException(409, '审查尚未完成')
+    document = report_document(run, scope)
+    return {'number': run['number'], 'paragraphs': [{'text': p.text, 'heading': p.style.name.startswith('Heading')} for p in document.paragraphs if p.text]}
 
 
 def portal_page(request: Request):

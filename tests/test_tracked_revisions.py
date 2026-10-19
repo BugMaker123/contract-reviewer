@@ -231,9 +231,10 @@ def test_word_style_revision_browser(revision_client, monkeypatch):
             page.locator('#card-liability').get_by_role('button', name='拒绝', exact=True).click()
             expect(preview.locator('article')).to_contain_text('另行协商')
             expect(preview.locator('article')).not_to_contain_text('累计违约赔偿')
+            page.locator('.wb-export-menu > summary').click()
             with page.expect_download() as download:
-                page.get_by_role('button', name='导出', exact=True).click()
-            assert download.value.suggested_filename.endswith('-修订稿.docx')
+                page.get_by_role('button', name='当前采纳稿（修订痕迹）', exact=True).click()
+            assert download.value.suggested_filename.endswith('-当前修订稿.docx')
             payment.get_by_role('button', name='采纳', exact=True).click()
             expect(payment.get_by_text('处理状态：已采纳', exact=True)).to_be_visible()
             expect(preview.locator('article ins')).to_have_count(0)

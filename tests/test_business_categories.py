@@ -48,6 +48,7 @@ def test_category_and_checklist_browser(isolated_workspace):
             checklist = page.request.post(base + '/api/checklists', data={'name': '技术审查标准', 'category_id': category['id'], 'published': True, 'items': [{'id': str(i), 'title': title, 'requirement': '检查合同约定是否完整', 'severity': 'critical'} for i, title in enumerate(['付款与验收条件', '违约责任上限'])]}).json()
             page.goto(base + '/?checklist=' + checklist['id'])
             expect(page.get_by_text('已勾选 2 项', exact=True)).to_be_visible()
+            page.locator('.checklist-selection-summary').click()
             page.get_by_role('button', name='取消全选', exact=True).click()
             expect(page.get_by_text('已勾选 0 项', exact=True)).to_be_visible()
             expect(page.get_by_role('button', name='进入工作台核对合同')).to_be_disabled()

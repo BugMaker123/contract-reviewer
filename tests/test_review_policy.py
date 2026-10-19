@@ -125,7 +125,7 @@ def test_policy_upload_confirmation_and_snapshot_in_browser(monkeypatch):
         page.get_by_role('button', name='✍️ 粘贴正文', exact=True).click()
         page.get_by_label('合同正文', exact=True).fill(TEXT)
         page.get_by_placeholder('填写便于识别的合同名称').fill('公司制度浏览器核验')
-        page.get_by_text('补充交易背景、重点要求与资料', exact=True).click()
+        page.get_by_text('补充交易背景与参考资料', exact=True).click()
         page.locator('details input[type=file][accept=".docx,.pdf,.txt"]').set_input_files({'name': '制度.txt', 'mimeType': 'text/plain', 'buffer': '付款期限不超过30日'.encode()})
         page.get_by_label('资料用途').select_option('policy')
         page.get_by_role('button', name='手动录入要求', exact=True).click()

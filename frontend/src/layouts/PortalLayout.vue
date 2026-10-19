@@ -1,5 +1,5 @@
 <script>
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { usePortalShell } from "../stores/portal.js";
 import ModelSettings from "../components/portal/ModelSettings.vue";
@@ -10,7 +10,11 @@ export default {
   setup() {
     const shell = usePortalShell();
     const route = useRoute();
-    return { ...shell, shell, page: computed(() => route.meta.page) };
+    const recentError = ref('');
+    const refreshRecent = async () => { try { await shell.loadRecords(); recentError.value = ''; } catch { recentError.value = '最近工作读取失败'; } };
+    watch(() => route.path, refreshRecent, {immediate:true});
+    const recentAction = status => ({completed:'查看审核结果',pending_review:'继续复核',running:'查看审查进度',draft:'继续审查',failed:'重新处理',interrupted:'恢复处理'})[status] || '打开任务';
+    return { ...shell, shell, recentAction, recentError, refreshRecent, page: computed(() => route.meta.page) };
   },
 };
 </script>
@@ -51,22 +55,16 @@ export default {
             >{{ item.name }}</RouterLink
           >
         </nav>
-        <div class="mt-6 card p-4 bg-slate-50" v-if="recentTasks.length">
+        <section class="mt-6 card p-4 bg-slate-50 recent-work">
           <div class="text-sm font-semibold mb-2 text-slate-700">最近工作</div>
-          <RouterLink
-            :to="'/workbench?task=' + recentTasks[0].id"
-            class="text-sm text-slate-700 break-words leading-relaxed block"
-            >{{ recentTasks[0].title }}</RouterLink
-          >
-          <div class="mt-2 text-xs text-slate-500">
-            {{ statusName(recentTasks[0].status) }}
-          </div>
-          <RouterLink
-            :to="'/workbench?task=' + recentTasks[0].id"
-            class="block mt-3 text-sm font-semibold text-blue-600"
-            >继续处理 →</RouterLink
-          >
-        </div>
+          <p v-if="recentError" class="text-xs text-amber-700">{{ recentError }} <button @click="refreshRecent">重试</button></p>
+          <p v-else-if="!recentTasks.length" class="text-xs text-slate-400">暂无工作记录</p>
+          <article v-for="task in recentTasks" :key="task.id" class="recent-work-item">
+            <RouterLink :to="'/workbench?task=' + task.id" class="text-sm text-slate-700 break-words leading-relaxed block">{{ task.title }}</RouterLink>
+            <div class="mt-2 text-xs text-slate-500">{{ statusName(task.status) }}</div>
+            <RouterLink :to="'/workbench?task=' + task.id" class="block mt-2 text-xs font-semibold text-blue-600">{{ recentAction(task.status) }} →</RouterLink>
+          </article>
+        </section>
         <div
           class="mt-auto pt-6 text-xs text-slate-500 border-t border-slate-100"
         >

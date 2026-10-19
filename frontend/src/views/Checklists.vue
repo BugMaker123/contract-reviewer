@@ -22,91 +22,26 @@ export default {
 </script>
 <template>
   <PageFrame :context="context">
-    <section class="max-w-6xl mx-auto space-y-5">
-      <div class="flex justify-between items-center">
-        <div>
-          <h1 class="text-xl font-bold">企业审查清单</h1>
-          <p class="text-xs text-slate-500 mt-2">
-            维护适用范围与检查要求，发布后用于逐项审查
-          </p>
-        </div>
-        <button @click="editChecklist()" class="button primary">
-          ＋ 创建审查清单
-        </button>
+    <section class="checklists-page">
+      <header class="checklists-heading"><div><h1>企业审查清单</h1><p>保存常用审查要求，下次直接选用。</p></div><button @click="editChecklist()" :disabled="busy || importing" class="button primary">＋ 创建审查清单</button></header>
+      <div class="checklists-list card">
+        <div class="checklists-filters"><input v-model="search" class="field" placeholder="搜索清单或审查要求" aria-label="搜索审查清单" /><select aria-label="筛选业务分类" v-model="categoryFilter" class="field"><option value="">全部业务分类</option><option v-for="row in categories" :key="row.id" :value="row.id">{{ row.name }}</option></select><select v-model="publicationFilter" class="field" aria-label="发布状态"><option value="">全部状态</option><option value="true">可用</option><option value="false">草稿</option></select><label><input type="checkbox" v-model="showArchived" />已归档</label></div>
+        <div class="checklists-table-scroll"><table class="data-table checklists-table"><thead><tr><th>清单名称</th><th>业务分类</th><th>审查要求</th><th>状态</th><th>操作</th></tr></thead><tbody>
+          <tr v-for="list in rows" :key="list.id"><td><strong :title="list.name">{{ list.name }}</strong><p v-if="list.description" :title="list.description">{{ list.description }}</p></td><td>{{ categoryName(list.category_id) }}</td><td>{{ list.item_count }} 条</td><td><span class="pill" :class="list.published && !list.archived ? 'green' : ''">{{ list.archived ? '已归档' : list.published ? '可用' : '草稿' }}</span></td><td><div class="checklists-row-actions"><RouterLink v-if="list.published && !list.archived" :to="'/?checklist=' + list.id" class="checklists-use">使用清单 →</RouterLink><button :disabled="busy || importing" @click="editChecklist(list)">编辑清单</button><button :disabled="busy || importing" @click="viewChecklist(list)">查看</button><button :disabled="busy || importing" @click="archive('checklists',list)" class="is-secondary">{{ list.archived ? '恢复' : '归档' }}</button><button :disabled="busy || importing" @click="requestDelete(list)" class="is-secondary">删除</button></div></td></tr>
+        </tbody></table></div>
+        <div v-if="fetching" class="catalog-loading" role="status">正在查询…</div>
+        <div v-else-if="!rows.length" class="empty">{{ search || categoryFilter || publicationFilter || showArchived ? '没有匹配的清单，请调整筛选条件' : '还没有清单。创建一份，写下你常用的审查要求。' }}</div>
+        <CatalogPagination :context="context" />
       </div>
-      <div class="card p-4 flex gap-3 items-center catalog-filters">
-        <input
-          v-model="search"
-          class="field max-w-xs"
-          placeholder="搜索清单、要点或条款内容"
-        /><select aria-label="筛选业务分类" v-model="categoryFilter" class="field max-w-xs">
-          <option value="">全部业务分类</option>
-          <option v-for="row in categories" :value="row.id">
-            {{ row.name }}
-          </option></select
-        ><select v-model="publicationFilter" class="field max-w-xs" aria-label="发布状态"><option value="">全部发布状态</option><option value="true">已发布</option><option value="false">草稿</option></select><label class="flex items-center gap-2 text-xs text-slate-500"
-          ><input type="checkbox" v-model="showArchived" />已归档</label
-        >
-      </div>
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <article v-for="list in rows" :key="list.id" class="card p-5">
-          <div class="flex justify-between items-start gap-3">
-            <h2 class="font-semibold text-sm">{{ list.name }}</h2>
-            <span class="pill" :class="list.published ? 'green' : ''"
-              >{{ list.published ? "已发布" : "草稿" }} · v{{
-                list.version
-              }}</span
-            >
-          </div>
-          <p class="text-xs text-slate-500 mt-2">
-            {{ categoryName(list.category_id) }} · {{ list.contract_type }} ·
-            {{ list.item_count }} 项检查
-          </p>
-          <p class="text-xs text-slate-500 mt-3 leading-relaxed">
-            {{ list.description || "尚未填写清单说明" }}
-          </p>
-          <div class="flex gap-3 mt-5 pt-4 border-t border-slate-100">
-            <button :disabled="busy" @click="viewChecklist(list)" class="text-xs text-blue-600">查看</button>
-            <button :disabled="busy" @click="editChecklist(list)" class="text-xs text-blue-600">
-              编辑清单</button
-            ><RouterLink
-              v-if="list.published && !list.archived"
-              :to="'/?checklist=' + list.id"
-              class="text-xs text-blue-600"
-              >使用清单审查 →</RouterLink
-            ><button
-              @click="archive('checklists', list)"
-              :disabled="busy"
-              class="ml-auto text-xs text-slate-400"
-            >
-              {{ list.archived ? "恢复" : "归档" }}
-            </button>
-            <button :disabled="busy" @click="requestDelete(list)" class="text-xs text-red-700">删除</button>
-          </div>
-        </article>
-      </div>
-      <div v-if="fetching" class="catalog-loading" role="status">正在查询…</div>
-      <div v-else-if="!rows.length" class="card empty">
-        暂无{{
-          showArchived ? "已归档" : "可用"
-        }}清单，创建或导入你们的企业检查要求
-      </div>
-      <CatalogPagination :context="context" />
     </section>
     <div v-if="detail" class="modal" @keydown.esc="detail = null">
-      <section class="modal-panel max-w-4xl p-6 space-y-4" role="dialog" aria-modal="true" aria-label="清单详情">
-        <div class="flex justify-between gap-3"><h2 class="font-bold">{{ detail.name }}</h2><button @click="detail = null" aria-label="关闭清单详情">✕</button></div>
-        <p class="text-xs text-slate-500">{{ categoryName(detail.category_id) }} · {{ detail.contract_type }} · v{{ detail.version }} · {{ detail.published ? '已发布' : '草稿' }}</p>
-        <p class="text-sm">{{ detail.description || '暂无说明' }}</p>
-        <article v-for="(item, index) in detail.items" :key="item.id" class="card p-4">
-          <h3 class="text-sm font-semibold">{{ index + 1 }}. {{ item.title }} <span class="pill" :class="item.severity === 'critical' ? 'red' : 'amber'">{{ {critical:'高风险',warning:'中风险',info:'低风险'}[item.severity] }}</span></h3>
-          <p class="text-xs mt-3">{{ item.requirement }}</p>
-          <p class="text-xs text-slate-500 mt-2">核验方式：{{ {semantic:'语义核验',contains_all:'包含全部文字',contains_any:'包含任一文字',forbidden:'禁止包含'}[item.operator] }}{{ item.keywords?.length ? ' · ' + item.keywords.join('、') : '' }}</p>
-          <p v-if="item.suggestion" class="text-xs text-slate-500 mt-2">处理建议：{{ item.suggestion }}</p>
-        </article>
+      <section class="modal-panel checklist-detail" role="dialog" aria-modal="true" aria-label="清单详情">
+        <header><div><h2>{{ detail.name }}</h2><p>{{ detail.items.length }} 条要求 · {{ categoryName(detail.category_id) }} · 第 {{ detail.version }} 版</p></div><button @click="detail = null" aria-label="关闭清单详情">关闭</button></header>
+        <p v-if="detail.description" class="checklist-detail-description">{{ detail.description }}</p>
+        <ol class="checklist-detail-items"><li v-for="(item,index) in detail.items" :key="item.id"><span>{{ index + 1 }}</span><div><strong v-if="item.title !== item.requirement && item.title !== item.requirement.slice(0,60)">{{ item.title }}</strong><p>{{ item.requirement }}</p></div></li></ol>
+        <details class="checklist-detail-rules"><summary>查看高级规则配置</summary><p v-for="(item,index) in detail.items" :key="item.id">{{ index + 1 }}. {{ {semantic:'按要求理解并判断',contains_all:'包含全部文字',contains_any:'包含任一文字',forbidden:'禁止包含'}[item.operator] }} · {{ {critical:'重大风险',warning:'一般风险',info:'优化建议'}[item.severity] }}{{ item.keywords?.length ? ' · '+item.keywords.join('、') : '' }}{{ item.suggestion ? ' · 建议：'+item.suggestion : '' }}</p></details>
       </section>
     </div>
-    <CatalogDelete :context="context" />
-    <ChecklistEditor :context="context" />
+    <CatalogDelete :context="context" /><ChecklistEditor :context="context" />
   </PageFrame>
 </template>

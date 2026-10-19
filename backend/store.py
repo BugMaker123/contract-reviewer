@@ -1,5 +1,6 @@
 """Small, durable repository. Each review input is an immutable snapshot."""
 import json
+import hashlib
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -134,6 +135,33 @@ class Repository:
         with self.connect() as db:
             return [dict(row) for row in db.execute(query).fetchall()]
 
+    def task_page(self, page=1, page_size=10, search='', mode=None, status=None, archived=None, from_stamp=None, to_stamp=None):
+        clauses, params = ["t.kind='task'"], []
+        updated = "CASE WHEN r.updated > t.updated THEN r.updated ELSE t.updated END"
+        if search.strip():
+            clauses.append("instr(lower(coalesce(json_extract(t.data,'$.title'),'')),lower(?))>0")
+            params.append(search.strip())
+        for field, value in (('mode', mode), ('status', status), ('archived', archived)):
+            if value is not None:
+                clauses.append(f"coalesce(json_extract(t.data,'$.{field}'),0)=?")
+                params.append(int(value) if field == 'archived' else value)
+        for operator, stamp in (('>=', from_stamp), ('<', to_stamp)):
+            if stamp:
+                clauses.append(f'{updated} {operator} ?'); params.append(stamp)
+        source = " FROM objects t LEFT JOIN objects r ON r.id=json_extract(t.data,'$.active_run') WHERE " + ' AND '.join(clauses)
+        projection = f"""t.id,t.revision,t.created AS created_at,{updated} AS updated_at,
+            json_extract(t.data,'$.title') AS title,json_extract(t.data,'$.type') AS type,
+            json_extract(t.data,'$.mode') AS mode,json_extract(t.data,'$.status') AS status,
+            json_extract(t.data,'$.archived') AS archived,json_extract(t.data,'$.active_run') AS active_run,
+            json_extract(r.data,'$.number') AS run_number,json_extract(r.data,'$.status') AS run_status,
+            coalesce(json_array_length(json_extract(r.data,'$.applied')),0) AS applied_count"""
+        with self.connect() as db:
+            total = db.execute('SELECT count(*)' + source, params).fetchone()[0]
+            page = min(page, max(1, (total + page_size - 1) // page_size))
+            rows = db.execute('SELECT ' + projection + source + f' ORDER BY {updated} DESC,t.id LIMIT ? OFFSET ?',
+                              [*params, page_size, (page - 1) * page_size]).fetchall()
+        return {'items': [dict(row) for row in rows], 'total': total, 'page': page, 'page_size': page_size}
+
     def update(self, identifier, changes, expected_revision=None):
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
@@ -148,7 +176,27 @@ class Repository:
                        (json.dumps(data, ensure_ascii=False), now(), identifier))
         return self.get(identifier)
 
-    def start_run(self, task_id):
+    def complete_review(self, task_id, task_revision, run_id, run_revision, confirmations):
+        """Commit confirmation and completion together after validating both versions."""
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            rows = {}
+            for identifier, revision in ((task_id, task_revision), (run_id, run_revision)):
+                row = db.execute('SELECT * FROM objects WHERE id=?', (identifier,)).fetchone()
+                if row is None or row['revision'] != revision:
+                    raise HTTPException(409, '审核期间记录已改变，请刷新后重新确认')
+                rows[identifier] = json.loads(row['data'])
+            task, run = rows[task_id], rows[run_id]
+            if task.get('active_run') != run_id or task['status'] != 'pending_review' or run['status'] != 'completed':
+                raise HTTPException(409, '审查状态已改变，请刷新后重新确认')
+            task['status'] = 'completed'
+            run.update(completion_confirmations=confirmations, confirmed_at=now())
+            for identifier, data in ((task_id, task), (run_id, run)):
+                db.execute('UPDATE objects SET data=?,revision=revision+1,updated=? WHERE id=?',
+                           (json.dumps(data, ensure_ascii=False), now(), identifier))
+        return self.get(task_id, 'task')
+
+    def start_run(self, task_id, baseline_kind='task', baseline_data=None, expected_task_revision=None, expected_run_revision=None):
         """Claim a task and capture its input atomically, preventing parallel starts."""
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
@@ -156,15 +204,26 @@ class Repository:
             if not row:
                 raise HTTPException(404, '任务不存在')
             task = json.loads(row['data'])
+            if expected_task_revision is not None and row['revision'] != expected_task_revision:
+                raise HTTPException(409, '合同或审查条件已改变，请刷新后重新选择稿件')
+            parent_run_id = task.get('active_run')
+            if expected_run_revision is not None:
+                previous = db.execute("SELECT revision,data FROM objects WHERE id=? AND kind='run'", (parent_run_id,)).fetchone()
+                if previous is None or previous['revision'] != expected_run_revision or json.loads(previous['data'])['status'] != 'completed':
+                    raise HTTPException(409, '采纳状态已改变，请刷新后重新选择稿件')
             if task.get('status') == 'running':
                 raise HTTPException(409, '此任务已在审查中')
             if task.get('archived'):
                 raise HTTPException(409, '请先恢复已归档任务')
+            if baseline_data:
+                task.update(baseline_data)
             task['status'] = 'running'
             identifier, stamp = uuid4().hex, now()
             snapshot = {key: task.get(key) for key in ('title', 'type', 'text', 'role', 'mode', 'scale', 'background', 'focus', 'references', 'requirements', 'execution', 'reference_text', 'checklist', 'source_id')}
             count = db.execute("SELECT count(*) FROM objects WHERE kind='run' AND parent=?", (task_id,)).fetchone()[0]
             run = {'task_id': task_id, 'number': count + 1, 'input': snapshot, 'status': 'running',
+                   'parent_run_id': parent_run_id, 'baseline_kind': baseline_kind,
+                   'document_digest': hashlib.sha256(snapshot['text'].encode('utf-8')).hexdigest(),
                    'result': None, 'decisions': {}, 'applied': [], 'comments': {}, 'followups': {}}
             db.execute('INSERT INTO objects(id,kind,parent,data,created,updated) VALUES(?,?,?,?,?,?)',
                        (identifier, 'run', task_id, json.dumps(run, ensure_ascii=False), stamp, stamp))

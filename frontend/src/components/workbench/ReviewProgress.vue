@@ -1,9 +1,28 @@
 <script setup>
-import { computed, unref } from "vue";
+import { computed, unref, ref, watch, onUnmounted } from "vue";
 const props = defineProps({ context: { type: Object, required: true } });
 const value = (key) => unref(props.context[key]);
 const running = computed(() => value("isReviewing"));
 const trace = computed(() => value("reviewTrace") || []);
+const clock = ref(Date.now());
+const startedAt = ref(Date.now());
+let timer;
+watch(running, (active) => {
+  clearInterval(timer);
+  if (active) {
+    const firstTime = Date.parse(trace.value[0]?.time || "");
+    startedAt.value = Number.isFinite(firstTime) ? firstTime : Date.now();
+    clock.value = Date.now();
+    timer = setInterval(() => { clock.value = Date.now(); }, 1000);
+  } else {
+    clock.value = Date.now();
+  }
+}, { immediate: true });
+onUnmounted(() => clearInterval(timer));
+const elapsed = computed(() => {
+  const seconds = Math.max(0, Math.floor((clock.value - startedAt.value) / 1000));
+  return seconds >= 60 ? `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒` : `${seconds} 秒`;
+});
 const steps = [
   "准入与计划",
   "条款提取",
@@ -103,28 +122,10 @@ const severityName = (severity) =>
         </ol>
         <section class="review-process" aria-label="实时处理过程">
           <div class="review-dialog-status" role="status">
-            <i v-if="running"></i
-            ><span>{{
-              running
-                ? value("latestLogMessage") || "正在连接模型服务…"
-                : "审查完成，意见和修订建议已生成。"
-            }}</span>
+            <i v-if="running"></i>
+            <span>{{ running ? '正在处理：' + steps[activeStep] : value('reviewError') ? '本次审查已停止' : '审查完成，意见和修订建议已生成。' }}</span>
+            <time class="review-elapsed" aria-label="累计处理用时">已用时 {{ elapsed }}</time>
           </div>
-          <details class="review-execution" open>
-            <summary>
-              处理记录 <span>{{ trace.length }} 条</span>
-            </summary>
-            <ol data-review-trace aria-live="polite" aria-relevant="additions">
-              <li v-for="(item, index) in trace" :key="index">
-                <time>{{
-                  new Date(item.time).toLocaleTimeString("zh-CN", {
-                    hour12: false,
-                  })
-                }}</time
-                ><span>{{ item.detail }}</span>
-              </li>
-            </ol>
-          </details>
         </section>
         <div class="review-analysis-heading">
           <h4>条款审查意见清单（已识别 {{ items.length }} 项）</h4>
@@ -134,7 +135,7 @@ const severityName = (severity) =>
           <div v-if="running" class="review-waiting-line"></div>
           <h4>{{ running ? "正在分析合同条款" : "本次未识别出审查问题" }}</h4>
           <p v-if="running">
-            处理记录持续更新，收到完整的条款意见后会逐项展示。
+            审查正在进行，完成的条款意见将在下方逐项展示。
           </p>
         </div>
         <div

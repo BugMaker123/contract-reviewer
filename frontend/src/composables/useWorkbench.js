@@ -47,6 +47,7 @@ export function useWorkbench() {
             );
       }),
     );
+  const toggleOpinions = () => { opinionsOpen.value = !opinionsOpen.value; fitDocuments(); };
   const toggleSummary = () => {
     summaryOpen.value = !summaryOpen.value;
     fitDocuments();
@@ -139,7 +140,7 @@ export function useWorkbench() {
     editTitle = ref(""),
     editType = ref("");
   const severityLabel = LexisSession.severityLabel;
-  let controller = null;
+  let controller = null, activeReviewRunId = null;
   const resultStale = computed(
     () =>
       !!reviewResult.value &&
@@ -392,8 +393,14 @@ export function useWorkbench() {
       showToast(error.message);
     }
   };
-  const cancelReview = () => {
-    if (controller) controller.abort();
+  const cancelReview = async () => {
+    const id = activeReviewRunId || workspace.task?.running_run;
+    if (!id) { showToast("正在建立审查连接，请稍后再取消"); return; }
+    try {
+      const response = await fetch(`/api/runs/${id}/cancel`, {method:'POST'});
+      if (!response.ok) throw new Error("取消失败，请重试");
+      controller?.abort();
+    } catch (err) { showToast(err.message); }
   };
   const exportContract = () => {
     if (resultStale.value) {
@@ -671,7 +678,8 @@ export function useWorkbench() {
   };
 
   // 核心审查执行函数：带专业蒙版遮罩、平滑进度流转与彻底去除原生弹窗
-  const startReview = async () => {
+  const startReview = async (resumeId = null, baselineKind = "task") => {
+    if (typeof resumeId !== "string") resumeId = null;
     if (
       !contractText.value.trim() ||
       isReviewing.value ||
@@ -680,12 +688,12 @@ export function useWorkbench() {
     )
       return;
     try {
-      await commitInlineDraft();
-      await workspace.flush();
+      if (!resumeId) { await commitInlineDraft(); await workspace.flush(); }
     } catch (error) {
       showToast(error.message);
       return;
     }
+    activeReviewRunId = resumeId;
     const previousComparison = {
       baseline: { ...reviewBaseline.value },
       enabled: documentCompare.value,
@@ -720,6 +728,9 @@ export function useWorkbench() {
     latestLogMessage.value = "正在解析合同正文…";
 
     const payload = {
+      baseline: baselineKind,
+      task_revision: workspace.task?.revision,
+      run_revision: workspace.run?.revision,
       contract_title: contractTitle.value,
       contract_type: contractType.value,
       party_role: partyRole.value,
@@ -738,11 +749,11 @@ export function useWorkbench() {
 
     try {
       const res = await fetch(
-        "/api/tasks/" + workspace.taskId + "/review/stream",
+        resumeId ? `/api/runs/${resumeId}/stream` : "/api/tasks/" + workspace.taskId + "/review/stream",
         {
-          method: "POST",
+          method: resumeId ? "GET" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: resumeId ? undefined : JSON.stringify(payload),
           signal: controller.signal,
         },
       );
@@ -770,6 +781,16 @@ export function useWorkbench() {
           .join("\n");
         if (!json) return;
         const data = JSON.parse(json);
+        if (event === "init") {
+          activeReviewRunId = data.run_id;
+          if (data.document) {
+            contractText.value = data.document.text;
+            workspace.conditions.source_id = data.document.source_id;
+            payload.contract_text = data.document.text;
+            reviewBaseline.value = {text:data.document.text,sourceId:data.document.source_id};
+            comparisonTexts.original = data.document.text;
+          }
+        }
         if (event === "progress") {
           reviewTrace.value.push(data);
           latestLogMessage.value = data.detail;
@@ -849,7 +870,7 @@ export function useWorkbench() {
       reviewError.value =
         err.name === "AbortError"
           ? "已取消本次审查，可重新开始。"
-          : err.message;
+          : err.message + "；后台任务可能仍在运行，可重新连接查看。";
       latestLogMessage.value = reviewError.value;
       try {
         await workspace.refresh();
@@ -860,21 +881,19 @@ export function useWorkbench() {
     } finally {
       isReviewing.value = false;
       controller = null;
+      activeReviewRunId = null;
       persist();
     }
   };
 
-  const reviewAcceptedDraft = async () => {
-    if (
-      resultStale.value ||
-      workspace.historical ||
-      !appliedIssueIds.value.length
-    )
-      return;
-    contractText.value = finalizedContractText.value;
-    viewMode.value = "raw";
-    await startReview();
+  const showReviewBaseline = ref(false), reviewBaselineChoice = ref('task');
+  const requestReview = () => {
+    if (!workspace.run?.result) return startReview();
+    reviewBaselineChoice.value = !resultStale.value && appliedIssueIds.value.length ? 'accepted' : 'task';
+    showReviewBaseline.value = true;
   };
+  const confirmReviewBaseline = () => { showReviewBaseline.value = false; return startReview(null,reviewBaselineChoice.value); };
+  const reviewAcceptedDraft = () => startReview(null,'accepted');
 
   const highlightInContract = (issue) => {
     if (viewMode.value === "original") {
@@ -1312,10 +1331,7 @@ export function useWorkbench() {
 
   const saveBeforeNavigation = async () => {
     if (!workspace.taskId && !contractText.value.trim()) return true;
-    if (isReviewing.value) {
-      showToast("审查正在进行，请等待完成或先取消审查");
-      return false;
-    }
+    if (isReviewing.value) return true; // The saved snapshot continues in the backend.
     try {
       await commitInlineDraft();
       await workspace.flush();
@@ -1345,12 +1361,14 @@ export function useWorkbench() {
   return {
     summaryOpen,
     toggleSummary,
+    toggleOpinions,
     opinionsOpen,
     documentCompare,
     reviewBaseline,
     revisionScope,
     workspace,
     reviewAcceptedDraft,
+    requestReview, showReviewBaseline, reviewBaselineChoice, confirmReviewBaseline,
     focusedIssueId,
     clauseEdit,
     openClauseEditor,

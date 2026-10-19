@@ -15,14 +15,6 @@ export default {
     "
   >
     <div class="prototype-nav-left">
-      <a
-        href="/records"
-        @click.prevent="workspace.leaveFor('/records')"
-        class="prototype-back"
-        title="返回审查记录"
-        aria-label="返回审查记录"
-        >←</a
-      >
       <h1 :title="contractTitle">{{ contractTitle }}</h1>
       <span class="prototype-status">{{
         isReviewing
@@ -36,6 +28,7 @@ export default {
 
     </div>
     <div class="prototype-nav-right">
+      <button @click="openEditor" :disabled="documentSaving || workspace.historical || workspace.loading || revisionBusy" class="wb-edit-action">编辑正文</button>
       <button @click="showReportModal = true" :disabled="!reviewResult" class="wb-report-action">审查意见书</button>
       <details class="wb-menu">
         <summary>审查设置 ▾</summary>
@@ -123,7 +116,7 @@ export default {
       </details>
 
       <button
-        @click="startReview"
+        @click="requestReview"
         :disabled="
           isReviewing ||
           revisionBusy ||
@@ -132,7 +125,7 @@ export default {
           workspace.task?.status === 'running' ||
           !contractText.trim()
         "
-        class="flex items-center space-x-2 text-sm font-semibold px-5 py-2 rounded-lg transition shadow-sm cursor-pointer"
+        class="wb-review-action flex items-center space-x-2 text-sm font-semibold px-5 py-2 rounded-lg transition shadow-sm cursor-pointer"
         :class="
           isReviewing
             ? 'bg-blue-400 text-white cursor-wait'
@@ -179,25 +172,31 @@ export default {
           workspace.historical ||
           revisionBusy
         "
-        class="px-3 py-2 text-blue-600"
+        class="wb-save-action"
       >
         {{ workspace.saving ? "保存中…" : "保存" }}
       </button>
-      <button
-        @click="
-          reviewReady && revisionMode !== 'compare'
-            ? exportReviewDocument()
-            : exportDocument()
-        "
-        :disabled="documentSaving || workspace.loading || !contractText.trim()"
-        :title="documentCompare ? '导出右侧显示的文档' : '导出当前合同'"
-        class="px-3 py-2 rounded-lg border border-slate-200 text-slate-700"
-      >
-        导出
-      </button>
+      <details class="wb-menu wb-export-menu">
+        <summary class="wb-export-action">导出 ▾</summary>
+        <div class="wb-popover">
+          <p class="text-xs text-slate-500 p-2">{{ contractTitle }} · {{ workspace.run ? '第 ' + workspace.run.number + ' 次审查' : '待审正文' }}</p>
+          <button @click="workspace.exportDocument(true)" :disabled="documentSaving || workspace.loading">待审正文</button>
+          <button v-for="option in [{id:'current',name:'当前采纳稿（清洁版）'},{id:'tracked',name:'当前采纳稿（修订痕迹）'},{id:'all',name:'全部建议稿（未自动采纳）'},{id:'report',name:'全部审查意见书'},{id:'applied_report',name:'已采纳意见书'}]" :key="option.id" :disabled="!workspace.run?.result || resultStale || workspace.saving" @click="workspace.exportScope = option.id; workspace.exportWord()">{{ option.name }}</button>
+          <button :disabled="!workspace.run" @click="workspace.downloadAudit()">JSON 审核记录</button>
+        </div>
+      </details>
 
-      <button @click="openEditor" :disabled="documentSaving || workspace.historical || workspace.loading || revisionBusy">编辑正文</button>
       <button @click="workspace.finish" :disabled="workspace.historical || resultStale || workspace.saving || workspace.task?.status !== 'pending_review'" :title="resultStale ? '请先重新审查当前正文' : ''" class="wb-finish-action">{{ workspace.task?.status === 'completed' ? '已完成审核' : '完成审核' }}</button>
     </div>
   </header>
+  <div v-if="showReviewBaseline" class="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-6">
+    <section class="bg-white rounded-xl p-6 w-full max-w-lg space-y-4" role="dialog" aria-modal="true" aria-label="选择重新审查稿件">
+      <h2 class="font-semibold">重新审查哪个稿件？</h2>
+      <label class="block text-sm"><input type="radio" v-model="reviewBaselineChoice" value="accepted" :disabled="resultStale || !appliedIssueIds.length" /> 当前采纳稿（合入 {{ appliedIssueIds.length }} 项已采纳修订）</label>
+      <label class="block text-sm"><input type="radio" v-model="reviewBaselineChoice" value="task" /> {{ resultStale ? '当前已保存正文（含正文编辑）' : '本轮审查原文（不合入本轮采纳修订）' }}</label>
+      <p class="text-xs text-slate-500">新审查独立生成版本，保留旧版输入、意见、采纳记录与确认理由。这里的原文是本轮审查的基线，不一定是首次上传稿。</p>
+      <p v-if="resultStale" class="text-xs text-amber-700">正文或条件已改变，请针对当前已保存正文审查。</p>
+      <div class="flex justify-end gap-3"><button @click="showReviewBaseline = false" class="button">取消</button><button @click="confirmReviewBaseline" class="button primary">确认并开始审查</button></div>
+    </section>
+  </div>
 </template>

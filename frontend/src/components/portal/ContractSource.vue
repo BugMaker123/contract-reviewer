@@ -1,10 +1,14 @@
 <script>
-import { ref } from "vue";
+import { ref, watch } from "vue";
+import RichContractEditor from "./RichContractEditor.vue";
 export default {
+  components: { RichContractEditor },
   props: { context: { type: Object, required: true } },
   setup(props) {
-    const previewOpen = ref(false);
-    return { ...props.context, previewOpen };
+    const previewOpen = ref(false), contractInput = ref(null);
+    const openFile = () => { if (!props.context.importing.value) contractInput.value?.click(); };
+    watch(() => props.context.contractUploadRequest.value, openFile);
+    return { ...props.context, previewOpen, contractInput, openFile };
   },
 };
 </script>
@@ -30,10 +34,11 @@ export default {
       "
       @click="!importing && $refs.contractInput.click()"
     >
-      <div
-        class="mx-auto w-12 h-12 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-center text-2xl text-blue-600 mb-4"
-      >
-        ↥
+      <div class="contract-drop-icon" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+          <path d="M14 3v6h6M8 13h8M8 17h5" />
+        </svg>
       </div>
       <div class="text-sm font-semibold">
         {{
@@ -58,34 +63,7 @@ export default {
         </div>
       </div>
     </div>
-    <textarea
-      v-else-if="inputMethod === 'paste'"
-      v-model="form.text"
-      class="field h-52 leading-relaxed"
-      placeholder="在此粘贴合同正文…"
-      aria-label="合同正文"
-    ></textarea>
-    <div v-else class="space-y-2">
-      <p class="text-xs text-slate-500 mb-3">
-        示例用于熟悉流程，请勿作为实际业务合同。
-      </p>
-      <button
-        v-for="(sample, key) in samples"
-        @click="selectSample(key)"
-        class="w-full p-4 border rounded-xl text-left"
-        :class="
-          sampleKey === key
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-slate-200 bg-slate-50'
-        "
-      >
-        <span class="text-xs font-semibold">{{ sample.title }}</span
-        ><span class="pill ml-2">示例</span
-        ><span class="text-[11px] text-slate-500 mt-2 block"
-          >{{ sample.type }} · {{ sample.text.length }} 字</span
-        >
-      </button>
-    </div>
+    <RichContractEditor v-else-if="inputMethod === 'paste'" v-model:html="form.paste_html" :text="form.text" :disabled="importing || busy" @text-change="form.text = $event; form.source_id = null" />
     <div v-if="previewOpen" class="modal" @click.self="previewOpen = false">
       <section class="modal-panel contract-preview" role="dialog" aria-modal="true" aria-labelledby="contract-preview-title" @keydown.esc="previewOpen = false">
         <header class="contract-preview-header">

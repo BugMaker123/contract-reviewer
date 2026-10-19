@@ -1,7 +1,8 @@
 <script>
+import ManualIssue from "./ManualIssue.vue";
 import RevisionActions from "./RevisionActions.vue";
 export default {
-  components: { RevisionActions },
+  components: { RevisionActions, ManualIssue },
   props: { context: { type: Object, required: true } },
   setup: (props) => props.context,
 };
@@ -15,17 +16,19 @@ export default {
     class="wb-sidebar wb-opinion-drawer"
     :class="{
       'is-compact-review': revisionMode !== 'compare',
+      'is-collapsed': !opinionsOpen,
     }"
   >
     <div class="wb-sidebar-heading">
-      <strong id="opinion-drawer-title">AI 审查建议
+      <button class="wb-sidebar-toggle" @click="toggleOpinions" :aria-expanded="opinionsOpen" aria-controls="review-opinion-content" :aria-label="opinionsOpen ? '收起审查意见与修订清单' : '展开审查意见与修订清单'" :title="opinionsOpen ? '收起审查意见与修订清单' : '展开审查意见与修订清单'"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m12 5-5 5 5 5" /></svg></button>
+      <strong v-show="opinionsOpen" id="opinion-drawer-title">审查建议
         <span class="wb-sidebar-count">{{
           filteredIssues.length
         }}</span></strong
       >
 
       <button
-        v-if="reviewReady && revisionMode !== 'compare'"
+        v-if="opinionsOpen && reviewReady && revisionMode !== 'compare'"
         class="batch-accept"
         :disabled="revisionReadOnly || !pendingApplicableCount"
         @click="acceptAllRevisions"
@@ -34,10 +37,12 @@ export default {
       </button>
     </div>
     <div
+      v-show="opinionsOpen"
       id="review-opinion-content"
       class="wb-opinion-content"
     >
 
+      <ManualIssue :context="context" />
       <details class="opinion-filters">
         <summary>
           筛选建议

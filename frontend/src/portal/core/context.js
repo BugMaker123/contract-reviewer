@@ -80,7 +80,7 @@ export function createContext(page, requiredData) {
   };
   context.loadRecords = async () => {
     const paths = {
-      tasks: "/api/tasks",
+      tasks: page === "shell" ? "/api/tasks?page=1&page_size=3&archived=false" : "/api/tasks",
       lists: "/api/checklists",
       categories: "/api/categories",
       samples: "/api/samples",

@@ -3,6 +3,7 @@ import { ref, reactive, computed } from "vue";
 export function setup(context) {
   const { roles, publishedLists, categoryFilter } = context;
   const samples = ref({});
+  const contractUploadRequest = ref(0);
   const inputMethod = ref("file"),
     sampleKey = ref(""),
     dragging = ref(false),
@@ -11,6 +12,7 @@ export function setup(context) {
     title: "",
     type: "商务合作协议",
     text: "",
+    paste_html: "",
     role: roles[0].value,
     mode: "deep",
     scale: "中立",
@@ -40,6 +42,7 @@ export function setup(context) {
 
   return {
     samples,
+    contractUploadRequest,
     inputMethod,
     sampleKey,
     dragging,

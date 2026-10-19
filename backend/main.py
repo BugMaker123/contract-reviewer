@@ -8,7 +8,7 @@ from io import BytesIO
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .models import ContractReviewRequest, ModelConfig
 from .graph import review_graph_app, get_llm_client
@@ -20,7 +20,11 @@ from .word_export import SOURCES, visible_paragraph_text
 @asynccontextmanager
 async def lifespan(app):
     repository.interrupt_running()
-    yield
+    try:
+        yield
+    finally:
+        from .review_jobs import shutdown
+        await shutdown(repository)
 
 app = FastAPI(
     title="LexisGraph 内部合同工作系统",
@@ -90,6 +94,26 @@ async def import_contract(file: UploadFile = File(...)):
     SOURCES.mkdir(parents=True, exist_ok=True)
     (SOURCES / (source['id'] + extension)).write_bytes(content)
     return {"success": True, "text": text, "title": os.path.splitext(file.filename or "待审合同")[0], 'source_id': source['id']}
+
+class PasteContract(BaseModel):
+    html: str = Field(default='', max_length=2000000)
+    text: str = Field(default='', max_length=200000)
+    title: str = Field(default='粘贴合同', max_length=200)
+
+
+@app.post('/api/contracts/paste')
+def paste_contract(request: PasteContract):
+    from .rich_text import pasted_document
+    try:
+        document, text = pasted_document(request.html, request.text)
+    except (ValueError, TypeError) as error:
+        raise HTTPException(422, str(error))
+    source = repository.create('source', {'extension': '.docx', 'text': text, 'name': (request.title or '粘贴合同') + '.docx'})
+    SOURCES.mkdir(parents=True, exist_ok=True)
+    buffer = BytesIO(); document.save(buffer)
+    (SOURCES / (source['id'] + '.docx')).write_bytes(buffer.getvalue())
+    return {'text': text, 'source_id': source['id']}
+
 
 @app.get("/api/samples")
 async def get_samples():

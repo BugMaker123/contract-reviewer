@@ -1,7 +1,9 @@
 <script>
 import { computed } from "vue";
+import ReviewOverview from "./ReviewOverview.vue";
 
 export default {
+  components: { ReviewOverview },
   props: { context: { type: Object, required: true } },
   setup(props) {
     const handledCount = computed(() =>
@@ -24,6 +26,7 @@ export default {
       <strong v-show="summaryOpen">审查导航</strong>
     </div>
     <div v-show="summaryOpen" id="review-summary-content" class="wb-summary-content wb-review-navigation">
+      <ReviewOverview :context="context" />
       <section class="wb-nav-card">
         <div class="wb-nav-section-title">处理进度</div>
         <div v-if="reviewResult" class="wb-nav-progress-number"><strong>{{ handledCount }}</strong><span>/ {{ reviewIssues.length }} 项已处理</span></div>

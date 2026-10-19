@@ -29,6 +29,7 @@ export function createWorkspaceWorkbench(refs) {
     question = ref(""),
     followupIssue = ref(null),
     followupBusy = ref(false);
+  const verifying = ref(false), manualBusy = ref(false), confirmations = ref({});
   const showConditions = ref(false),
     exportScope = ref("current"),
     versions = ref([]),
@@ -106,8 +107,9 @@ export function createWorkspaceWorkbench(refs) {
   });
   const flush = async () => {
     clearTimeout(timer);
-    if (hydrating.value || historical.value) return;
+    if (hydrating.value || historical.value || refs.isReviewing.value || task.value?.status === "running") return;
     const job = async () => {
+      if (refs.isReviewing.value || task.value?.status === "running") return;
       saving.value = true;
       error.value = "";
       refs.saveStatus.value = "正在保存…";
@@ -188,6 +190,7 @@ export function createWorkspaceWorkbench(refs) {
   );
   const applyRun = (record) => {
     run.value = record;
+    confirmations.value = { ...(record?.completion_confirmations || {}) };
     refs.reviewResult.value = record?.result || null;
     refs.appliedIssueIds.value = record?.applied || [];
     decisions.value = record?.decisions || {};
@@ -253,7 +256,7 @@ export function createWorkspaceWorkbench(refs) {
         };
         versions.value = task.value.runs;
         if (task.value.status === "running")
-          error.value = "此任务已在其他页面审查中，请稍后重新打开。";
+          error.value = "后台正在审查，可点击重新连接查看进度。";
         lastInput = JSON.stringify(input());
         refs.saveStatus.value = "已从本机服务恢复";
       }
@@ -306,11 +309,11 @@ export function createWorkspaceWorkbench(refs) {
         ? "applied"
         : decisions.value[id] || "pending"
     ];
-  const exportDocument = async () => {
+  const exportDocument = async (original = false) => {
     try {
       await flush();
       const suffix = historical.value ? "?run=" + run.value.id : "";
-      const preview = refs.getPreviewExport?.();
+      const preview = original ? null : refs.getPreviewExport?.();
       const documentUrl = preview
         ? "/api/runs/" + preview.run + "/preview-file?scope=" + preview.scope
         : "/api/tasks/" + taskId.value + "/document" + suffix;
@@ -368,12 +371,52 @@ export function createWorkspaceWorkbench(refs) {
       task.value = await api(
         "/api/tasks/" + taskId.value + "/complete",
         "POST",
-        { archived: false, revision: task.value.revision },
+        { archived: false, revision: task.value.revision, confirmations: confirmations.value },
       );
+      await refresh();
       refs.showToast("已完成复核，任务记录已更新");
+      await router.push("/");
     } catch (err) {
       refs.showToast(err.message);
     }
+  };
+  const verifyCurrent = async () => {
+    if (verifying.value || historical.value || refs.isReviewing.value) return;
+    verifying.value = true;
+    try {
+      await flush();
+      const saved = await api(`/api/runs/${run.value.id}/verify-current`, "POST", {
+        revision: run.value.revision, model_config_data: refs.getModel(),
+      });
+      applyRun(saved);
+      task.value = await api("/api/tasks/" + taskId.value);
+      refs.showToast("当前稿核验完成，请核对逐项结论");
+    } catch (err) { error.value = err.message; refs.showToast(err.message); }
+    finally { verifying.value = false; }
+  };
+  const addManualIssue = async (draft) => {
+    if (manualBusy.value || historical.value) return false;
+    manualBusy.value = true;
+    try {
+      await flush();
+      applyRun(await api(`/api/runs/${run.value.id}/issues`, "POST", { ...draft, revision: run.value.revision }));
+      task.value = await api("/api/tasks/" + taskId.value);
+      refs.showToast("人工意见已保存");
+      return true;
+    } catch (err) { error.value = err.message; refs.showToast(err.message); return false; }
+    finally { manualBusy.value = false; }
+  };
+  const selectVersion = async (id) => {
+    await flush();
+    await router.push(`/workbench?task=${taskId.value}${id ? '&run=' + id : ''}`);
+  };
+  const downloadAudit = async () => {
+    await flush();
+    const response = await fetch(`/api/runs/${run.value.id}/audit`);
+    if (!response.ok) { refs.showToast("审核记录下载失败"); return; }
+    const url = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `review-audit-${run.value.id}.json`; anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   const ask = async (issue) => {
     if (!question.value.trim() || followupBusy.value) return;
@@ -403,6 +446,8 @@ export function createWorkspaceWorkbench(refs) {
     if (answer.suggested_text) refs.copyText(answer.suggested_text);
   };
   return {
+    getModel: refs.getModel,
+    verifying, manualBusy, confirmations, verifyCurrent, addManualIssue, selectVersion, downloadAudit,
     taskId,
     task,
     run,

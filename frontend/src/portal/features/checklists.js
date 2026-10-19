@@ -40,26 +40,19 @@ export function setup(context) {
     modalError.value = "";
     try {
       const editor = checklistEditor.value;
-      if (
-        !editor.name.trim() ||
-        !editor.items.length ||
-        editor.items.some(
-          (item) => !item.title.trim() || !item.requirement.trim(),
-        )
-      )
-        throw new Error("请填写清单名称，并为每个检查项填写标题和具体要求");
+      const items = editor.items.filter(item => item.title.trim() || item.requirement.trim() || item.keywordText?.trim() || item.suggestion?.trim() || item.operator !== 'semantic' || item.severity !== 'warning');
+      if (!editor.name.trim() || !items.length || items.some(item => !item.requirement.trim()))
+        throw new Error('请填写清单名称和至少一条具体审查要求');
+      if (items.length > 100) throw new Error('每份清单最多100条要求');
       const body = {
         ...editor,
+        name: editor.name.trim(),
         published,
-        items: editor.items.map((item) => ({
+        items: items.map(item => ({
           ...item,
-          keywords:
-            item.operator === "semantic"
-              ? []
-              : item.keywordText
-                  .split(/[,，\n]/)
-                  .map((word) => word.trim())
-                  .filter(Boolean),
+          title: item.title.trim() || item.requirement.trim().slice(0,60),
+          requirement: item.requirement.trim(),
+          keywords: item.operator === 'semantic' ? [] : (item.keywordText || '').split(/[,，\n]/).map(word => word.trim()).filter(Boolean),
         })),
       };
       await api(
@@ -70,7 +63,7 @@ export function setup(context) {
       checklistEditor.value = null;
       context.currentPage.value = 1;
       await loadRecords();
-      notify(published ? "清单已发布，历史任务仍使用原版本" : "清单草稿已保存");
+      notify(published ? "清单已启用，可在开始页直接选用" : "清单草稿已保存");
     } catch (err) {
       modalError.value = err.message;
     } finally {
@@ -78,27 +71,30 @@ export function setup(context) {
     }
   };
 
+  const appendChecklistRequirements = (text) => {
+    const editor = checklistEditor.value;
+    if (!editor) throw new Error('请先打开清单编辑器');
+    const lines = text.split('\n').map(line => line.trim().replace(/^(?:[-*•]\s+|\d+\.\s+|\d+[、)）]\s*)/, '')).filter(Boolean);
+    if (!lines.length) throw new Error('请填写审查要求，每行一条');
+    if (lines.some(line => line.length > 3000)) throw new Error('单条要求不能超过3000字，请拆分后添加');
+    const retained = editor.items.filter(item => item.title.trim() || item.requirement.trim() || item.keywordText?.trim() || item.suggestion?.trim() || item.operator !== 'semantic' || item.severity !== 'warning');
+    const seen = new Set(retained.map(item => item.requirement.trim()));
+    const added = [];
+    for (const line of lines) {
+      if (seen.has(line)) continue;
+      seen.add(line);
+      added.push({id:crypto.randomUUID(),title:'',requirement:line,operator:'semantic',keywords:[],keywordText:'',severity:'warning',suggestion:''});
+    }
+    if (retained.length + added.length > 100) throw new Error('每份清单最多100条要求，请精简后添加');
+    editor.items = [...retained,...added];
+    return {added:added.length,duplicates:lines.length-added.length};
+  };
   const importHandlers = {
     checklist(data) {
-      const lines = data.text
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
-      if (lines.length > 100)
-        throw new Error("提取超过 100 行，请精简清单后导入");
-      checklistEditor.value.items = lines.map((line) => ({
-        id: crypto.randomUUID(),
-        title: line.slice(0, 80),
-        requirement: line,
-        operator: "semantic",
-        keywords: [],
-        keywordText: "",
-        severity: "warning",
-        suggestion: "",
-      }));
+      const result = appendChecklistRequirements(data.text);
       if (!checklistEditor.value.name) checklistEditor.value.name = data.title;
-      return "已按行提取清单草稿，请合并标题、核对要求后发布";
+      return `已追加 ${result.added} 条要求${result.duplicates ? '，跳过 '+result.duplicates+' 条重复内容' : ''}，请核对后启用`;
     },
   };
-  return { importHandlers, addChecklistItem, editChecklist, saveChecklist };
+  return { importHandlers, addChecklistItem, editChecklist, saveChecklist, appendChecklistRequirements };
 }

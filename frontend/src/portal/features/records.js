@@ -9,6 +9,7 @@ export function setup(context) {
         revision: row.revision,
       });
       await loadRecords();
+      await context.refreshRecent?.();
       notify(row.archived ? "已恢复记录" : "已归档，可在已归档列表恢复");
     } catch (err) {
       error.value = err.message;

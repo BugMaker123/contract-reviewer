@@ -40,11 +40,14 @@ export function setup(context) {
     form.references.splice(index, 1);
   };
   const switchSource = (next) => {
-    if (next === inputMethod.value || importing.value) return;
+    if (importing.value) return;
+    if (next === "file") context.contractUploadRequest.value++;
+    if (next === inputMethod.value) return;
     sourceDrafts[inputMethod.value] = {
       text: form.text,
       sampleKey: sampleKey.value,
       source_id: form.source_id,
+      paste_html: form.paste_html,
     };
     const saved = sourceDrafts[next] || {
       text: "",
@@ -52,6 +55,7 @@ export function setup(context) {
       source_id: null,
     };
     form.text = saved.text;
+    form.paste_html = saved.paste_html || "";
     form.source_id = saved.source_id;
     sampleKey.value = saved.sampleKey;
     inputMethod.value = next;
@@ -69,6 +73,10 @@ export function setup(context) {
     busy.value = true;
     error.value = "";
     try {
+      if (inputMethod.value === 'paste') {
+        const pasted = await api('/api/contracts/paste','POST',{html:form.paste_html || '',text:form.text,title:form.title});
+        form.text = pasted.text; form.source_id = pasted.source_id;
+      }
       const body = {
         ...form,
         type: form.type?.trim() || "商务合同",
@@ -81,6 +89,9 @@ export function setup(context) {
       const task = await api("/api/tasks", "POST", body);
       sessionStorage.removeItem("LEXIS_HOME_DRAFT");
       await navigate("/workbench?task=" + task.id);
+      form.title = ''; form.text = ''; form.paste_html = ''; form.source_id = null;
+      Object.keys(sourceDrafts).forEach(key => delete sourceDrafts[key]);
+      sessionStorage.removeItem('LEXIS_HOME_DRAFT');
     } catch (err) {
       error.value = err.message;
     } finally {
@@ -112,7 +123,7 @@ export function setup(context) {
       Object.assign(form, values);
       if (!form.type?.trim()) form.type = '商务合同';
       if (!['deep', 'checklist'].includes(form.mode)) form.mode = 'deep';
-      inputMethod.value = source || "paste";
+      inputMethod.value = ["file", "paste"].includes(source) ? source : "paste";
     }
     const query = new URLSearchParams(location.search);
     if (query.has("checklist")) {
@@ -125,6 +136,7 @@ export function setup(context) {
   const importHandlers = {
     contract(data) {
       form.text = data.text;
+      form.paste_html = "";
       form.title = data.title;
       form.source_id = data.source_id;
       sampleKey.value = "";

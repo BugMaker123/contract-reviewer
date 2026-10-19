@@ -126,6 +126,12 @@ class RunRequest(BaseModel):
     model_config_data: ModelConfig = Field(default_factory=ModelConfig)
 
 
+class StartReviewInput(RunRequest):
+    baseline: Literal['task', 'accepted'] = 'task'
+    task_revision: int | None = Field(default=None, ge=1)
+    run_revision: int | None = Field(default=None, ge=1)
+
+
 class HandlingInput(BaseModel):
     revision: int
     applied: list[str] = Field(default_factory=list, max_length=500)
@@ -183,3 +189,27 @@ class RevisionEdit(BaseModel):
 class RevisionRestore(BaseModel):
     revision: int = Field(ge=1)
     version: int = Field(ge=1)
+
+
+class VerifyCurrentInput(RunRequest):
+    revision: int = Field(ge=1)
+
+
+class CompleteInput(ArchiveInput):
+    confirmations: dict[str, str] = Field(default_factory=dict, max_length=100)
+
+    @field_validator('confirmations')
+    @classmethod
+    def confirmation_lengths(cls, value):
+        if any(len(key) > 80 or len(reason) > 3000 for key, reason in value.items()):
+            raise ValueError('人工确认理由最多3000字')
+        return {key: reason.strip() for key, reason in value.items()}
+
+
+class ManualIssueInput(BaseModel):
+    revision: int = Field(ge=1)
+    title: str = Field(min_length=1, max_length=200)
+    evidence: str = Field(default='', max_length=20000)
+    analysis: str = Field(min_length=1, max_length=5000)
+    suggestion: str = Field(default='', max_length=20000)
+    severity: Literal['critical', 'warning', 'info'] = 'warning'

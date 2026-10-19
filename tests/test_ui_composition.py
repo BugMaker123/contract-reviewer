@@ -75,7 +75,7 @@ def test_navigation_keeps_document_layout_forms_and_history(isolated_workspace):
         page.go_forward()
         expect(page.get_by_role('heading', name='企业审查清单', exact=True)).to_be_visible()
         nav.get_by_role('link', name='开始', exact=True).click()
-        expect(page.get_by_label('合同正文', exact=True)).to_have_value('第一条 验收后付款。')
+        expect(page.get_by_label('合同正文', exact=True)).to_have_text('第一条 验收后付款。')
         expect(page.get_by_placeholder('填写便于识别的合同名称')).to_have_value('保留中的审查表单')
         page.get_by_role('button', name='⚙ 模型配置', exact=True).click()
         expect(page.get_by_role('heading', name='模型配置', exact=True)).to_be_visible()
@@ -111,21 +111,20 @@ def test_workbench_enters_leaves_and_switches_tasks_without_reload(isolated_work
         page.evaluate("window.spaMarker = 'workbench-session'")
         page.get_by_role('row').filter(has=page.get_by_role('link', name='合同一', exact=True)).get_by_role('link', name='打开', exact=True).click()
         expect(page.get_by_role('heading', name='合同一', exact=True)).to_be_visible()
-        page.locator('.prototype-document-menu > summary').click()
         expect(page.get_by_role('button', name='编辑正文', exact=True)).to_be_enabled()
         assert page.evaluate('window.spaMarker') == 'workbench-session'
         assert page.evaluate('window.messageListeners.size') == 2
         page.get_by_role('button', name='编辑正文', exact=True).click()
         page.get_by_label('编辑合同正文').fill('第一条 验收合格后30日付款。')
         page.get_by_role('button', name='保存正文', exact=True).click()
-        page.get_by_title('返回审查记录', exact=True).click()
-        expect(page.get_by_role('heading', name='审查记录', exact=True)).to_be_visible()
+        page.get_by_role('link', name='退出工作台', exact=True).click()
+        expect(page.get_by_role('heading', name='审查条件', exact=True)).to_be_visible()
         assert page.evaluate('window.messageListeners.size') == 0
         assert page.request.get(base+'/api/tasks/'+first['id']).json()['text'] == '第一条 验收合格后30日付款。'
         page.go_back()
         expect(page.get_by_role('heading', name='合同一', exact=True)).to_be_visible()
         # A second in-app task link must create a fresh workbench session.
-        page.get_by_title('返回审查记录', exact=True).click()
+        page.get_by_role('link', name='退出工作台', exact=True).click()
         page.locator('.portal-sidebar nav').get_by_role('link', name='审查记录', exact=True).click()
         page.get_by_role('row').filter(has=page.get_by_role('link', name='合同二', exact=True)).get_by_role('link', name='打开', exact=True).click()
         expect(page.get_by_role('heading', name='合同二', exact=True)).to_be_visible()
@@ -142,7 +141,6 @@ def test_first_workbench_save_assigns_task_without_remount(isolated_workspace):
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(base+'/workbench')
-        page.locator('.prototype-document-menu > summary').click()
         expect(page.get_by_role('button', name='编辑正文', exact=True)).to_be_enabled()
         page.evaluate("window.spaMarker = 'new-task-editor'")
         page.get_by_role('button', name='编辑正文', exact=True).click()
@@ -154,7 +152,7 @@ def test_first_workbench_save_assigns_task_without_remount(isolated_workspace):
         expect(page.get_by_role('heading', name='新任务首次保存', exact=True)).to_be_visible()
         assert page.evaluate('window.spaMarker') == 'new-task-editor'
         assert len(page.request.get(base+'/api/tasks').json()['items']) == 1
-        page.get_by_title('返回审查记录', exact=True).click()
-        expect(page.get_by_role('heading', name='审查记录', exact=True)).to_be_visible()
+        page.get_by_role('link', name='退出工作台', exact=True).click()
+        expect(page.get_by_role('heading', name='审查条件', exact=True)).to_be_visible()
         assert not errors
         browser.close()

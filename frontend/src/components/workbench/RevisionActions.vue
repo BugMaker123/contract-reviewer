@@ -14,7 +14,7 @@ export default {
     :aria-label="issue.clause_title + '修订操作'"
   >
     <div class="revision-author">
-      <span>AI</span><strong>LexisGraph 修订建议</strong
+      <span>{{ issue.source === "manual" ? "人工" : "AI" }}</span><strong>{{ issue.source === "manual" ? "人工补充意见" : "LexisGraph 修订建议" }}</strong
       ><small v-if="workspace.run?.revision_history?.[issue.id]?.length"
         >第
         {{ workspace.run.revision_history[issue.id].at(-1).version }} 版</small

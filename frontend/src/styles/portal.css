@@ -366,21 +366,22 @@ a:focus-visible {
   }
 }
 /* New review: document and standards beside the decision context. */
-.review-start { max-width: 1440px; margin: 0 auto; padding-bottom: 8px; }
-.review-conditions-first { margin-bottom: 20px; }
+.portal-main:has(.review-start) { padding: 0; }
+.review-start { display: flex; flex-direction: column; min-height: 100%; width: 100%; }
+.review-conditions-first { flex: 1; margin-bottom: 0; }
 .review-conditions-first .review-condition-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.review-setup-body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 28px; padding: 0 24px 24px; align-items: start; }
+.review-setup-body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 28px; padding: 0 24px 16px; align-items: start; }
 .review-requirement-panel, .review-contract-panel { min-width: 0; }
-.review-contract-panel { padding: 18px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fbfdff; }
-.review-contract-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.review-contract-panel { padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fbfdff; }
+.review-contract-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .review-contract-heading .label { margin: 0; font-size: 13px; font-weight: 600; color: #334155; }
-.review-contract-name { margin-bottom: 16px; }
+.review-contract-name { margin-bottom: 12px; }
 .review-contract-name em { color: #e26868; font-style: normal; }
 .review-contract-panel .review-source-tabs { padding: 0; flex-wrap: wrap; }
 .review-contract-panel .review-source-tabs .button { padding: 8px 10px; }
 .review-contract-panel .review-document > div { padding: 14px 0 0; }
-.review-contract-panel .drop-area { min-height: 144px; padding: 20px 12px; }
-.review-contract-panel .drop-area > div:first-child { width: 38px; height: 38px; margin-bottom: 10px; }
+.review-start .review-document .drop-area { min-height: 112px; padding: 14px 12px; }
+.contract-drop-icon { display: flex; align-items: center; justify-content: center; color: #5680c7; margin-bottom: 8px; }
 .contract-preview { max-width: 1100px; height: 90vh; display: flex; flex-direction: column; }
 .contract-preview-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; }
 .contract-preview-header h2 { font-size: 18px; font-weight: 700; color: #1e293b; }
@@ -409,9 +410,8 @@ a:focus-visible {
 .active .review-mode-radio { border: 4px solid #2563eb; background: white; }
 .review-columns { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; align-items: start; }
 .review-primary { display: grid; gap: 20px; min-width: 0; }
-.review-start .card { border-radius: 14px; box-shadow: 0 3px 14px #263c5504; }
+.review-start > .card { border: 0; border-radius: 0; box-shadow: none; }
 .review-section-heading { display: flex; align-items: center; gap: 12px; padding: 20px 24px; }
-.review-step { display: grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; background: #eff6ff; color: #2563eb; border: 1px solid #dbeafe; border-radius: 9px; font-size: 12px; font-weight: 700; }
 .review-section-heading h2 { font-size: 14px; font-weight: 700; color: #1e293b; }
 .review-section-heading p { font-size: 11px; color: #8290a3; margin-top: 4px; line-height: 1.6; }
 .review-section-heading > .pill { margin-left: auto; }
@@ -434,7 +434,7 @@ a:focus-visible {
 .review-condition-note { margin: 4px 24px 24px; padding: 15px; background: #f6f8fc; border-radius: 8px; }
 .review-condition-note strong { font-size: 11px; font-weight: 600; color: #475569; }
 .review-condition-note p { font-size: 11px; line-height: 1.8; color: #8290a3; margin-top: 6px; }
-.review-submit { position: sticky; bottom: -32px; z-index: 5; display: flex; align-items: center; justify-content: flex-start; gap: 24px; margin-top: 22px; padding: 18px 24px; background: #fffffffa; border: 1px solid #dce5f0; border-radius: 12px; box-shadow: 0 -4px 24px #1e3a5f08; }
+.review-submit { position: sticky; bottom: 0; z-index: 5; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-start; gap: 24px; margin-top: 0; padding: 18px 24px; background: #fffffffa; border-top: 1px solid #dce5f0; box-shadow: 0 -4px 24px #1e3a5f08; }
 .review-submit strong { font-size: 13px; color: #334155; }
 .review-submit p { color: #718096; font-size: 12px; margin-top: 5px; }
 .review-submit .review-submit-error { color: #b91c1c; }
@@ -443,7 +443,7 @@ a:focus-visible {
 .review-list-empty { font-size: 12px; color: #92400e; padding: 12px; margin-top: 12px; background: #fffbeb; border-radius: 8px; }
 @media (min-width: 1600px) { .review-columns { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 1200px) { .review-columns { grid-template-columns: minmax(0, 1fr); gap: 16px; } .review-modes { gap: 10px; } .review-mode-icon { display: none; } .review-standard-prompt { flex-wrap: wrap; } .review-start .checklist-options { grid-template-columns: 1fr; } }
-@media (max-width: 1000px) { .review-columns { grid-template-columns: 1fr; } .review-conditions-first .review-condition-fields { grid-template-columns: 1fr 1fr; } .review-settings .review-condition-note { display: none; } .review-submit { bottom: -20px; } }
+@media (max-width: 1000px) { .review-columns { grid-template-columns: 1fr; } .review-conditions-first .review-condition-fields { grid-template-columns: 1fr 1fr; } .review-settings .review-condition-note { display: none; } }
 @media (max-width: 1000px) { .review-setup-body { grid-template-columns: 1fr; } }
 @media (max-width: 650px) { .review-conditions-first .review-condition-fields { grid-template-columns: 1fr; } }
 @media (max-width: 650px) { .review-setup-body { padding: 0 16px 16px; gap: 18px; } .review-contract-panel { padding: 14px; } }
@@ -456,3 +456,128 @@ a:focus-visible {
 .catalog-loading { padding: 18px; text-align: center; font-size: 12px; color: #64748b; }
 .catalog-filters { flex-wrap: wrap; }
 @media (max-width: 650px) { .catalog-pagination { padding: 14px; } .catalog-pagination > div { gap: 6px; } .catalog-pagination .button { padding: 8px; } }
+
+.recent-work-item + .recent-work-item { border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 12px; }
+.record-comparison { width: min(1100px, 96vw); max-width: 1100px; max-height: 88vh; overflow-y: auto; }
+.comparison-table { table-layout: fixed; width: 100%; }
+.comparison-table td { width: 50%; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; }
+.comparison-before { background: #fff1f2; color: #9f1239; }
+.comparison-after { background: #ecfdf5; color: #065f46; }
+
+.rich-contract-editor { border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; overflow: hidden; }
+.rich-contract-toolbar { display:flex; flex-wrap:wrap; gap:5px; padding:8px; border-bottom:1px solid #e2e8f0; background:#f8fafc; }
+.rich-contract-toolbar button, .rich-contract-toolbar select { min-height:28px; padding:3px 8px; border:1px solid #e2e8f0; border-radius:4px; background:white; font-size:12px; }
+.rich-contract-content { min-height:260px; max-height:500px; overflow:auto; padding:16px; outline:none; font-size:14px; line-height:1.8; white-space:pre-wrap; overflow-wrap:anywhere; }
+.rich-contract-content:empty::before { content:attr(data-placeholder); color:#94a3b8; pointer-events:none; }
+.rich-contract-content table { border-collapse:collapse; width:100%; }
+.rich-contract-content td,.rich-contract-content th { border:1px solid #cbd5e1; padding:6px; }
+.rich-contract-content ul { list-style:disc; padding-left:24px; }
+.rich-contract-content ol { list-style:decimal; padding-left:24px; }
+.rich-contract-content h1 { font-size:24px; font-weight:bold; }.rich-contract-content h2 { font-size:20px; font-weight:bold; }
+.rich-contract-editor > p { padding:0 12px 10px; }
+
+/* Records keep filters compact so the table remains the main content. */
+.portal-main:has(.records-page) { padding: 24px; }
+.records-page { width: 100%; min-width: 0; margin: 0 auto; }
+.records-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 12px; }
+.records-heading h1 { font-size: 22px; line-height: 1.4; }
+.records-heading p { margin-top: 4px; }
+.records-heading-actions { display: flex; gap: 8px; flex: none; }
+.records-heading-actions .button { padding: 8px 12px; font-size: 12px; }
+.records-statistics { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; min-height: 32px; margin-bottom: 12px; font-size: 12px; color: #64748b; }
+.records-statistics-label { font-weight: 600; color: #475569; }
+.records-statistics-values { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.records-statistics-values > span { white-space: nowrap; }
+.records-statistics-values strong { margin-left: 3px; color: #334155; font-size: 14px; font-variant-numeric: tabular-nums; }
+.records-statistics-values .is-success { color: #059669; }.records-statistics-values .is-danger { color: #dc2626; }.records-statistics-values .is-running { color: #2563eb; }
+.records-statistics-scope { color: #94a3b8; font-size: 11px; }
+.records-statistics-refresh { margin-left: auto; color: #2563eb; white-space: nowrap; }
+.records-list { border-radius: 10px; overflow: hidden; }
+.records-filters { display: grid; grid-template-columns: minmax(180px, 1fr) 136px 110px 284px auto; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; }
+.records-filters .field { width: 100%; min-width: 0; max-width: none; height: 34px; padding: 5px 9px; border-radius: 6px; font-size: 12px; }
+.records-date-range { display: flex; align-items: center; gap: 7px; color: #94a3b8; font-size: 12px; }
+.records-date-range .field { width: calc((100% - 26px) / 2); }
+.records-archive { display: flex; align-items: center; gap: 6px; color: #64748b; font-size: 12px; white-space: nowrap; }
+.records-table-scroll { overflow-x: auto; }
+.records-table { min-width: 940px; table-layout: fixed; }
+.records-table th, .records-table td { padding: 12px; vertical-align: middle; }
+.records-table th { padding-top: 11px; padding-bottom: 11px; background: #f8fafc; font-size: 12px; }
+.records-table th:nth-child(2) { width: 88px; }.records-table th:nth-child(3) { width: 145px; }.records-table th:nth-child(4) { width: 80px; }.records-table th:nth-child(5) { width: 76px; }.records-table th:nth-child(6) { width: 312px; }
+.records-contract-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.records-table td:nth-child(2), .records-table td:nth-child(5) { white-space: nowrap; color: #64748b; }
+.records-table td:nth-child(3) { font-size: 11px; color: #64748b; }
+.records-row-actions { display: flex; align-items: center; gap: 12px; white-space: nowrap; font-size: 12px; }
+.records-row-actions .records-open { padding: 4px 7px; border-radius: 4px; background: #eff6ff; }
+.records-row-actions > a:hover, .records-row-actions > button:hover { text-decoration: underline; }
+.records-list .catalog-pagination { padding: 10px 16px; border-radius: 0; }
+.records-list .catalog-pagination .button { padding: 6px 10px; }
+.records-list .catalog-pagination .field { height: 32px; padding: 4px 8px; }
+@media (max-width: 1250px) {
+  .records-filters { grid-template-columns: minmax(180px, 1fr) 140px 120px; }
+  .records-date-range { grid-column: 1 / 3; max-width: 320px; }
+  .records-statistics-scope { display: none; }
+}
+@media (max-width: 650px) {
+  .portal-main:has(.records-page) { padding: 16px; }
+  .records-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .records-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 10px; }
+  .records-search { grid-column: 1 / -1; }
+  .records-date-range { grid-column: 1 / -1; max-width: none; }
+  .records-statistics { gap: 8px; }.records-statistics-values { gap: 10px; }
+}
+
+/* Checklist authoring starts with requirements; detailed rules stay optional. */
+.portal-main:has(.checklists-page) { padding: 24px; }
+.checklists-page { width: 100%; min-width: 0; }
+.checklists-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.checklists-heading h1 { font-size: 22px; font-weight: 700; color: #0f172a; }
+.checklists-heading p { font-size: 12px; color: #64748b; margin-top: 5px; }
+.checklists-heading .button { font-size: 12px; padding: 9px 14px; }
+.checklists-list { border-radius: 10px; overflow: hidden; }
+.checklists-filters { display: grid; grid-template-columns: minmax(180px,1fr) 180px 120px auto; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid #e2e8f0; }
+.checklists-filters .field { min-width:0; height:34px; padding:5px 9px; font-size:12px; border-radius:6px; }
+.checklists-filters > label { display:flex; align-items:center; gap:6px; font-size:12px; color:#64748b; white-space:nowrap; }
+.checklists-table-scroll { overflow-x:auto; }
+.checklists-table { min-width:800px; table-layout:fixed; }
+.checklists-table td,.checklists-table th { padding:13px 16px; }
+.checklists-table th:nth-child(2) { width:160px; }.checklists-table th:nth-child(3) { width:90px; }.checklists-table th:nth-child(4) { width:80px; }.checklists-table th:nth-child(5) { width:310px; }
+.checklists-table td:first-child strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
+.checklists-table td:first-child p { margin-top:4px; color:#94a3b8; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.checklists-table td:nth-child(2),.checklists-table td:nth-child(3) { color:#64748b; }
+.checklists-row-actions { display:flex; align-items:center; gap:14px; white-space:nowrap; color:#2563eb; }
+.checklists-row-actions .is-secondary { color:#94a3b8; }
+.checklists-use { padding:5px 8px; background:#eff6ff; border-radius:5px; }
+.checklists-row-actions > :hover { text-decoration:underline; }
+.checklists-list .catalog-pagination { padding:10px 16px; }.checklists-list .catalog-pagination .button { padding:6px 10px; }
+.modal-panel.checklist-editor { max-width:900px; display:flex; flex-direction:column; overflow:hidden; }
+.checklist-editor-heading { display:flex; align-items:center; justify-content:space-between; flex:none; padding:18px 24px; border-bottom:1px solid #e2e8f0; }
+.checklist-editor-heading h2 { font-size:17px; font-weight:700; }.checklist-editor-heading p { color:#64748b; font-size:12px; margin-top:4px; }.checklist-editor-heading > button { font-size:12px; color:#64748b; }
+.checklist-editor-body { padding:20px 24px; overflow-y:auto; min-height:0; }
+.checklist-editor-body fieldset { min-width:0; }
+.checklist-basic-fields { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:16px; }
+.checklist-basic-fields em { color:#dc2626; font-style:normal; }
+.checklist-supplement { margin:12px 0 22px; font-size:12px; color:#64748b; }.checklist-supplement > summary { cursor:pointer; }.checklist-supplement .checklist-basic-fields { margin-top:12px; }
+.checklist-requirements-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.checklist-requirements-heading h3 { font-size:14px; font-weight:600; }.checklist-requirements-heading h3 span { margin-left:6px; font-size:11px; color:#94a3b8; font-weight:400; }.checklist-requirements-heading > div { display:flex; gap:8px; }
+.checklist-requirements-heading .button { font-size:12px; padding:6px 10px; }
+.checklist-requirement-row { padding:12px 0; border-bottom:1px solid #edf2f7; }
+.checklist-requirement-main { display:flex; align-items:flex-start; gap:10px; }
+.checklist-item-number { flex:none; display:grid; place-items:center; width:24px; height:26px; margin-top:7px; font-size:12px; color:#64748b; background:#f1f5f9; border-radius:5px; }
+.checklist-requirement-main textarea { min-height:62px; resize:vertical; font-size:13px; line-height:1.6; }
+.checklist-requirement-main > button { flex:none; margin-top:10px; color:#94a3b8; font-size:12px; }
+.checklist-item-advanced { margin:7px 36px 0 34px; color:#94a3b8; font-size:11px; }.checklist-item-advanced > summary { cursor:pointer; }.checklist-item-advanced[open] > summary { color:#2563eb; }
+.checklist-advanced-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:12px; padding:12px; background:#f8fafc; border:1px solid #edf2f7; border-radius:6px; }.checklist-suggestion { grid-column:1/-1; }
+.checklist-add-requirement { width:100%; padding:12px; margin-top:12px; border:1px dashed #bfdbfe; border-radius:6px; color:#2563eb; font-size:13px; }
+.checklist-editor-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 24px; border-top:1px solid #e2e8f0; background:#fff; flex:none; }.checklist-editor-footer > span { font-size:11px; color:#94a3b8; }.checklist-editor-footer > div { display:flex; gap:8px; flex:none; }.checklist-editor-footer .button { font-size:12px; padding:8px 12px; }
+.checklist-editor-error { padding:10px 12px; margin-bottom:14px; border-radius:6px; background:#fef2f2; color:#b91c1c; font-size:12px; }
+.checklist-batch { padding:12px; margin-bottom:10px; border:1px solid #bfdbfe; border-radius:8px; background:#f8fbff; }.checklist-batch > div { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }.checklist-batch .button { font-size:12px; padding:6px 10px; }
+.checklist-detail { max-width:760px; padding:24px; }.checklist-detail > header { display:flex; align-items:center; justify-content:space-between; gap:16px; }.checklist-detail h2 { font-size:18px; font-weight:700; }.checklist-detail header p { font-size:12px; color:#94a3b8; margin-top:5px; }.checklist-detail header > button { font-size:12px; color:#64748b; }.checklist-detail-description { margin-top:14px; font-size:13px; color:#64748b; }
+.checklist-detail-items { margin-top:18px; }.checklist-detail-items li { display:flex; gap:12px; padding:14px 0; border-bottom:1px solid #edf2f7; }.checklist-detail-items li > span { flex:none; color:#94a3b8; font-size:12px; }.checklist-detail-items li p { font-size:13px; line-height:1.7; white-space:pre-wrap; }.checklist-detail-items li strong { display:block; margin-bottom:4px; font-size:13px; }.checklist-detail-rules { font-size:12px; color:#64748b; margin-top:18px; }.checklist-detail-rules summary { cursor:pointer; }.checklist-detail-rules p { margin-top:10px; }
+.checklist-selection > .checklist-selection-summary { display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; list-style:none; font-size:12px; }
+.checklist-selection-summary::-webkit-details-marker { display:none; }.checklist-selection-summary::before { content:'›'; color:#64748b; font-size:18px; }.checklist-selection[open] > .checklist-selection-summary::before { transform:rotate(90deg); }.checklist-selection-summary strong { flex:1; font-weight:500; }
+.checklist-selection > .selection-heading { margin-top:14px; font-size:12px; color:#64748b; }
+.checklist-selection .checklist-options { display:flex; flex-direction:column; gap:8px; margin-top:10px; max-height:320px; overflow-y:auto; }.checklist-selection .checklist-option { padding:10px; }.checklist-selection .checklist-option strong { font-size:12px; }.checklist-selection .checklist-option p { font-size:12px; line-height:1.6; margin-top:0; }
+@media (max-width:800px) {
+  .checklists-filters { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }.checklists-filters > input { grid-column:1/-1; }
+  .checklist-basic-fields { grid-template-columns:1fr; }.checklist-advanced-fields { grid-template-columns:1fr; }.checklist-editor-footer { align-items:flex-start; flex-direction:column; }.checklist-editor-footer > div { align-self:flex-end; }.checklist-requirements-heading { align-items:flex-start; flex-direction:column; }
+}

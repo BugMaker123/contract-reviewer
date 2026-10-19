@@ -16,7 +16,6 @@ export function createPresentation() {
   const sources = [
     { id: "file", name: "📤 上传合同" },
     { id: "paste", name: "✍️ 粘贴正文" },
-    { id: "sample", name: "📑 示例合同" },
   ];
   const roles = [
     { value: "中立审慎", label: "通用审查 · 中立审慎（默认）" },

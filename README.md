@@ -34,7 +34,7 @@ uv pip install --python .venv/Scripts/python.exe -r requirements.txt
 
 数据保存在 `data/lexis.db`，原始文件保存在 `data/sources/`；备份时应一起备份。任务可归档和恢复。服务重启时未完成的审查标记中断，旧结果保留。
 
-新增功能与验证说明见 [审查闭环说明](docs/审查闭环说明.md)。
+新增功能与验证说明见 [审查闭环说明](docs/审查闭环说明.md) 、[功能完整性修复清单](docs/功能完整性修复清单.md) 和 [工作流与版本管理修复](docs/工作流与版本管理修复.md)。
 
 ## 开发与验证
 

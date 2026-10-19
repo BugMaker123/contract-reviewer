@@ -19,13 +19,17 @@ onActivated(refresh);
 </script>
 
 <template>
-  <div class="card p-4 text-xs space-y-3">
-    <div class="flex justify-between"><strong>全部审查尝试统计（含历史版本与归档任务）</strong><button class="text-blue-600" @click="refresh">刷新统计</button></div>
-    <p v-if="error" class="text-amber-700">{{ error }}</p>
-    <div v-if="report" class="flex flex-wrap gap-5">
-      <span>总计 {{ report.total }}</span><span>已出结果 {{ report.statuses.completed }}</span>
-      <span>失败／未通过准入 {{ report.statuses.failed }}</span><span>已中断 {{ report.statuses.interrupted }}</span><span>执行中 {{ report.statuses.running }}</span>
+  <div class="records-statistics" title="全部审查尝试统计，包含历史版本与归档任务；不随列表筛选变化">
+    <span class="records-statistics-label">全部审查</span>
+    <div v-if="report" class="records-statistics-values">
+      <span>累计 <strong>{{ report.total }}</strong></span>
+      <span>已出结果 <strong class="is-success">{{ report.statuses.completed }}</strong></span>
+      <span>失败 <strong class="is-danger">{{ report.statuses.failed }}</strong></span>
+      <span>已中断 <strong>{{ report.statuses.interrupted }}</strong></span>
+      <span>执行中 <strong class="is-running">{{ report.statuses.running }}</strong></span>
     </div>
-    <p class="text-slate-500">以下列表筛选不改变此统计及“导出全部审查报表”的范围。</p>
+    <span class="records-statistics-scope">含历史版本与归档任务</span>
+    <span v-if="error" class="text-amber-700">{{ error }}</span>
+    <button class="records-statistics-refresh" @click="refresh">刷新统计</button>
   </div>
 </template>

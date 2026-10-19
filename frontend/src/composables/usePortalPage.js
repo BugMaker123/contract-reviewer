@@ -12,7 +12,7 @@ export function usePortalPage(key) {
   const context = createContext(key, page.data);
   let actionNavigation = false;
   Object.assign(context, {
-    tasks: shell.tasks,
+    refreshRecent: shell.loadRecords,
     model: shell.model,
     toast: shell.toast,
     notify: shell.notify,
