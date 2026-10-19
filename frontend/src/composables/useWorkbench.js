@@ -807,7 +807,11 @@ export function useWorkbench() {
             if (list) list.scrollTop = list.scrollHeight;
           });
         }
-        if (event === "error") throw new Error(data.error || "审查失败");
+        if (event === "error") {
+          const failure = new Error(data.error || "审查失败");
+          failure.reviewTerminal = true;
+          throw failure;
+        }
         if (event === "node_update") {
           reviewTrace.value.push({
             stage: data.node,
@@ -865,7 +869,7 @@ export function useWorkbench() {
       opinionsOpen.value = true;
       fitDocuments();
     } catch (err) {
-      reviewDialogOpen.value = false;
+      reviewDialogOpen.value = err.name !== "AbortError";
       reviewBaseline.value = previousComparison.baseline;
       documentCompare.value = previousComparison.enabled;
       comparisonTexts.original = previousComparison.baseline.text;
@@ -875,14 +879,13 @@ export function useWorkbench() {
       comparisonGeneration++;
       reviewResult.value = previousResult;
       appliedIssueIds.value = previousApplied;
-      reviewError.value =
-        err.name === "AbortError"
-          ? "已取消本次审查，可重新开始。"
-          : err.message + "；后台任务可能仍在运行，可重新连接查看。";
-      latestLogMessage.value = reviewError.value;
       try {
         await workspace.refresh();
       } catch {}
+      reviewError.value = err.name === "AbortError"
+        ? "已取消本次审查，可重新开始。"
+        : err.message + (!err.reviewTerminal && workspace.task?.running_run ? "；后台任务仍在运行，可重新连接查看。" : "");
+      latestLogMessage.value = reviewError.value;
       for (const key in nodeStates.value)
         if (nodeStates.value[key] === "running") nodeStates.value[key] = "idle";
       showToast(reviewError.value);

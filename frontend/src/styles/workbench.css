@@ -2176,3 +2176,9 @@
 .workbench-view .wb-delivery-menu button:hover { background:#f1f5f9; }
 .workbench-view .wb-delivery-menu strong { font-size:13px; font-weight:600; color:#334155; }
 .workbench-view .wb-delivery-menu span { font-size:11px; color:#64748b; }
+
+.workbench-view .wb-batch-actions { display:flex; align-items:center; gap:6px; margin-left:auto; }
+.workbench-view .wb-batch-actions .batch-accept { margin-left:0; }
+.workbench-view .batch-cancel { border:1px solid #cbd5e1; background:#fff; color:#475569; border-radius:5px; padding:5px 9px; font-size:11px; white-space:nowrap; cursor:pointer; }
+.workbench-view .batch-cancel:hover:not(:disabled) { background:#f8fafc; border-color:#94a3b8; }
+.workbench-view .batch-cancel:disabled { opacity:.4; cursor:default; }

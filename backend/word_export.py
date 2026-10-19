@@ -32,8 +32,23 @@ def paragraphs(document):
     return [Paragraph(node, document) for node in document.element.body.iter(qn('w:p'))]
 
 
+def paragraph_run_properties(paragraph):
+    """Use visible text formatting, falling back to paragraph-mark formatting."""
+    for run in paragraph.runs:
+        if run.text and run._r.rPr is not None:
+            return deepcopy(run._r.rPr)
+    if paragraph._p.pPr is not None:
+        properties = paragraph._p.pPr.find(qn('w:rPr'))
+        if properties is not None:
+            return deepcopy(properties)
+    for run in paragraph.runs:
+        if run._r.rPr is not None:
+            return deepcopy(run._r.rPr)
+    return None
+
+
 def add_revision(paragraph, old, new, counter, date):
-    properties = deepcopy(paragraph.runs[0]._r.rPr) if paragraph.runs and paragraph.runs[0]._r.rPr is not None else None
+    properties = paragraph_run_properties(paragraph)
     paragraph.clear()
     def append(text, kind=None):
         if not text:
@@ -115,15 +130,27 @@ def contract_document(run, final_text, repo, default_builder, tracked=False, bas
         if tag == 'equal':
             continue
         if tag == 'insert':
+            template = source_paragraphs[max(0, a - 1)] if source_paragraphs else None
             for line in after[c:d]:
                 if a < len(source_paragraphs):
                     p = source_paragraphs[a].insert_paragraph_before()
                 else:
                     p = document.add_paragraph()
+                properties = paragraph_run_properties(template) if template is not None else None
+                if template is not None:
+                    p.style = template.style
+                    if template._p.pPr is not None:
+                        paragraph_properties = deepcopy(template._p.pPr)
+                        for section in list(paragraph_properties.findall(qn('w:sectPr'))):
+                            paragraph_properties.remove(section)
+                        if p._p.pPr is not None:
+                            p._p.remove(p._p.pPr)
+                        p._p.insert(0, paragraph_properties)
+                r = p.add_run('' if tracked else line)
+                if properties is not None:
+                    r._r.insert(0, properties)
                 if tracked:
                     add_revision(p, '', line, counter, stamp)
-                else:
-                    p.add_run(line)
         else:
             for index, p in enumerate(source_paragraphs[a:b]):
                 # Adjacent revisions belong to their own paragraph/cell. Do not
@@ -137,7 +164,7 @@ def contract_document(run, final_text, repo, default_builder, tracked=False, bas
                 if tracked:
                     add_revision(p, before[a + index], new, counter, stamp)
                 else:
-                    properties = deepcopy(p.runs[0]._r.rPr) if p.runs and p.runs[0]._r.rPr is not None else None
+                    properties = paragraph_run_properties(p)
                     p.clear(); r = p.add_run(new)
                     if properties is not None:
                         r._r.insert(0, properties)

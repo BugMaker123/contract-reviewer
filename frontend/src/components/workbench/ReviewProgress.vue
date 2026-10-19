@@ -8,6 +8,9 @@ const running = computed(() => value("isReviewing"));
 const queued = computed(() => running.value && value("reviewQueue")?.status === "queued");
 const queuePosition = computed(() => value("reviewQueue")?.position || 1);
 const trace = computed(() => value("reviewTrace") || []);
+const succeeded = computed(() => !running.value && !value('reviewError') && !!value('reviewResult'));
+const admissionStopped = computed(() => !!value('reviewError') && trace.value.some(event => event.stage === 'admission' && event.admission && event.admission.status !== 'pass'));
+
 const clock = ref(Date.now());
 const startedAt = ref(Date.now());
 let timer;
@@ -40,7 +43,8 @@ const steps = [
   "发布结果",
 ];
 const activeStep = computed(() => {
-  if (!running.value && value('reviewResult')) return 7;
+  if (succeeded.value) return 7;
+  if (trace.value.some(event => event.stage === 'admission') && !trace.value.some(event => event.admission?.status === 'pass')) return 0;
   let step = 0;
   for (const event of trace.value) {
     const stages = {
@@ -70,6 +74,7 @@ const activeStep = computed(() => {
 });
 const items = computed(() => {
   if (running.value) return value("publicAnalysis") || [];
+  if (!succeeded.value) return [];
   return (value("reviewResult")?.issues || []).map((item) => ({
     title: item.issue_title,
     clause: item.clause_title,
@@ -89,7 +94,7 @@ const phaseDescriptions = [
   '正在汇总重点要求结论与全文意见，准备本轮审查结果。',
 ];
 const activity = computed(() => reviewActivities(trace.value, running.value ? items.value.length : 0));
-const phaseDescription = computed(() => queued.value ? `当前排队第 ${queuePosition.value} 位，轮到后自动开始；可最小化窗口继续其他工作，也可取消排队。` : running.value ? phaseDescriptions[Math.min(activeStep.value,6)] : value('reviewError') ? '本次处理已停止，已有结果会保留。' : '重点要求与全文分析已整理完成，可进入工作台逐项复核。');
+const phaseDescription = computed(() => queued.value ? `当前排队第 ${queuePosition.value} 位，轮到后自动开始；可最小化窗口继续其他工作，也可取消排队。` : running.value ? phaseDescriptions[Math.min(activeStep.value,6)] : value('reviewError') ? '本轮未完成审查，不能作为审核结论；上次已完成的结果会保留。' : '重点要求与全文分析已整理完成，可进入工作台逐项复核。');
 const metrics = computed(() => {
   const prepare = trace.value.find(item => item.stage === 'prepare') || {};
   const segment = [...trace.value].reverse().find(item => Number.isInteger(item.segment_count));
@@ -142,7 +147,7 @@ const severityName = (severity) =>
           <li
             v-for="(step, index) in steps"
             :key="step"
-            :class="{ done: index < activeStep, active: !queued && index === activeStep }"
+            :class="{ done: index < activeStep, active: running && !queued && index === activeStep }"
             :aria-current="!queued && index === activeStep ? 'step' : undefined"
           >
             <span class="review-stage-icon">{{
@@ -154,22 +159,24 @@ const severityName = (severity) =>
         <section class="review-process" aria-label="实时处理过程">
           <div class="review-dialog-status" role="status">
             <i v-if="running"></i>
-            <span>{{ queued ? '等待执行 · 排队第 ' + queuePosition + ' 位' : running ? '正在处理：' + steps[activeStep] : value('reviewError') ? '本次审查已停止' : '审查完成，意见和修订建议已生成。' }}</span>
+            <span>{{ queued ? '等待执行 · 排队第 ' + queuePosition + ' 位' : running ? '正在处理：' + steps[activeStep] : value('reviewError') ? admissionStopped ? '未通过审查准入' : '本次审查已停止' : '审查完成，意见和修订建议已生成。' }}</span>
             <time class="review-elapsed" aria-label="累计处理用时">{{ queued ? '已等待' : '已用时' }} {{ elapsed }}</time>
           </div>
+          <p v-if="value('reviewError')" class="review-failure-message" role="alert">{{ value('reviewError') }}</p>
           <div class="review-current-activity"><p>{{ phaseDescription }}</p><div v-if="metrics.length" class="review-activity-metrics"><span v-for="metric in metrics" :key="metric">{{ metric }}</span></div></div>
           <ol v-if="activity.length" class="review-activity-list" aria-label="审查动态" aria-live="polite" aria-relevant="additions text">
             <li v-for="(entry,index) in activity" :key="entry.id" :class="{'is-latest':index === activity.length - 1 && running}"><span class="review-activity-dot" aria-hidden="true"></span><span>{{ entry.text }}</span><time>{{ activityTime(entry.time) }}</time></li>
           </ol>
         </section>
-        <PriorityReview v-if="!running && value('reviewResult')" :context="context" :result="value('reviewResult')" />
+        <PriorityReview v-if="succeeded" :context="context" :result="value('reviewResult')" />
         <div class="review-analysis-heading">
-          <h4>全文风险分析（已识别 {{ items.length }} 项）</h4>
-          <span>{{ running ? "实时更新 · 待最终校验" : "已完成校验" }}</span>
+          <h4 v-if="running || succeeded">全文风险分析（已识别 {{ items.length }} 项）</h4>
+          <h4 v-else>本轮未生成有效审查结果</h4>
+          <span>{{ running ? "实时更新 · 待最终校验" : succeeded ? "已完成校验" : "未完成校验" }}</span>
         </div>
         <div v-if="!items.length" class="review-waiting">
           <div v-if="running" class="review-waiting-line"></div>
-          <h4>{{ queued ? "任务已加入本地队列" : running ? "正在形成条款意见" : "本次未识别出审查问题" }}</h4>
+          <h4>{{ queued ? "任务已加入本地队列" : running ? "正在形成条款意见" : succeeded ? "本次未识别出审查问题" : "审查未完成，不能判断是否存在问题" }}</h4>
           <p v-if="running">
             {{ queued ? '同一服务凭证最多并发 5 个审查任务，排队期间尚未开始分析。' : '完成的条款意见将逐项出现在这里，初步意见仍需后续校验。' }}
           </p>
@@ -213,14 +220,14 @@ const severityName = (severity) =>
         <span>{{
           running
             ? queued ? "排队第 " + queuePosition + " 位" : "正在处理：" + steps[activeStep]
-            : "共 " + items.length + " 项审查意见"
+            : succeeded ? "共 " + items.length + " 项审查意见" : "本轮未完成审查"
         }}</span
         ><button
           v-if="!running"
           class="review-result-button"
           @click="context.closeReviewDialog"
         >
-          查看审查修订稿</button
+          {{ succeeded ? '查看审查修订稿' : '返回工作台' }}</button
         ><span v-else>阶段完成后自动更新</span>
       </footer>
     </section>
@@ -231,3 +238,7 @@ const severityName = (severity) =>
     <span class="review-background-open">{{ running ? '查看进度' : '查看结果' }}</span>
   </button>
 </template>
+
+<style scoped>
+.review-failure-message { margin:16px; padding:12px 14px; border:1px solid #fecaca; border-radius:8px; background:#fef2f2; color:#991b1b; font-size:13px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
+</style>

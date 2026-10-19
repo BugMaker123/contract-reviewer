@@ -28,14 +28,10 @@ export default {
         }}</span></strong
       >
 
-      <button
-        v-if="opinionsOpen && reviewReady && !resultStale && revisionMode !== 'compare'"
-        class="batch-accept"
-        :disabled="revisionReadOnly || !pendingApplicableCount"
-        @click="acceptAllRevisions"
-      >
-        一键全部采纳
-      </button>
+      <div v-if="opinionsOpen && reviewReady && !resultStale && revisionMode !== 'compare'" class="wb-batch-actions">
+        <button class="batch-accept" :disabled="revisionReadOnly || !pendingApplicableCount" @click="acceptAllRevisions">一键全部采纳</button>
+        <button class="batch-cancel" :disabled="revisionReadOnly || !appliedIssueIds.length" @click="cancelAllAcceptedRevisions">一键取消已采纳</button>
+      </div>
     </div>
     <div
       v-show="opinionsOpen"

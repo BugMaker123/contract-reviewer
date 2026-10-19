@@ -260,6 +260,29 @@ export function useTrackedReview(context) {
     }
     if (issues.length) message("已采纳 " + issues.length + " 项修订");
   };
+  const cancelAllAcceptedRevisions = async () => {
+    if (!writable() || !appliedIssueIds.value.length) return false;
+    revisionBusy.value = true;
+    const previousApplied = [...appliedIssueIds.value];
+    const previousDecisions = { ...workspace.decisions };
+    try {
+      const decisions = { ...previousDecisions };
+      for (const id of previousApplied) decisions[id] = "pending";
+      appliedIssueIds.value = [];
+      workspace.decisions = decisions;
+      // Persist the whole batch once, with the run revision checked by the server.
+      await workspace.flush();
+      message(`已取消 ${previousApplied.length} 项采纳，恢复为待处理`);
+      return true;
+    } catch (error) {
+      appliedIssueIds.value = previousApplied;
+      workspace.decisions = previousDecisions;
+      message("取消采纳失败：" + error.message);
+      return false;
+    } finally {
+      revisionBusy.value = false;
+    }
+  };
   const modelConfig = () => ({
     ...context.modelConfig.value,
     model_name:
@@ -448,6 +471,7 @@ export function useTrackedReview(context) {
     setReviewDecision,
     pendingApplicableCount,
     acceptAllRevisions,
+    cancelAllAcceptedRevisions,
     generateRevision,
     beginRevisionEdit,
     saveRevisionEdit,
