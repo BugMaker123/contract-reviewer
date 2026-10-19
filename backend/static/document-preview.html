@@ -103,6 +103,7 @@
     }
 
     #download {
+      display: none !important;
       display: flex;
       align-items: center;
       gap: 4px;
@@ -561,7 +562,7 @@
         try {
           const [metadata, file] = await Promise.all([
             fetch('/api/runs/' + run + '/review-document/info?display=' + encodeURIComponent(display)),
-            fetch('/api/runs/' + run + '/review-document?display=' + encodeURIComponent(display))
+            fetch('/api/runs/' + run + '/review-document/preview?display=' + encodeURIComponent(display))
           ]);
           if (!metadata.ok || !file.ok) throw Error('无法获取最新修订');
           const nextInfo = await metadata.json(), blob = await file.blob();
@@ -757,7 +758,7 @@
         const response = await fetch(metadata);
         if (!response.ok) { const data = await response.json(); throw Error(data.detail || '文档记录不存在'); }
         info = await response.json(); document.querySelector('#name').textContent = info.name; label.title = info.name;
-        const url = tracking ? '/api/runs/' + run + '/review-document?display=' + encodeURIComponent(display) : run ? '/api/runs/' + encodeURIComponent(run) + '/preview-file?scope=' + encodeURIComponent(scope) : '/api/sources/' + id + '/file';
+        const url = tracking ? '/api/runs/' + run + '/review-document/preview?display=' + encodeURIComponent(display) : run ? '/api/runs/' + encodeURIComponent(run) + '/preview-file/inline?scope=' + encodeURIComponent(scope) : '/api/sources/' + id + '/file';
         const link = document.querySelector('#download'); link.href = url; link.download = info.name;
         const file = await fetch(url); if (!file.ok) throw Error('原件文件缺失，请重新上传'); const blob = await file.blob();
         if (info.extension === '.docx') {

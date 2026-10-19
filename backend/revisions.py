@@ -53,16 +53,20 @@ def review_document(run, repo, builder, display='markup'):
     return document, layout, warnings
 
 
+def matching_input(task, snapshot):
+    def value(record, key):
+        return (record.get(key) or ('plan' if key == 'execution' else [])) if key in ('execution', 'requirements') else record.get(key)
+    return all(value(task, key) == value(snapshot, key) for key in ('title', 'text', 'role', 'type', 'mode', 'scale', 'background', 'focus', 'reference_text', 'references', 'requirements', 'execution', 'checklist', 'source_id'))
+
+
 def editable_run(repo, run_id, revision):
     run = repo.get(run_id, 'run')
     task = repo.get(run['task_id'], 'task')
-    if run['status'] != 'completed' or task.get('active_run') != run_id or task['status'] == 'running':
+    if run['status'] != 'completed' or task.get('active_run') != run_id or task['status'] in ('running', 'queued'):
         raise HTTPException(409, '只能修改当前已完成的审查版本')
     if run['revision'] != revision:
         raise HTTPException(409, '修订已在其他页面变更，请刷新后重试')
-    def value(record, key):
-        return (record.get(key) or ('plan' if key == 'execution' else [])) if key in ('execution', 'requirements') else record.get(key)
-    if any(value(task, key) != value(run['input'], key) for key in ('title', 'text', 'role', 'type', 'mode', 'scale', 'background', 'focus', 'reference_text', 'references', 'requirements', 'execution', 'checklist', 'source_id')):
+    if not matching_input(task, run['input']):
         raise HTTPException(409, '合同或审查条件已改变，请重新审查后再生成修订')
     return run
 
@@ -103,9 +107,6 @@ def save_candidate(repo, run, issue_id, redline, explanation, instruction, sourc
     candidate = {**run, 'result': result, 'applied': applied}
     revised_text(candidate, applied + [issue_id])
     decisions = {**run.get('decisions', {}), issue_id: 'pending'}
-    saved = repo.update(run['id'], {'result': result, 'applied': applied, 'decisions': decisions,
-                                   'revision_history': history}, run['revision'])
-    task = repo.get(run['task_id'], 'task')
-    if task.get('active_run') == run['id'] and task['status'] == 'completed':
-        repo.update(task['id'], {'status': 'pending_review'})
+    saved = repo.update_review(run['id'], {'result': result, 'applied': applied, 'decisions': decisions,
+                                   'revision_history': history}, run['revision'], editable=True)
     return saved

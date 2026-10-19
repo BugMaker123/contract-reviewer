@@ -87,3 +87,34 @@ def test_catalog_browser_crud_and_category_navigation(isolated_workspace):
         expect(page.get_by_role('heading', name='页面不存在')).to_be_visible()
         assert not errors, errors
         browser.close()
+
+
+def test_home_checklist_summary_restored_draft_and_selection(isolated_workspace):
+    import json
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright, expect
+    with live_server() as base, sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        lists = [page.request.post(base + '/api/checklists', data={
+            'name': '首页清单' + str(index), 'published': True,
+            'items': [{'id': 'payment', 'title': '付款', 'requirement': '验收后付款'}],
+        }).json() for index in range(2)]
+        draft = {'mode': 'checklist', 'title': '恢复中的合同', 'text': '第一条 验收后付款。',
+                 'checklist_id': lists[0]['id'], 'checklist_item_ids': ['payment']}
+        page.add_init_script('sessionStorage.setItem("LEXIS_HOME_DRAFT", ' + json.dumps(json.dumps(draft)) + ')')
+        page.goto(base)
+        expect(page.get_by_role('heading', name='新建合同审查', exact=True)).to_be_visible()
+        expect(page.get_by_text('首页清单1 · 1 条要求', exact=True)).to_have_count(1)
+        expect(page.get_by_role('button', name='进入工作台核对合同', exact=True)).to_be_enabled()
+        page.locator('.checklist-picker select').last.select_option(lists[1]['id'])
+        expect(page.locator('.checklist-selection')).to_contain_text('已勾选 1 项')
+        page.get_by_role('button', name='进入工作台核对合同', exact=True).click()
+        page.wait_for_url('**/workbench?task=*')
+        task = page.request.get(base + '/api/tasks/' + page.url.split('task=')[1]).json()
+        assert task['checklist']['id'] == lists[1]['id']
+        assert task['text'] == draft['text']
+        assert not errors, errors
+        browser.close()

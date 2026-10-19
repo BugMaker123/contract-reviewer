@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 
 from . import workspace_review
 from .store import now
+from .export_policy import exportable_run
 from .word_export import paragraphs, visible_paragraph_text
 from .workspace_models import RevisionGenerate, RevisionEdit, RevisionRestore
 from .revisions import editable_run, revision_anchor, save_candidate, review_document, revision_plan
@@ -97,7 +98,14 @@ def create_revision_router(repository, builder):
 
     @router.get('/api/runs/{run_id}/review-document')
     def document_file(run_id: str, display: str = 'markup'):
-        run = completed(run_id)
+        return document_response(run_id, display, False)
+
+    @router.get('/api/runs/{run_id}/review-document/preview')
+    def document_preview(run_id: str, display: str = 'markup'):
+        return document_response(run_id, display, True)
+
+    def document_response(run_id, display, preview):
+        run = completed(run_id) if preview else exportable_run(repository(), run_id)
         document, layout, _ = review_document(run, repository(), builder, display)
         buffer = BytesIO()
         document.save(buffer)
@@ -105,7 +113,7 @@ def create_revision_router(repository, builder):
         from urllib.parse import quote
         name = run['input']['title'] + ('-修订稿' if display == 'markup' else '-当前稿' if display == 'current' else '-原始稿') + '.docx'
         return StreamingResponse(buffer, media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                                 headers={'Content-Disposition': "attachment; filename*=UTF-8''" + quote(name),
+                                 headers={'Content-Disposition': ("inline" if preview else "attachment") + "; filename*=UTF-8''" + quote(name),
                                           'Cache-Control': 'no-store', 'X-Word-Layout': layout})
 
     return router

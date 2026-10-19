@@ -3,6 +3,7 @@ from copy import deepcopy
 from difflib import SequenceMatcher
 from io import BytesIO
 from pathlib import Path
+import os
 
 from docx import Document
 from docx.oxml import OxmlElement
@@ -10,7 +11,7 @@ from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 
 
-SOURCES = Path(__file__).parent.parent / 'data' / 'sources'
+SOURCES = Path(os.environ.get('LEXIS_DATA_DIR') or Path(os.environ.get('LEXIS_DB_PATH') or Path(__file__).parent.parent / 'data' / 'lexis.db').parent) / 'sources'
 
 
 def visible_paragraph_text(element):

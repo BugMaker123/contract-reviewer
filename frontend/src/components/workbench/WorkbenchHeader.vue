@@ -1,9 +1,35 @@
 <script>
+import { ref, watch, onMounted, onScopeDispose } from "vue";
 import ChevronIcon from "../ChevronIcon.vue";
 export default {
   components: { ChevronIcon },
   props: { context: { type: Object, required: true } },
-  setup: (props) => props.context,
+  setup(props) {
+    const exportOpen = ref(false);
+    const closeExport = (event) => {
+      if (event.type === 'keydown' ? event.key === 'Escape' : !event.target.closest('.wb-export-menu')) exportOpen.value = false;
+    };
+    onMounted(() => {
+      document.addEventListener('pointerdown', closeExport);
+      document.addEventListener('keydown', closeExport);
+    });
+    onScopeDispose(() => {
+      document.removeEventListener('pointerdown', closeExport);
+      document.removeEventListener('keydown', closeExport);
+    });
+    watch(() => props.context.workspace.canExport, (allowed) => { if (!allowed) exportOpen.value = false; });
+    const toggleExport = async () => {
+      if (exportOpen.value) { exportOpen.value = false; return; }
+      if (await props.context.workspace.checkExport()) exportOpen.value = true;
+    };
+    const download = async (scope) => {
+      exportOpen.value = false;
+      if (!await props.context.workspace.checkExport(scope)) return;
+      props.context.workspace.exportScope = scope;
+      return props.context.workspace.exportWord();
+    };
+    return { ...props.context, exportOpen, download, toggleExport };
+  },
 };
 </script>
 <template>
@@ -32,8 +58,6 @@ export default {
 
     </div>
     <div class="prototype-nav-right">
-      <button @click="openEditor" :disabled="documentSaving || workspace.historical || workspace.loading || revisionBusy || isReviewing || ['running','queued'].includes(workspace.task?.status)" class="wb-edit-action">编辑正文</button>
-      <button @click="showReportModal = true" :disabled="!reviewResult" class="wb-report-action">审查意见书</button>
       <details class="wb-menu">
         <summary>审查设置 <ChevronIcon /></summary>
         <div class="wb-popover">
@@ -117,6 +141,7 @@ export default {
           </section>
         </div>
       </details>
+      <button @click="showReportModal = true" :disabled="!reviewResult" class="wb-report-action">审查意见书</button>
 
       <button v-if="!isReviewing && workspace.task?.running_run" class="wb-background-progress" @click="startReview(workspace.task.running_run)">查看后台进度</button>
       <button
@@ -180,17 +205,17 @@ export default {
       >
         {{ workspace.saving ? "保存中…" : "保存" }}
       </button>
-      <details class="wb-menu wb-export-menu">
-        <summary class="wb-export-action">导出 <ChevronIcon /></summary>
-        <div class="wb-popover">
-          <p class="text-xs text-slate-500 p-2">{{ contractTitle }} · {{ workspace.run ? '第 ' + workspace.run.number + ' 次审查' : '待审正文' }}</p>
-          <button @click="workspace.exportDocument(true)" :disabled="documentSaving || workspace.loading">待审正文</button>
-          <button v-for="option in [{id:'current',name:'当前采纳稿（清洁版）'},{id:'tracked',name:'当前采纳稿（修订痕迹）'},{id:'all',name:'全部建议稿（未自动采纳）'},{id:'report',name:'全部审查意见书'},{id:'applied_report',name:'已采纳意见书'}]" :key="option.id" :disabled="!workspace.run?.result || resultStale || workspace.saving" @click="workspace.exportScope = option.id; workspace.exportWord()">{{ option.name }}</button>
-          <button :disabled="!workspace.run" @click="workspace.downloadAudit()">JSON 审核记录</button>
-        </div>
-      </details>
 
       <button @click="workspace.finish" :disabled="workspace.historical || resultStale || workspace.saving || workspace.task?.status !== 'pending_review'" :title="resultStale ? '请先重新审查当前正文' : ''" class="wb-finish-action">{{ workspace.task?.status === 'completed' ? '已完成审核' : '完成审核' }}</button>
+      <div class="wb-export-menu wb-menu">
+        <button class="wb-delivery-button"
+          :title="workspace.canExport ? '导出修订稿' : '请先完成审核'" :aria-expanded="exportOpen"
+          aria-haspopup="menu" @click="toggleExport">导出 <ChevronIcon /></button>
+        <div v-if="exportOpen" class="wb-delivery-menu" role="menu" aria-label="导出审核文件">
+          <button role="menuitem" @click="download('current')"><strong>修订稿</strong><span>{{ workspace.canExport ? '仅合入已采纳修改 · Word' : '完成审核后可导出 · Word' }}</span></button>
+        </div>
+      </div>
+
     </div>
   </header>
   <div v-if="showReviewBaseline" class="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-6">

@@ -16,6 +16,13 @@ def confirm_original_review(page):
     dialog.get_by_role('button', name='确认并开始审查', exact=True).click()
 
 
+def choose_comparison(page):
+    # Comparison is an explicit choice; reviews open in the revision document.
+    expect(page.get_by_test_id('tracked-document-pane')).to_be_visible()
+    page.get_by_label('更多文档视图').click()
+    page.get_by_role('tab', name='前后对比', exact=True).click()
+
+
 def open_opinions(page):
     expect(page.locator('#opinion-drawer')).to_be_visible()
 
@@ -87,10 +94,12 @@ def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
             task = response.json()
             page.request.post(base + '/api/tasks/' + task['id'] + '/review/stream', data={})
             page.goto(base + '/workbench?task=' + task['id'])
+            choose_comparison(page)
             expect(page.locator('iframe[title="合同原件预览"]')).to_be_visible()
-            page.get_by_role('button', name='重新审查', exact=True).click()
+            page.locator('.prototype-navbar').get_by_role('button', name='重新审查', exact=True).click()
             confirm_original_review(page)
             page.get_by_role('button', name='查看审查修订稿', exact=True).click()
+            choose_comparison(page)
             expect(page.get_by_test_id('original-document-pane')).to_be_visible()
             expect(page.frame_locator('iframe[title="合同原件预览"]').locator('article')).not_to_have_count(0, timeout=30000)
             open_opinions(page)
@@ -142,14 +151,15 @@ def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
             page.reload()
             open_opinions(page)
             expect(page.locator('#contract-viewer')).to_contain_text('【整篇正文修改】')
-            page.get_by_role('button', name='重新审查', exact=True).click()
+            page.locator('.prototype-navbar').get_by_role('button', name='重新审查', exact=True).click()
             confirm_original_review(page)
             close_opinions(page)
-            expect(page.get_by_role('button', name='重新审查', exact=True)).to_be_enabled(timeout=30000)
+            expect(page.locator('.prototype-navbar').get_by_role('button', name='重新审查', exact=True)).to_be_enabled(timeout=30000)
             assert len(page.request.get(base+'/api/tasks/'+task['id']).json()['runs']) == 3
             page.reload()
             open_opinions(page)
-            expect(page.locator('#contract-viewer')).to_contain_text('【整篇正文修改】')
+            expect(page.get_by_test_id('tracked-document-pane')).to_be_visible()
+            expect(page.frame_locator('iframe[title="合同修订文档"]').locator('article')).to_contain_text('【整篇正文修改】')
             assert not errors, errors
             browser.close()
     finally:
@@ -196,6 +206,7 @@ def test_docx_inline_edit_stays_in_document(isolated_workspace, monkeypatch):
             result['issues'][0]['redline'] = None
             workspace_api.repo.update(run['id'], {'result': result})
             page.goto(base+'/workbench?task='+task['id'])
+            choose_comparison(page)
             frame = page.frame_locator('iframe[title="合同原件预览"]')
             expect(frame.locator('article p').first).to_contain_text('Payment: 100 USD')
             close_opinions(page)
@@ -380,6 +391,7 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
                     page.screenshot(path='artifacts/review-processing.png')
                     page.set_viewport_size({'width':1920,'height':1080})
                 page.get_by_role('button',name='查看审查修订稿',exact=True).click()
+                choose_comparison(page)
                 expect(page.locator('.review-dialog')).to_have_count(0)
                 expect(page.locator('#review-summary-content')).to_be_visible()
                 expect(page.locator('#review-opinion-content')).to_be_visible()
@@ -537,7 +549,7 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             expect(right.locator('article p').first).to_have_text('Payment: 500 USD')
             expect(right.locator('article p').nth(2)).to_have_text('Section 1: saved from toolbar')
             expect(right.locator('article p').nth(1)).to_have_text('Section 0: body edit must survive')
-            page.get_by_role('button',name='重新审查',exact=True).click()
+            page.locator('.prototype-navbar').get_by_role('button',name='重新审查',exact=True).click()
             confirm_original_review(page)
             expect(page.locator('.review-dialog')).to_be_visible()
             page.get_by_role('button',name='取消审查',exact=True).click()

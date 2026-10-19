@@ -105,6 +105,41 @@ export function createWorkspaceWorkbench(refs) {
       (conditions.value.source_id || null) !== (snapshot.source_id || null)
     );
   });
+  const dirty = computed(() => !hydrating.value && !historical.value &&
+    (JSON.stringify(input()) !== lastInput || (run.value?.status === "completed" && JSON.stringify(handling()) !== lastHandling)));
+  const canExport = computed(() => task.value?.status === "completed" &&
+    task.value?.active_run === run.value?.id && run.value?.status === "completed" &&
+    !historical.value && !isStale.value && !dirty.value && !saving.value);
+  const canExportReport = computed(() => ['pending_review', 'completed'].includes(task.value?.status) &&
+    task.value?.active_run === run.value?.id && run.value?.status === "completed" &&
+    !historical.value && !isStale.value && !dirty.value && !saving.value);
+  const requireReportExport = () => {
+    if (!canExportReport.value) throw new Error("请先完成当前合同审查，再导出审查意见书");
+  };
+  const requireExport = () => {
+    if (!canExport.value) throw new Error("请先完成审核，再导出文件");
+  };
+  const checkExport = async (scope = "current") => {
+    const check = scope === "report" ? requireReportExport : requireExport;
+    try {
+      check();
+      const current = await api('/api/tasks/' + taskId.value);
+      task.value = current;
+      check();
+      if (current.run?.revision !== run.value?.revision) throw new Error('审核记录已改变，请刷新后再导出');
+      return true;
+    } catch (err) {
+      refs.showToast(err.message);
+      return false;
+    }
+  };
+  const beforeUnload = (event) => {
+    if (!dirty.value && !saving.value) return;
+    event.preventDefault();
+    event.returnValue = "";
+  };
+  window.addEventListener("beforeunload", beforeUnload);
+  onScopeDispose(() => window.removeEventListener("beforeunload", beforeUnload));
   const flush = async () => {
     clearTimeout(timer);
     if (hydrating.value || historical.value || refs.isReviewing.value || ["running","queued"].includes(task.value?.status)) return;
@@ -150,7 +185,7 @@ export function createWorkspaceWorkbench(refs) {
               task.value = await api("/api/tasks/" + taskId.value);
           }
         }
-        refs.saveStatus.value = "已保存到本机服务";
+        refs.saveStatus.value = dirty.value ? "有待保存的修改" : "已保存到本机服务";
       } catch (err) {
         error.value = err.message;
         refs.saveStatus.value = "保存失败，请重试";
@@ -312,6 +347,7 @@ export function createWorkspaceWorkbench(refs) {
   const exportDocument = async (original = false) => {
     try {
       await flush();
+      requireExport();
       const suffix = historical.value ? "?run=" + run.value.id : "";
       const preview = original ? null : refs.getPreviewExport?.();
       const documentUrl = preview
@@ -330,6 +366,7 @@ export function createWorkspaceWorkbench(refs) {
           "合同.docx",
       );
       anchor.click();
+      refs.showToast("已发起 Word 下载，请查看浏览器下载列表");
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       if (response.headers.get("X-Word-Layout") === "reconstructed")
         refs.showToast("已下载当前正文，Word 使用统一版式");
@@ -339,11 +376,14 @@ export function createWorkspaceWorkbench(refs) {
     }
   };
   const exportWord = async () => {
+    const scope = exportScope.value;
     try {
       await flush();
+      if (["report", "applied_report"].includes(scope)) requireReportExport();
+      else requireExport();
       if (!run.value) throw new Error("请先选择审查版本");
       const response = await fetch(
-        "/api/runs/" + run.value.id + "/export?scope=" + exportScope.value,
+        "/api/runs/" + run.value.id + "/export?scope=" + scope,
       );
       if (!response.ok) {
         const data = await response.json();
@@ -357,6 +397,7 @@ export function createWorkspaceWorkbench(refs) {
           "合同.docx",
       );
       anchor.click();
+      refs.showToast("已发起 Word 下载，请查看浏览器下载列表");
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       if (response.headers.get("X-Word-Layout") === "reconstructed")
         refs.showToast("Word 已导出，正文按统一版式重新排版，请复核后使用");
@@ -374,8 +415,7 @@ export function createWorkspaceWorkbench(refs) {
         { archived: false, revision: task.value.revision, confirmations: confirmations.value },
       );
       await refresh();
-      refs.showToast("已完成复核，任务记录已更新");
-      await router.push("/");
+      refs.showToast("已完成审核，现在可以导出文件");
     } catch (err) {
       refs.showToast(err.message);
     }
@@ -446,6 +486,7 @@ export function createWorkspaceWorkbench(refs) {
     if (answer.suggested_text) refs.copyText(answer.suggested_text);
   };
   return {
+    canExport, canExportReport, requireExport, checkExport,
     getModel: refs.getModel,
     verifying, manualBusy, confirmations, verifyCurrent, addManualIssue, selectVersion, downloadAudit,
     taskId,

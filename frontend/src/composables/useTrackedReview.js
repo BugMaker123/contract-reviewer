@@ -10,20 +10,25 @@ export function useTrackedReview(context) {
     focusedIssueId,
     isReviewing,
   } = context;
+  const displayKey = () => `LEXIS_REVIEW_DISPLAY:${workspace.taskId || "unsaved"}`;
   let savedMode = "markup";
   try {
-    savedMode = sessionStorage.getItem("LEXIS_REVIEW_DISPLAY") || "markup";
+    const taskMode = sessionStorage.getItem(displayKey());
+    const legacyMode = sessionStorage.getItem("LEXIS_REVIEW_DISPLAY");
+    savedMode = taskMode || (["markup", "current", "original"].includes(legacyMode) ? legacyMode : "markup");
   } catch {}
   const revisionMode = ref(
-    ["markup", "current", "original"].includes(savedMode)
-      ? savedMode
-      : "markup",
+    ["markup", "current", "original", "compare"].includes(savedMode) ? savedMode : "markup",
   );
   watch(revisionMode, (mode) => {
-    try {
-      sessionStorage.setItem("LEXIS_REVIEW_DISPLAY", mode);
-    } catch {}
+    try { sessionStorage.setItem(displayKey(), mode); } catch {}
   });
+  watch(isReviewing, (running) => {
+    if (running) revisionMode.value = "markup";
+  }, { flush: "sync" });
+  const showDocumentComparison = computed(() =>
+    revisionMode.value === "compare" && context.documentCompare.value &&
+    !isReviewing.value && !["running", "queued"].includes(workspace.task?.status));
   const revisionBusy = ref(false);
   const revisionDocumentLoaded = ref(false);
   const revisionRenderedVersion = ref(0);
@@ -311,6 +316,7 @@ export function useTrackedReview(context) {
   const exportReviewDocument = async () => {
     try {
       await workspace.flush();
+      workspace.requireExport();
       const display =
         revisionMode.value === "compare" ? "markup" : revisionMode.value;
       const response = await fetch(
@@ -329,6 +335,7 @@ export function useTrackedReview(context) {
             ? "-当前稿.docx"
             : "-原始稿.docx");
       anchor.click();
+      message("已发起 Word 下载，请查看浏览器下载列表");
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
       message(error.message);
@@ -417,6 +424,7 @@ export function useTrackedReview(context) {
   onBeforeRouteUpdate(guard);
   return {
     revisionMode,
+    showDocumentComparison,
     reviewReady,
     useRevisionDocument,
     revisionDocumentUrl,

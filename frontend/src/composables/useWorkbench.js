@@ -1337,6 +1337,16 @@ export function useWorkbench() {
     }
   });
 
+  const protectEditorUnload = (event) => {
+    const draft = documentDraft.value;
+    if (!(draft && draft.text !== contractText.value) &&
+        !(clauseEdit.value && clauseEdit.value.text !== clauseEdit.value.original) &&
+        !(showEditor.value && editText.value !== contractText.value)) return;
+    event.preventDefault();
+    event.returnValue = "";
+  };
+  window.addEventListener("beforeunload", protectEditorUnload);
+  onScopeDispose(() => window.removeEventListener("beforeunload", protectEditorUnload));
   const saveBeforeNavigation = async () => {
     if (!workspace.taskId && !contractText.value.trim()) return true;
     if (isReviewing.value) return true; // The saved snapshot continues in the backend.

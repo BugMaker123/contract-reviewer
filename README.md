@@ -4,11 +4,13 @@
 
 ## 启动
 
-前端已迁移为 Vue 3 单页应用。请先安装 Node.js 和 npm；启动器会按需安装前端依赖并构建。
+使用 Python 3.14、Node.js 22。发布前安装锁定依赖并构建；默认启动不联网安装、不热重载，仅支持一个 worker。
 
 ```powershell
 uv venv
-uv pip install --python .venv/Scripts/python.exe -r requirements.txt
+uv pip install --python .venv/Scripts/python.exe -r requirements-lock.txt
+npm --prefix frontend ci
+npm --prefix frontend run build
 .venv/Scripts/python.exe run.py
 ```
 
@@ -35,6 +37,12 @@ uv pip install --python .venv/Scripts/python.exe -r requirements.txt
 数据保存在 `data/lexis.db`，原始文件保存在 `data/sources/`；备份时应一起备份。任务可归档和恢复。服务重启时未完成的审查标记中断，旧结果保留。
 
 新增功能与验证说明见 [审查闭环说明](docs/审查闭环说明.md) 、[功能完整性修复清单](docs/功能完整性修复清单.md) 和 [工作流与版本管理修复](docs/工作流与版本管理修复.md)。
+
+开发时使用 `.venv/Scripts/python.exe run.py --dev`，按需安装及构建前端并启用后端热重载。
+
+可设置 `LEXIS_DATA_DIR` 统一数据库和源文件目录；仅设置 `LEXIS_DB_PATH` 时源文件跟随数据库所在目录。旧数据无需搬迁；更换目录前停服并复制数据库与 sources。迁移回滚只需停服后恢复原目录配置。分类名称/编码增加唯一索引，已有重复项会明确阻止启动，需先备份并人工合并。
+
+停服后执行 `python -m backend.data_maintenance verify` 核对文件、哈希和数据库；`python -m backend.data_maintenance backup <新备份目录>` 创建备份。在新的空 `LEXIS_DATA_DIR` 下执行 `python -m backend.data_maintenance restore <备份目录>` 并再次 verify，验证后再切换服务目录。旧文件无历史哈希时只能核对存在性。归档保留所有源文件和历史快照；暂不自动彻底删除，verify 只报告未引用文件，不自动清理。健康检查：`/api/health`；响应携带 `X-Request-ID`，异常日志不打印合同正文或凭据。
 
 ## 开发与验证
 

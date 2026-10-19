@@ -81,13 +81,17 @@ export function createContext(page, requiredData) {
   context.loadRecords = async () => {
     const paths = {
       tasks: page === "shell" ? "/api/tasks?page=1&page_size=3&archived=false" : "/api/tasks",
-      lists: "/api/checklists",
+      lists: "/api/checklists?summary=true",
       categories: "/api/categories",
       samples: "/api/samples",
     };
     const results = await Promise.allSettled(
       requiredData.map(async (key) => {
         const data = await api(paths[key]);
+        if (key === "lists" && context.form?.checklist_id) {
+          const index = data.items.findIndex(item => item.id === context.form.checklist_id);
+          if (index >= 0) data.items[index] = await api('/api/checklists/' + context.form.checklist_id);
+        }
         context[key].value = key === "samples" ? data.samples : data.items;
       }),
     );

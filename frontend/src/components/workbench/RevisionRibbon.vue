@@ -10,13 +10,14 @@ export default {
   <section class="prototype-view-switch" aria-label="文档修订工具栏">
     <div class="revision-view-tabs" role="tablist" aria-label="修订显示方式">
       <details class="wb-menu revision-view-menu">
-        <summary aria-label="更多文档视图"><span class="revision-view-caption">文档视图</span><strong>{{ { markup: '全部修订标记', original: '原始文本', current: '当前采纳稿' }[revisionMode] }}</strong><ChevronIcon /></summary>
+        <summary aria-label="更多文档视图"><span class="revision-view-caption">文档视图</span><strong>{{ { markup: '全部修订标记', original: '原始文本', current: '当前采纳稿', compare: '前后对比' }[revisionMode] }}</strong><ChevronIcon /></summary>
         <div class="wb-popover" @click="$event.target.closest('button') && $event.currentTarget.closest('details').removeAttribute('open')">
           <button
             v-for="mode in [
               { id: 'markup', name: '全部修订标记', label: '所有标记', description: '查看原文及修订痕迹' },
               { id: 'original', name: '原始文本', label: '原始稿', description: '查看本轮审查前的正文' },
               { id: 'current', name: '当前采纳稿', label: '当前稿', description: '仅合入已采纳的修改，隐藏痕迹' },
+              { id: 'compare', name: '前后对比', label: '前后对比', description: '并排核对原文和全部建议' },
             ]"
             :key="mode.id"
             role="tab"

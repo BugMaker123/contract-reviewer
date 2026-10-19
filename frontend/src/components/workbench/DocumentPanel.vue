@@ -83,10 +83,10 @@ export default {
     <div
       v-else
       class="wb-document-grid"
-      :class="{ 'is-comparing': documentCompare }"
+      :class="{ 'is-comparing': showDocumentComparison }"
     >
       <div
-        v-if="documentCompare"
+        v-if="showDocumentComparison"
         class="wb-document-pane"
         data-testid="original-document-pane"
       >
@@ -109,7 +109,7 @@ export default {
       <div class="wb-document-pane" data-testid="revised-document-pane">
         <div
           v-if="
-            documentCompare &&
+            showDocumentComparison &&
             (isReviewing ||
               viewMode !== 'original' ||
               !workspace.conditions.source_id)
@@ -127,7 +127,7 @@ export default {
           }}</small>
         </div>
         <div
-          v-if="documentCompare && isReviewing"
+          v-if="showDocumentComparison && isReviewing"
           class="wb-review-placeholder"
         >
           <strong>{{ reviewQueue?.status === "queued" ? "审查任务排队中" : "正在审查合同" }}</strong><span>完成后在此展示修订后的文档</span>
@@ -138,9 +138,9 @@ export default {
             '/static/document-preview.html?source=' +
             workspace.conditions.source_id +
             '&pane=' +
-            (documentCompare ? 'revised' : 'original') +
+            (showDocumentComparison ? 'revised' : 'original') +
             (resultStale ? '&edited=1' : '') +
-            (documentCompare && !resultStale && workspace.run && reviewResult
+            (showDocumentComparison && !resultStale && workspace.run && reviewResult
               ? '&run=' +
                 workspace.run.id +
                 '&scope=' +

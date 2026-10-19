@@ -2167,3 +2167,12 @@
 .workbench-view .review-background-indicator strong { display:block; font-size:12px; font-weight:600; }.workbench-view .review-background-indicator small { display:block; margin-top:4px; font-size:10px; color:#64748b; }
 .workbench-view .review-background-dot { width:7px; height:7px; background:#2563eb; border-radius:50%; animation:review-pulse 1.4s infinite; }.workbench-view .review-background-dot.done { background:#059669; animation:none; }
 .workbench-view .review-background-open { font-size:11px; color:#2563eb; }.workbench-view .wb-background-progress { color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; padding:8px 12px; border-radius:6px; font-size:12px; }
+
+.workbench-view .wb-delivery-button { display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#334155; font:inherit; font-size:12px; cursor:pointer; }
+.workbench-view .wb-delivery-button:hover:not(:disabled) { border-color:#94a3b8; background:#f8fafc; }
+.workbench-view .wb-delivery-button:disabled { color:#94a3b8; border-color:#e2e8f0; background:#f8fafc; cursor:not-allowed; }
+.workbench-view .wb-delivery-menu { position:absolute; right:0; top:calc(100% + 8px); width:232px; padding:6px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; box-shadow:0 8px 24px #0f172a14; z-index:45; }
+.workbench-view .wb-delivery-menu button { display:flex; flex-direction:column; gap:4px; width:100%; padding:10px 12px; border:0; border-radius:6px; text-align:left; background:transparent; cursor:pointer; }
+.workbench-view .wb-delivery-menu button:hover { background:#f1f5f9; }
+.workbench-view .wb-delivery-menu strong { font-size:13px; font-weight:600; color:#334155; }
+.workbench-view .wb-delivery-menu span { font-size:11px; color:#64748b; }

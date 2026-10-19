@@ -231,7 +231,7 @@ def test_functional_workbench_in_browser(isolated_workspace, monkeypatch):
         fields = page.get_by_placeholder('每条填写一项可核验的要求')
         fields.last.fill('设备应附带验收材料')
         page.get_by_role('button',name='保存审查条件',exact=True).click()
-        expect(page.get_by_text('正文或条件已改变，请重新审查；以下结论属于旧版本。',exact=True)).to_be_visible()
+        expect(page.get_by_text('审查条件已改变，当前展示上次审查的文档与意见。请重新审查后再处理修订。',exact=True)).to_be_visible()
         assert not errors, errors
         browser.close()
 

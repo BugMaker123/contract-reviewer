@@ -15,7 +15,7 @@ export function setup(context) {
         (
           list.name +
           list.description +
-          list.items.map((item) => item.title + item.requirement).join(" ")
+          (list.items || []).map((item) => item.title + item.requirement).join(" ")
         )
           .toLowerCase()
           .includes(search.value.trim().toLowerCase()),

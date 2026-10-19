@@ -79,8 +79,8 @@ export default {
                     :to="'/workbench?task=' + task.id"
                     class="records-open text-blue-600"
                     >打开</RouterLink
-                  ><a v-if="task.active_run" :href="`/api/runs/${task.active_run}/export?scope=report`" class="text-blue-600">导出审核结果</a>
-                  <a v-if="task.active_run" :href="`/api/runs/${task.active_run}/export?scope=current`" class="text-emerald-700" :title="`第 ${task.run_number} 次审查采纳稿`">导出采纳稿</a>
+                  ><a v-if="task.active_run && ['pending_review', 'completed'].includes(task.status)" :href="`/api/runs/${task.active_run}/export?scope=report`" class="text-blue-600">导出审核结果</a>
+                  <a v-if="task.active_run && task.status === 'completed'" :href="`/api/runs/${task.active_run}/export?scope=current`" class="text-emerald-700" :title="`第 ${task.run_number} 次审查采纳稿`">导出采纳稿</a>
                   <button v-if="task.active_run" class="text-blue-600" @click="comparisonTask = task">前后对比</button>
                   <button
                     @click="archive('tasks', task)"
@@ -90,7 +90,7 @@ export default {
                     {{ task.archived ? "恢复" : "归档" }}
                   </button>
                 </div>
-                <p v-if="task.active_run && ['draft','failed','interrupted','running','queued'].includes(task.status)" class="text-xs text-amber-700 mt-2">导出及对比使用第 {{ task.run_number }} 次已留档结果</p>
+                <p v-if="task.active_run && ['draft','failed','interrupted','running','queued'].includes(task.status)" class="text-xs text-amber-700 mt-2">对比使用第 {{ task.run_number }} 次已留档结果</p>
               </td>
             </tr>
           </tbody>

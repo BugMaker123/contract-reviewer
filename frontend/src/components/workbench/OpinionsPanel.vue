@@ -43,8 +43,9 @@ export default {
       class="wb-opinion-content"
     >
 
-      <StaleReviewNotice v-if="resultStale" :context="context" />
-      <template v-else>
+      <StaleReviewNotice v-if="resultStale && revisionMode !== 'compare'" :context="context" />
+      <p v-if="resultStale && revisionMode === 'compare'" role="status">正文或条件已改变，请重新审查；以下结论属于旧版本。</p>
+      <template v-if="!resultStale || revisionMode === 'compare'">
       <section class="wb-opinion-toolbar" aria-label="审查建议筛选">
         <input v-model="issueSearch" placeholder="搜索条款或意见" aria-label="搜索审查意见" class="wb-opinion-search" />
         <div class="wb-opinion-filter-row">

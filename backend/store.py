@@ -17,7 +17,7 @@ def now():
 
 class Repository:
     def __init__(self, path=None):
-        self.path = str(path or os.environ.get('LEXIS_DB_PATH') or Path(__file__).parent.parent / 'data' / 'lexis.db')
+        self.path = str(path or os.environ.get('LEXIS_DB_PATH') or Path(os.environ.get('LEXIS_DATA_DIR') or Path(__file__).parent.parent / 'data') / 'lexis.db')
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as db:
             db.execute('''CREATE TABLE IF NOT EXISTS objects (
@@ -25,6 +25,13 @@ class Repository:
                 data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1,
                 created TEXT NOT NULL, updated TEXT NOT NULL)''')
             db.execute('CREATE INDEX IF NOT EXISTS objects_kind_parent ON objects(kind, parent)')
+            db.execute('CREATE TABLE IF NOT EXISTS review_events (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, data TEXT NOT NULL)')
+            db.execute('CREATE INDEX IF NOT EXISTS review_events_run ON review_events(run_id,id)')
+            for field in ('name', 'code'):
+                try:
+                    db.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS category_unique_{field} ON objects(lower(trim(json_extract(data,'$.{field}')))) WHERE kind='category' AND trim(coalesce(json_extract(data,'$.{field}'),''))!=''")
+                except sqlite3.IntegrityError as error:
+                    raise RuntimeError('分类名称或编码存在重复，请备份后合并重复分类再启动') from error
             db.execute('CREATE INDEX IF NOT EXISTS objects_kind_updated ON objects(kind, updated DESC, id)')
             db.execute("CREATE INDEX IF NOT EXISTS objects_checklist_category ON objects(json_extract(data,'$.category_id')) WHERE kind='checklist'")
 
@@ -60,6 +67,11 @@ class Repository:
             else:
                 rows = db.execute('SELECT * FROM objects WHERE kind=? AND parent=? ORDER BY created DESC', (kind, parent)).fetchall()
         return [self.unpack(row) for row in rows]
+
+    def checklist_summaries(self):
+        with self.connect() as db:
+            rows = db.execute("SELECT id,revision,created,updated,json_remove(data,'$.items') AS data,json_array_length(data,'$.items') AS item_count FROM objects WHERE kind='checklist' ORDER BY updated DESC").fetchall()
+        return [{**self.unpack(row), 'item_count': row['item_count']} for row in rows]
 
     def catalog_page(self, kind, page, page_size, search='', category_id=None, archived=None, published=None):
         """Filter/count/page in SQLite; list cards never load checklist bodies."""
@@ -109,9 +121,21 @@ class Repository:
                 db.execute("DELETE FROM objects WHERE kind='checklist_version' AND parent=?", (identifier,))
         return {'deleted': identifier}
 
-    def create(self, kind, data, parent=None):
-        identifier, stamp = uuid4().hex, now()
+    def _catalog_constraints(self, db, kind, data, identifier=None):
+        if kind == 'category':
+            for field in ('name', 'code'):
+                value = data.get(field, '').strip().casefold()
+                if value and any(json.loads(row['data']).get(field, '').strip().casefold() == value for row in db.execute("SELECT data FROM objects WHERE kind='category' AND id!=?", (identifier or '',))):
+                    raise HTTPException(409, '分类名称或编码已存在')
+        if kind == 'checklist' and data.get('category_id'):
+            if not db.execute("SELECT 1 FROM objects WHERE kind='category' AND id=?", (data['category_id'],)).fetchone():
+                raise HTTPException(409, '分类已删除，请重新选择')
+
+    def create(self, kind, data, parent=None, identifier=None):
+        identifier, stamp = identifier or uuid4().hex, now()
         with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            self._catalog_constraints(db, kind, data)
             db.execute('INSERT INTO objects(id,kind,parent,data,created,updated) VALUES(?,?,?,?,?,?)',
                        (identifier, kind, parent, json.dumps(data, ensure_ascii=False), stamp, stamp))
         return self.get(identifier, kind)
@@ -172,9 +196,58 @@ class Repository:
                 raise HTTPException(409, '记录已在其他页面修改，请重新打开后再保存')
             data = json.loads(row['data'])
             data.update(changes)
+            self._catalog_constraints(db, row['kind'], data, identifier)
+            if row['kind'] == 'checklist' and 'version' in changes:
+                stamp = now()
+                db.execute('INSERT INTO objects(id,kind,parent,data,created,updated) VALUES(?,?,?,?,?,?)',
+                           (uuid4().hex, 'checklist_version', identifier, json.dumps(self.unpack(row), ensure_ascii=False), stamp, stamp))
             db.execute('UPDATE objects SET data=?, revision=revision+1, updated=? WHERE id=?',
                        (json.dumps(data, ensure_ascii=False), now(), identifier))
         return self.get(identifier)
+
+    def append_trace(self, run_id, entry):
+        """Append small telemetry rows without rewriting contract/result snapshots."""
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            db.execute('INSERT INTO review_events(run_id,data) VALUES(?,?)', (run_id, json.dumps(entry, ensure_ascii=False)))
+            db.execute('DELETE FROM review_events WHERE run_id=? AND id NOT IN (SELECT id FROM review_events WHERE run_id=? ORDER BY id DESC LIMIT 256)', (run_id, run_id))
+
+    def update_review(self, run_id, changes, expected_revision=None, *, task_changes=None, editable=False, strict=True):
+        """Validate and commit the run and its task under one write lock."""
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute("SELECT * FROM objects WHERE id=? AND kind='run'", (run_id,)).fetchone()
+            if row is None:
+                raise HTTPException(404, '审查版本不存在')
+            run = self.unpack(row)
+            task_row = db.execute("SELECT * FROM objects WHERE id=? AND kind='task'", (run['task_id'],)).fetchone()
+            if task_row is None:
+                raise HTTPException(404, '任务不存在')
+            task = self.unpack(task_row)
+            if expected_revision is not None and row['revision'] != expected_revision:
+                raise HTTPException(409, '审查版本已改变，请刷新后重试')
+            if editable:
+                if run['status'] != 'completed' or task.get('active_run') != run_id or task['status'] in ('running', 'queued'):
+                    raise HTTPException(409, '只能修改当前已完成的审查版本')
+                if strict:
+                    from .revisions import matching_input
+                    if not matching_input(task, run['input']):
+                        raise HTTPException(409, '合同或审查条件已改变，请重新审查')
+                if task_changes is None and task['status'] == 'completed':
+                    task_changes = {'status': 'pending_review'}
+            for record, delta in ((run, changes), (task, task_changes)):
+                if not delta:
+                    continue
+                data = {k: v for k, v in record.items() if k not in ('id', 'revision', 'created_at', 'updated_at')}
+                data.update(delta)
+                db.execute('UPDATE objects SET data=?,revision=revision+1,updated=? WHERE id=?',
+                           (json.dumps(data, ensure_ascii=False), now(), record['id']))
+        return self.get(run_id, 'run')
+
+    def run_summaries(self, task_id):
+        with self.connect() as db:
+            rows = db.execute("SELECT id,revision,created,updated,json_object('number',json_extract(data,'$.number'),'status',json_extract(data,'$.status'),'error',json_extract(data,'$.error'),'baseline_kind',json_extract(data,'$.baseline_kind'),'parent_run_id',json_extract(data,'$.parent_run_id'),'queue',json_extract(data,'$.queue')) AS data FROM objects WHERE kind='run' AND parent=? ORDER BY created DESC", (task_id,)).fetchall()
+        return [self.unpack(row) for row in rows]
 
     def complete_review(self, task_id, task_revision, run_id, run_revision, confirmations):
         """Commit confirmation and completion together after validating both versions."""

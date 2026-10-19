@@ -25,18 +25,22 @@ def emit_progress(stage, detail, **fields):
 async def observable_events(events, snapshot, config):
     """Forward progress emitted by graph worker threads before a node completes."""
     loop = asyncio.get_running_loop()
-    queue = asyncio.Queue()
+    queue = asyncio.Queue(maxsize=256)
     owner = threading.get_ident()
     stopped = threading.Event()
     started = time.monotonic()
+
+    def offer(data):
+        if not stopped.is_set() and not queue.full():
+            queue.put_nowait(('progress', data))
 
     def observe(data):
         if stopped.is_set():
             return
         if threading.get_ident() == owner:
-            queue.put_nowait(('progress', data))
+            offer(data)
         elif not loop.is_closed():
-            loop.call_soon_threadsafe(queue.put_nowait, ('progress', data))
+            loop.call_soon_threadsafe(offer, data)
 
     async def produce():
         token = _observer.set(observe)

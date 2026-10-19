@@ -125,11 +125,16 @@ export function setup(context) {
       if (!['deep', 'checklist'].includes(form.mode)) form.mode = 'deep';
       inputMethod.value = ["file", "paste"].includes(source) ? source : "paste";
     }
+    if (form.checklist_id) {
+      const selected = form.checklist_item_ids;
+      await chooseChecklist();
+      form.checklist_item_ids = selected;
+    }
     const query = new URLSearchParams(location.search);
     if (query.has("checklist")) {
       form.mode = "checklist";
       form.checklist_id = query.get("checklist");
-      chooseChecklist();
+      await chooseChecklist();
     }
   };
 

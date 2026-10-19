@@ -24,7 +24,7 @@ export default {
       >
         <option value="">请选择可用清单</option>
         <option v-for="list in availableLists" :value="list.id">
-          {{ list.name }} · {{ list.items.length }} 条要求
+          {{ list.name }} · {{ list.item_count ?? list.items?.length ?? 0 }} 条要求
         </option>
       </select></label
     >

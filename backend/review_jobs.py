@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from .store import now
 from .graph import ModelCallError
@@ -21,9 +22,14 @@ class ReviewJob:
     task: object = None
     ticket: object = None
     queue: object = None
+    expires: object = None
+    offset: int = 0
 
     def publish(self, kind, data):
         self.events.append((kind, data))
+        if len(self.events) > 512:
+            del self.events[0]
+            self.offset += 1
         self.changed.set()
 
 
@@ -51,8 +57,7 @@ def launch(repo, run, config, review_events):
         if changed == queue_state:
             return
         queue_state = changed
-        repo.update(run['id'], {'status':state['status'], 'queue':changed})
-        repo.update(run['task_id'], {'status':state['status']})
+        repo.update_review(run['id'], {'status':state['status'], 'queue':changed}, task_changes={'status':state['status']})
         job.publish('queue', changed)
     # Only the fingerprint enters the scheduler; credentials stay in the job closure.
     group = credential_group(config)
@@ -62,42 +67,49 @@ def launch(repo, run, config, review_events):
     async def execute():
         progress, trace = [], []
         completed = False
+        last_trace_write = 0
         try:
-            await job.ticket.ready
+            await asyncio.wait_for(asyncio.shield(job.ticket.ready), timeout=job.queue.wait_timeout)
             async for kind, data in observable_events(review_events, run['input'], config):
                 if kind == 'progress':
                     trace.append(data)
-                    repo.update(run['id'], {'audit_trace': trace})
+                    trace[:] = trace[-256:]
+                    if time.monotonic() - last_trace_write < 1:
+                        job.publish(kind, data)
+                        continue
+                    last_trace_write = time.monotonic()
+                    await asyncio.to_thread(repo.append_trace, run['id'], data)
                 if kind == 'node_update':
                     progress.append(data['log'])
                     trace.append({'stage': data['node'], 'detail': data['log']['detail'], 'time': now()})
-                    repo.update(run['id'], {'progress_log': progress, 'last_node': data['node'], 'audit_trace': trace})
+                    await asyncio.to_thread(repo.update, run['id'], {'progress_log': progress, 'last_node': data['node']})
                 if kind == 'complete':
-                    completed = True
                     data['audit_trace'] = trace
-                    repo.update(run['id'], {'status': 'completed', 'result': data, 'completed_at': now(), 'queue':{**queue_state,'status':'completed','position':0,'finished_at':now()}})
-                    repo.update(run['task_id'], {'status': 'pending_review', 'active_run': run['id'], 'error': None})
+                    repo.update_review(run['id'], {'status': 'completed', 'result': data, 'audit_trace': trace, 'completed_at': now(), 'queue':{**queue_state,'status':'completed','position':0,'finished_at':now()}}, task_changes={'status': 'pending_review', 'active_run': run['id'], 'error': None})
+                    completed = True
                     data = {'success': True, 'data': data, 'run_id': run['id'], 'number': run['number']}
                 job.publish(kind, data)
             if not completed:
                 raise ValueError('未收到完整审查结果')
         except asyncio.CancelledError:
-            repo.update(run['id'], {'status': 'interrupted', 'error': '审查已取消或服务已停止', 'queue':{**queue_state,'status':'interrupted','position':0,'finished_at':now()}})
-            repo.update(run['task_id'], {'status': 'interrupted', 'error': '审查已中断，上次结果已保留'})
+            repo.update_review(run['id'], {'status': 'interrupted', 'error': '审查已取消或服务已停止', 'queue':{**queue_state,'status':'interrupted','position':0,'finished_at':now()}}, task_changes={'status': 'interrupted', 'error': '审查已中断，上次结果已保留'})
             job.publish('error', {'error': '审查已中断，上次结果已保留'})
             raise
         except Exception as error:
             logger.exception('Review failed: run=%s', run['id'])
-            message = str(error) if isinstance(error, (ModelCallError, TimeoutError)) else '审查执行失败，请检查模型连接后重试'
+            message = (str(error) or '排队等待超过 5 分钟，请稍后重试') if isinstance(error, (ModelCallError, TimeoutError)) else '审查执行失败，请检查模型连接后重试'
             trace.append({'stage': 'failed', 'detail': message, 'time': now()})
-            repo.update(run['id'], {'status': 'failed', 'error': message, 'audit_trace': trace, 'queue':{**queue_state,'status':'failed','position':0,'finished_at':now()},
-                                   **({'admission': error.decision} if isinstance(error, AdmissionError) else {})})
-            repo.update(run['task_id'], {'status': 'failed', 'error': '审查执行失败，上次完成的结果已保留'})
+            try:
+                repo.update_review(run['id'], {'status': 'failed', 'error': message, 'audit_trace': trace, 'queue':{**queue_state,'status':'failed','position':0,'finished_at':now()},
+                                   **({'admission': error.decision} if isinstance(error, AdmissionError) else {})}, task_changes={'status': 'failed', 'error': '审查执行失败，上次完成的结果已保留'})
+            except Exception:
+                logger.exception('Could not persist failure: run=%s', run['id'])
             job.publish('error', {'error': message + '；上次完成的结果已保留'})
         finally:
             job.queue.release(job.ticket)
             job.done = True
             job.changed.set()
+            job.expires = asyncio.get_running_loop().call_later(300, lambda: _jobs.pop(key(repo, run['id']), None))
 
     job.task = asyncio.create_task(execute())
     return job
@@ -116,16 +128,21 @@ async def subscribe(repo, run_id):
         else:
             yield event('error', {'error': run.get('error') or '任务无法在当前服务连接，请重新打开任务检查状态'})
         return
-    cursor = 0
+    cursor = job.offset
+    if job.offset:
+        run = await asyncio.to_thread(repo.get, run_id, 'run')
+        yield event('init', {'run_id': run_id, 'number': run['number'], 'document': {'text': run['input']['text'], 'source_id': run['input'].get('source_id')}})
     while True:
-        while cursor < len(job.events):
-            kind, data = job.events[cursor]
+        cursor = max(cursor, job.offset)
+        while cursor < job.offset + len(job.events):
+            cursor = max(cursor, job.offset)
+            kind, data = job.events[cursor - job.offset]
             cursor += 1
             yield event(kind, data)
         if job.done:
             return
         job.changed.clear()
-        if cursor < len(job.events):
+        if cursor < job.offset + len(job.events):
             continue
         try:
             await asyncio.wait_for(job.changed.wait(), timeout=10)
@@ -144,11 +161,10 @@ async def cancel(repo, run_id):
         await asyncio.gather(job.task, return_exceptions=True)
         if not job.done:  # Cancellation before execute() gets its first turn.
             state = repo.get(run_id, 'run').get('queue') or {}
-            repo.update(run_id, {'status': 'interrupted', 'error': '审查已取消', 'queue':{**state,'status':'interrupted','position':0,'finished_at':now()}})
-            run = repo.get(run_id, 'run')
-            repo.update(run['task_id'], {'status': 'interrupted', 'error': '审查已取消，上次结果已保留'})
+            repo.update_review(run_id, {'status': 'interrupted', 'error': '审查已取消', 'queue':{**state,'status':'interrupted','position':0,'finished_at':now()}}, task_changes={'status': 'interrupted', 'error': '审查已取消，上次结果已保留'})
             job.publish('error', {'error': '审查已取消，上次结果已保留'})
             job.done = True
+            job.expires = asyncio.get_running_loop().call_later(300, lambda: _jobs.pop(key(repo, run_id), None))
             job.queue.cancel(job.ticket)
 
 

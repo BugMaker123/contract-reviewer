@@ -424,3 +424,96 @@ def test_reference_layout_with_multiline_contract(revision_client):
     finally:
         server.should_exit = True
         thread.join(timeout=5)
+
+
+def test_default_single_revision_during_review_and_reload(revision_client, monkeypatch):
+    import asyncio
+    import threading
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright, expect
+    task, run = seed_review(revision_client, True)
+    release = threading.Event()
+    async def delayed(snapshot, config):
+        while not release.is_set():
+            await asyncio.sleep(.02)
+        yield 'complete', deepcopy(run['result'])
+    monkeypatch.setattr(workspace_api, 'review_events', delayed)
+    with live_server() as base, sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        # Old browser state must not turn all new tasks into comparison mode.
+        page.add_init_script("sessionStorage.setItem('LEXIS_REVIEW_DISPLAY','compare')")
+        try:
+            page.goto(base + '/workbench?task=' + task['id'])
+            expect(page.get_by_test_id('tracked-document-pane')).to_be_visible()
+            expect(page.get_by_test_id('original-document-pane')).to_have_count(0)
+            preview = page.frame_locator('iframe[title="合同修订文档"]')
+            expect(preview.locator('article ins')).not_to_have_count(0)
+            page.get_by_label('更多文档视图').click()
+            page.get_by_role('tab', name='前后对比', exact=True).click()
+            expect(page.get_by_test_id('original-document-pane')).to_be_visible()
+            page.locator('.prototype-navbar').get_by_role('button', name='重新审查', exact=True).click()
+            dialog = page.get_by_role('dialog', name='选择重新审查稿件')
+            dialog.locator('input[value="task"]').check()
+            dialog.get_by_role('button', name='确认并开始审查', exact=True).click()
+            page.get_by_label('最小化审查进度').click()
+            expect(page.get_by_test_id('original-document-pane')).to_have_count(0)
+            expect(page.locator('iframe[title="合同原件预览"]')).to_be_visible()
+            expect(page.locator('.wb-document-grid')).not_to_have_class('is-comparing')
+            release.set()
+            expect(page.get_by_test_id('tracked-document-pane')).to_be_visible(timeout=15000)
+            expect(preview.locator('article ins')).not_to_have_count(0)
+            expect(preview.locator('article del')).not_to_have_count(0)
+            page.reload()
+            expect(page.get_by_test_id('tracked-document-pane')).to_be_visible()
+            expect(page.get_by_test_id('original-document-pane')).to_have_count(0)
+            assert not errors, errors
+        finally:
+            release.set()
+            browser.close()
+
+
+def test_export_menu_after_accepting_all_without_reload(revision_client):
+    import json
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright, expect
+    task, _ = seed_review(revision_client, True)
+    with live_server() as base, sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(accept_downloads=True)
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        page.goto(base + '/workbench?task=' + task['id'])
+        expect(page.get_by_test_id('tracked-document-pane')).to_be_visible()
+        page.get_by_role('button', name='一键全部采纳', exact=True).click()
+        expect(page.get_by_role('button', name='一键全部采纳', exact=True)).to_be_disabled()
+        with page.expect_download() as direct_download:
+            page.get_by_role('button', name='导出', exact=True).click()
+        assert direct_download.value.failure() is None
+        assert Document(direct_download.value.path()).paragraphs
+        assert not page.locator('.wb-export-menu').get_attribute('open')
+        page.get_by_label('更多导出格式', exact=True).click()
+        assert page.locator('.wb-export-menu').get_attribute('open') is not None
+        options = ['待审正文', '当前采纳稿（清洁版）', '当前采纳稿（修订痕迹）',
+                   '全部建议稿（未自动采纳）', '全部审查意见书', '已采纳意见书', 'JSON 审核记录']
+        for option in options:
+            if page.locator('.wb-export-menu').get_attribute('open') is None:
+                page.locator('.wb-export-menu > summary').click()
+            with page.expect_download() as download:
+                page.get_by_role('button', name=option, exact=True).click()
+            assert download.value.failure() is None
+            path = download.value.path()
+            if option == 'JSON 审核记录':
+                assert len(json.loads(path.read_text(encoding='utf-8'))['applied']) == 2
+            else:
+                document = Document(path)
+                assert document.paragraphs
+                if option == '当前采纳稿（清洁版）':
+                    assert '验收合格后30日付款' in native_text(path.read_bytes())[0]
+                if option == '当前采纳稿（修订痕迹）':
+                    with ZipFile(path) as archive:
+                        assert b'<w:ins' in archive.read('word/document.xml')
+        assert not errors, errors
+        browser.close()

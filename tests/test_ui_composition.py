@@ -65,13 +65,13 @@ def test_navigation_keeps_document_layout_forms_and_history(isolated_workspace):
         page.get_by_label('合同正文', exact=True).fill('第一条 验收后付款。')
         page.get_by_placeholder('填写便于识别的合同名称').fill('保留中的审查表单')
         nav = page.locator('.portal-sidebar nav')
-        for name, heading in [('审查记录','审查记录'),('业务分类维护','合同业务分类维护'),('审查清单','企业审查清单')]:
+        for name, heading in [('审查记录','审查记录'),('业务分类维护','业务分类维护'),('审查清单','企业审查清单')]:
             nav.get_by_role('link', name=name, exact=True).click()
             expect(page.get_by_role('heading', name=heading, exact=True)).to_be_visible()
             assert page.evaluate('window.spaMarker') == 'same-document'
             assert page.evaluate("window.shellHeader === document.querySelector('.portal-header')")
         page.go_back()
-        expect(page.get_by_role('heading', name='合同业务分类维护', exact=True)).to_be_visible()
+        expect(page.get_by_role('heading', name='业务分类维护', exact=True)).to_be_visible()
         page.go_forward()
         expect(page.get_by_role('heading', name='企业审查清单', exact=True)).to_be_visible()
         nav.get_by_role('link', name='开始', exact=True).click()

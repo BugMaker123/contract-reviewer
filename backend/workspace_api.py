@@ -12,6 +12,7 @@ from fastapi.responses import Response
 
 from .store import repository as repo, now
 from .revisions import revised_text, editable_run
+from .export_policy import exportable_run, exportable_report
 from .revision_api import create_revision_router
 from .ui import PORTAL_PAGES
 from .workspace_models import (TaskInput, ChecklistInput, CategoryInput, RunRequest, HandlingInput, ArchiveInput,
@@ -212,30 +213,44 @@ def list_tasks(page: int = Query(1, ge=1), page_size: int = Query(10, ge=1, le=1
 
 
 @router.get('/api/reports/reviews')
-def review_report(format: str = 'json'):
+def review_report(format: str = 'json', page: int = Query(1, ge=1), page_size: int = Query(100, ge=1, le=1000),
+                  from_date: date | None = None, to_date: date | None = None):
     if format not in ('json', 'csv'):
         raise HTTPException(422, '仅支持 JSON 或 CSV')
-    # Each row is a review attempt, including rejected, failed and interrupted runs.
-    with repo.connect() as db:
-        rows = [dict(row) for row in db.execute('''SELECT id, created AS created_at,
-            json_extract(data,'$.task_id') AS task_id, json_extract(data,'$.number') AS number,
-            json_extract(data,'$.input.title') AS title, json_extract(data,'$.status') AS status,
-            json_extract(data,'$.input.mode') AS mode, json_extract(data,'$.error') AS error,
-            coalesce(json_extract(data,'$.admission.status'),json_extract(data,'$.result.admission.status')) AS admission,
-            json_array_length(data,'$.result.issues') AS issues,
-            json_array_length(data,'$.applied') AS applied
-            FROM objects WHERE kind='run' ORDER BY created DESC''').fetchall()]
-    totals = {status: sum(row['status'] == status for row in rows) for status in ('completed', 'failed', 'interrupted', 'running', 'queued')}
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(422, '开始日期不能晚于结束日期')
+    where, params = "kind='run'", []
+    for operator, day in (('>=', from_date), ('<', to_date + timedelta(days=1) if to_date else None)):
+        if day:
+            where += ' AND created ' + operator + ' ?'
+            params.append(datetime.combine(day, datetime.min.time(), timezone(timedelta(hours=8))).astimezone(timezone.utc).isoformat())
+    query = """SELECT id, created AS created_at,
+        json_extract(data,'$.task_id') AS task_id, json_extract(data,'$.number') AS number,
+        json_extract(data,'$.input.title') AS title, json_extract(data,'$.status') AS status,
+        json_extract(data,'$.input.mode') AS mode, json_extract(data,'$.error') AS error,
+        coalesce(json_extract(data,'$.admission.status'),json_extract(data,'$.result.admission.status')) AS admission,
+        json_array_length(data,'$.result.issues') AS issues, json_array_length(data,'$.applied') AS applied
+        FROM objects WHERE """ + where + ' ORDER BY created DESC'
     if format == 'json':
-        return {'total': len(rows), 'statuses': totals, 'items': rows, 'scope': '全部审查尝试（含归档任务）'}
-    stream = StringIO(newline='')
-    writer = csv.writer(stream)
-    writer.writerow(['审查编号', '任务编号', '版本', '合同名称', '状态', '审查方式', '开始时间', '准入结论', '意见数', '采纳数', '异常原因'])
-    for row in rows:
-        values = [row.get(key) for key in ('id', 'task_id', 'number', 'title', 'status', 'mode', 'created_at', 'admission', 'issues', 'applied', 'error')]
-        writer.writerow([("'" + value if value.lstrip().startswith(('=', '+', '-', '@')) else value) if isinstance(value, str) else value for value in values])
-    return Response(stream.getvalue().encode('utf-8-sig'), media_type='text/csv',
-                    headers={'Content-Disposition': 'attachment; filename="review-records.csv"'})
+        with repo.connect() as db:
+            totals = {status: 0 for status in ('completed', 'failed', 'interrupted', 'running', 'queued')}
+            counts = db.execute("SELECT json_extract(data,'$.status'),count(*) FROM objects WHERE " + where + " GROUP BY json_extract(data,'$.status')", params).fetchall()
+            totals.update({row[0]: row[1] for row in counts})
+            rows = db.execute(query + ' LIMIT ? OFFSET ?', [*params, page_size, (page-1)*page_size]).fetchall()
+        return {'total': sum(totals.values()), 'statuses': totals, 'items': [dict(row) for row in rows], 'page': page, 'page_size': page_size, 'scope': '全部审查尝试（含归档任务）'}
+    def stream_csv():
+        stream = StringIO(newline='')
+        writer = csv.writer(stream)
+        writer.writerow(['审查编号', '任务编号', '版本', '合同名称', '状态', '审查方式', '开始时间', '准入结论', '意见数', '采纳数', '异常原因'])
+        yield stream.getvalue().encode('utf-8-sig')
+        with repo.connect() as db:
+            for record in db.execute(query, params):
+                stream.seek(0); stream.truncate(0)
+                row = dict(record)
+                values = [row.get(key) for key in ('id', 'task_id', 'number', 'title', 'status', 'mode', 'created_at', 'admission', 'issues', 'applied', 'error')]
+                writer.writerow([("'" + value if value.lstrip().startswith(('=', '+', '-', '@')) else value) if isinstance(value, str) else value for value in values])
+                yield stream.getvalue().encode('utf-8')
+    return StreamingResponse(stream_csv(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename="review-records.csv"'})
 
 
 @router.post('/api/tasks')
@@ -247,7 +262,7 @@ def create_task(request: TaskInput):
 def get_task(task_id: str):
     task = repo.get(task_id, 'task')
     task['source_matches'] = bool(task.get('source_id')) and repo.get(task['source_id'], 'source')['text'] == task['text']
-    task['runs'] = [{key: run.get(key) for key in ('id', 'number', 'status', 'created_at', 'error', 'baseline_kind', 'parent_run_id', 'queue')} for run in repo.list('run', task_id)]
+    task['runs'] = [{key: run.get(key) for key in ('id', 'number', 'status', 'created_at', 'error', 'baseline_kind', 'parent_run_id', 'queue')} for run in repo.run_summaries(task_id)]
     task['running_run'] = next((r['id'] for r in task['runs'] if r['status'] in ('running', 'queued')), None)
     task['run'] = run_view(repo.get(task['active_run'], 'run')) if task.get('active_run') else None
     return task
@@ -275,6 +290,8 @@ def archive_task(task_id: str, request: ArchiveInput):
 
 @router.post('/api/tasks/{task_id}/review/stream')
 async def start_review(task_id: str, request: StartReviewInput):
+    from .review_queue import get_review_queue
+    get_review_queue().ensure_capacity()
     baseline_data = None
     if request.baseline == 'accepted':
         from .word_export import SOURCES
@@ -289,12 +306,21 @@ async def start_review(task_id: str, request: StartReviewInput):
             values = paragraphs(document)
             if values and '\n'.join(visible_paragraph_text(p._p) for p in values) == task['title'] + '\n' + text:
                 values[0]._p.getparent().remove(values[0]._p)
-        source = repo.create('source', {'extension': '.docx', 'text': text, 'name': task['title'] + '-采纳稿.docx'})
-        SOURCES.mkdir(parents=True, exist_ok=True)
+        from .source_storage import save_source
         output = BytesIO(); document.save(output)
-        (SOURCES / (source['id'] + '.docx')).write_bytes(output.getvalue())
+        source = save_source(repo, SOURCES, {'extension': '.docx', 'text': text, 'name': task['title'] + '-采纳稿.docx'}, output.getvalue())
         baseline_data = {'text': text, 'source_id': source['id']}
-    run = repo.start_run(task_id, request.baseline, baseline_data, request.task_revision, request.run_revision)
+    try:
+        run = repo.start_run(task_id, request.baseline, baseline_data, request.task_revision, request.run_revision)
+    except BaseException:
+        if baseline_data:
+            from .source_storage import discard_source
+            try:
+                discard_source(repo, SOURCES, source)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception('Could not clean unused baseline source: source=%s', source['id'])
+        raise
     review_jobs.launch(repo, run, request.model_config_data.model_dump(), review_events)
     return StreamingResponse(review_jobs.subscribe(repo, run['id']), media_type='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
@@ -341,7 +367,7 @@ def compare_task_versions(task_id: str, before_run: str | None = None, after_run
 
 @router.get('/api/runs/{run_id}/audit')
 def export_audit(run_id: str):
-    run = repo.get(run_id, 'run')
+    run = exportable_run(repo, run_id)
     return Response(json.dumps(run, ensure_ascii=False, indent=2), media_type='application/json',
                     headers={'Content-Disposition': f'attachment; filename="review-audit-{run_id}.json"'})
 
@@ -367,10 +393,7 @@ def save_handling(run_id: str, request: HandlingInput):
             decisions[identifier] = 'applied'
         elif decisions.get(identifier) == 'applied':
             decisions[identifier] = 'pending'
-    result = repo.update(run_id, {'applied': request.applied, 'decisions': decisions, 'comments': request.comments}, request.revision)
-    task = repo.get(run['task_id'], 'task')
-    if task.get('active_run') == run_id and task['status'] == 'completed':
-        repo.update(task['id'], {'status': 'pending_review'})
+    result = repo.update_review(run_id, {'applied': request.applied, 'decisions': decisions, 'comments': request.comments}, request.revision, editable=True, strict=False)
     return run_view(result)
 
 
@@ -392,10 +415,7 @@ async def verify_current(run_id: str, request: VerifyCurrentInput):
     # Recheck task and run after the model call: do not attach results to changed inputs.
     editable_run(repo, run_id, request.revision)
     verification = {'digest': current_digest(run), 'findings': findings, 'verified_at': now()}
-    saved = repo.update(run_id, {'current_verification': verification, 'completion_confirmations': {}}, request.revision)
-    task = repo.get(run['task_id'], 'task')
-    if task['status'] == 'completed':
-        repo.update(task['id'], {'status': 'pending_review'}, task['revision'])
+    saved = repo.update_review(run_id, {'current_verification': verification, 'completion_confirmations': {}}, request.revision, editable=True)
     return run_view(saved)
 
 
@@ -420,10 +440,7 @@ def add_manual_issue(run_id: str, request: ManualIssueInput):
     if issue['redline']:
         for finding in result.get('proposed_requirement_findings', []):
             finding.update(status='needs_review', evidence='', explanation='新增人工修订后，全部建议稿核验已失效。')
-    saved = repo.update(run_id, {'result': result}, request.revision)
-    task = repo.get(run['task_id'], 'task')
-    if task['status'] == 'completed':
-        repo.update(task['id'], {'status': 'pending_review'}, task['revision'])
+    saved = repo.update_review(run_id, {'result': result}, request.revision, editable=True)
     return run_view(saved)
 
 
@@ -508,7 +525,9 @@ def validate_category(request):
 @router.get('/api/checklists')
 def list_checklists(page: int | None = Query(None, ge=1), page_size: int = Query(10, ge=1, le=100),
                     q: str = Query('', max_length=200), category_id: str | None = None,
-                    archived: bool | None = None, published: bool | None = None):
+                    archived: bool | None = None, published: bool | None = None, summary: bool = False):
+    if summary:
+        return {'items': repo.checklist_summaries()}
     if page is not None:
         return repo.catalog_page('checklist', page, page_size, q, category_id, archived, published)
     return {'items': repo.list('checklist')}
@@ -529,7 +548,6 @@ def update_checklist(identifier: str, request: ChecklistInput):
     # Every published version remains available to already created tasks.
     if request.revision != existing['revision']:
         raise HTTPException(409, '清单已在其他页面修改，请重新打开')
-    repo.create('checklist_version', existing, identifier)
     return repo.update(identifier, {**request.model_dump(exclude={'revision'}), 'version': existing['version'] + 1}, request.revision)
 
 
@@ -562,7 +580,7 @@ async def followup(run_id: str, request: FollowupInput):
     latest = editable_run(repo, run_id, run['revision'])
     history = latest['followups']
     history.setdefault(request.issue_id, []).append({'question': request.question, **data, 'created_at': now()})
-    return run_view(repo.update(run_id, {'followups': history}, latest['revision']))
+    return run_view(repo.update_review(run_id, {'followups': history}, latest['revision'], editable=True, task_changes={}))
 
 
 def word_document(title, text):
@@ -605,12 +623,12 @@ def display_time(stamp):
     return datetime.fromisoformat(stamp.replace('Z', '+00:00')).astimezone(timezone(timedelta(hours=8))).strftime('%Y年%m月%d日 %H:%M')
 
 
-def download_docx(document, filename, layout='reconstructed'):
+def download_docx(document, filename, layout='reconstructed', inline=False):
     stream = BytesIO()
     document.save(stream)
     stream.seek(0)
     return StreamingResponse(stream, media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                             headers={'Content-Disposition': "attachment; filename*=UTF-8''" + quote(filename + '.docx'), 'X-Word-Layout': layout})
+                             headers={'Content-Disposition': ("inline" if inline else "attachment") + "; filename*=UTF-8''" + quote(filename + '.docx'), 'X-Word-Layout': layout})
 
 
 @router.get('/api/tasks/{task_id}/document')
@@ -619,6 +637,7 @@ def export_task_document(task_id: str, run: str | None = None):
     from docx import Document
     from .word_export import SOURCES
     record = repo.get(task_id, 'task')
+    exportable_run(repo, run or record.get('active_run') or '')
     if run:
         version = repo.get(run, 'run')
         if version['task_id'] != task_id:
@@ -632,9 +651,18 @@ def export_task_document(task_id: str, run: str | None = None):
     return download_docx(word_document(record['title'], record['text']), record['title'])
 
 
+@router.get('/api/runs/{run_id}/preview-file/inline')
+def inline_revised_document(run_id: str, scope: str = 'all'):
+    run = repo.get(run_id, 'run')
+    if run['status'] != 'completed':
+        raise HTTPException(422, '当前版本无法生成修订预览')
+    document, layout, _ = revision_preview(run, scope)
+    return download_docx(document, run['input']['title'] + '-修订预览', layout, inline=True)
+
+
 @router.get('/api/runs/{run_id}/preview-file')
 def preview_revised_document(run_id: str, scope: str = 'all'):
-    run = repo.get(run_id, 'run')
+    run = exportable_run(repo, run_id)
     if run['status'] != 'completed':
         raise HTTPException(422, '当前版本无法生成修订预览')
     document, layout, warnings = revision_preview(run, scope)
@@ -643,7 +671,7 @@ def preview_revised_document(run_id: str, scope: str = 'all'):
 
 @router.get('/api/runs/{run_id}/export')
 def export_run(run_id: str, scope: str = 'current'):
-    run = repo.get(run_id, 'run')
+    run = exportable_report(repo, run_id) if scope in ('report', 'applied_report') else exportable_run(repo, run_id)
     if run['status'] != 'completed':
         raise HTTPException(409, '审查尚未完成')
     if scope not in ('current', 'tracked', 'all', 'report', 'applied_report'):

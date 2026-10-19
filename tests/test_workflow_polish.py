@@ -143,8 +143,11 @@ def test_browser_upload_and_rich_paste(isolated_workspace, monkeypatch):
         expect(page.frame_locator('iframe[title="合同原件预览"]').locator('article table')).to_be_visible()
         page.get_by_role('link',name='退出工作台',exact=True).click()
         expect(page.get_by_role('heading',name='新建合同审查',exact=True)).to_be_visible()
-        expect(page.locator('.recent-work')).to_contain_text('富文本浏览器验收')
-        page.locator('.recent-work').get_by_role('link',name='继续审查 →',exact=True).click()
+        page.locator('.portal-sidebar nav').get_by_role('link', name='审查记录', exact=True).click()
+        page.get_by_role('textbox', name='搜索审查记录', exact=True).fill('富文本浏览器验收')
+        row = page.locator('tbody tr').filter(has_text='富文本浏览器验收')
+        expect(row).to_have_count(1)
+        row.get_by_role('link', name='打开', exact=True).click()
         expect(page.get_by_role('heading',name='富文本浏览器验收',exact=True)).to_be_visible()
         assert not errors,errors
         browser.close()
@@ -176,8 +179,11 @@ def test_browser_records_paging_comparison_and_completion(isolated_workspace, mo
         row.get_by_role('link',name='打开',exact=True).click()
         page.get_by_role('button',name='完成审核',exact=True).click()
         expect(page.get_by_role('heading',name='新建合同审查',exact=True)).to_be_visible()
-        expect(page.locator('.recent-work')).to_contain_text('已完成')
-        expect(page.locator('.recent-work').get_by_role('link',name='查看审核结果 →',exact=True)).to_be_visible()
+        page.locator('.portal-sidebar nav').get_by_role('link', name='审查记录', exact=True).click()
+        page.get_by_role('textbox', name='搜索审查记录', exact=True).fill('记录交付验收')
+        row = page.locator('tbody tr').filter(has_text='记录交付验收')
+        expect(row).to_contain_text('已完成')
+        expect(row.get_by_role('link', name='打开', exact=True)).to_be_visible()
         assert page.request.get(base+'/api/tasks/'+item['id']).json()['status'] == 'completed'
         assert not errors,errors
         browser.close()

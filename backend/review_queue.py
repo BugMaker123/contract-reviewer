@@ -1,6 +1,7 @@
 """Replaceable FIFO admission queue for review jobs; local adapter is process-local."""
 import asyncio
 import hashlib
+from fastapi import HTTPException
 from contextlib import asynccontextmanager
 from uuid import uuid4
 from collections import deque
@@ -32,13 +33,21 @@ class _Group:
 
 class LocalReviewQueue:
     """All mutations run atomically on one asyncio loop. FIFO is per credential."""
-    def __init__(self, limit=5):
+    def __init__(self, limit=5, global_limit=10, max_waiting=100, wait_timeout=300):
         if limit < 1:
             raise ValueError('Concurrency limit must be positive')
         self.limit = limit
         self.groups = {}
+        self.global_limit = global_limit
+        self.max_waiting = max_waiting
+        self.wait_timeout = wait_timeout
+
+    def ensure_capacity(self):
+        if sum(len(state.waiting) for state in self.groups.values()) >= self.max_waiting:
+            raise HTTPException(429, '审查队列已满，请稍后重试', headers={'Retry-After': '10'})
 
     def enqueue(self, group, job_id, notify):
+        self.ensure_capacity()
         ticket = QueueTicket(group, job_id, notify, asyncio.get_running_loop().create_future())
         state = self.groups.setdefault(group, _Group())
         state.waiting.append(ticket)
@@ -46,7 +55,7 @@ class LocalReviewQueue:
         return ticket
 
     def _dispatch(self, group, state):
-        while len(state.running) < self.limit and state.waiting:
+        while len(state.running) < self.limit and state.waiting and sum(len(value.running) for value in self.groups.values()) < self.global_limit:
             ticket = state.waiting.popleft()
             if ticket.ready.cancelled():
                 ticket.status = 'cancelled'
@@ -74,7 +83,8 @@ class LocalReviewQueue:
             state.waiting.remove(ticket)
         except ValueError:
             pass
-        self._dispatch(ticket.group, state)
+        for group, current in list(self.groups.items()):
+            self._dispatch(group, current)
 
     def release(self, ticket):
         self._remove(ticket, 'done')
@@ -106,7 +116,7 @@ async def review_slot(config):
     queue = get_review_queue()
     ticket = queue.enqueue(credential_group(config), uuid4().hex, lambda state: None)
     try:
-        await ticket.ready
+        await asyncio.wait_for(asyncio.shield(ticket.ready), timeout=queue.wait_timeout)
         yield
     finally:
         queue.release(ticket)
