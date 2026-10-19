@@ -15,7 +15,7 @@ export function useTrackedReview(context) {
     savedMode = sessionStorage.getItem("LEXIS_REVIEW_DISPLAY") || "markup";
   } catch {}
   const revisionMode = ref(
-    ["markup", "current", "original", "compare"].includes(savedMode)
+    ["markup", "current", "original"].includes(savedMode)
       ? savedMode
       : "markup",
   );
