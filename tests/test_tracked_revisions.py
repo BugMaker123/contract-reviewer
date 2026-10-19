@@ -248,6 +248,59 @@ def test_word_style_revision_browser(revision_client, monkeypatch):
         thread.join(timeout=5)
 
 
+def test_review_settings_preserve_document_view(revision_client):
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright, expect
+
+    task, _ = seed_review(revision_client, True)
+    with live_server() as base, sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page(viewport={'width': 1600, 'height': 1050})
+            page.goto(base + '/workbench?task=' + task['id'])
+            pane = page.get_by_test_id('tracked-document-pane')
+            expect(pane).to_be_visible()
+            preview = page.locator('iframe[title="合同修订文档"]')
+            original_url = preview.get_attribute('src')
+            page.locator('summary').filter(has_text='审查设置').click()
+            page.get_by_role('combobox', name='审查立场', exact=True).select_option('甲方(买方/采购方/委托方)')
+            expect(page.get_by_text('审查条件已改变，当前展示上次审查的文档与意见。请重新审查后再处理修订。', exact=True)).to_be_visible()
+            expect(pane).to_be_visible()
+            expect(page.get_by_test_id('original-document-pane')).to_have_count(0)
+            expect(page.get_by_role('tab', name='所有标记', exact=True)).to_have_attribute('aria-selected', 'true')
+            assert preview.get_attribute('src') == original_url
+            expect(page.locator('#card-payment')).to_have_count(0)
+            expect(page.locator('#review-summary-panel .wb-nav-issues')).to_have_count(0)
+            expect(page.locator('#opinion-drawer .wb-opinion-toolbar')).to_have_count(0)
+            expect(page.locator('.stale-review-notice')).to_have_count(2)
+            # Save changed conditions before restoring, so both transitions persist.
+            page.get_by_role('button', name='保存', exact=True).click()
+            expect(page.locator('.wb-save-action')).to_have_text('保存')
+            page.locator('summary').filter(has_text='审查设置').click()
+            page.get_by_role('combobox', name='审查立场', exact=True).select_option('中立审慎')
+            expect(page.locator('.stale-review-notice')).to_have_count(0)
+            expect(page.locator('#card-payment')).to_be_visible()
+            expect(page.locator('#review-summary-panel .wb-nav-issues')).to_be_visible()
+            expect(page.locator('#card-payment').get_by_role('button', name='采纳', exact=True)).to_be_enabled()
+            # The conditions dialog must use the same reversible visibility rule.
+            page.get_by_role('button', name='修改审查条件', exact=True).click()
+            dialog = page.get_by_role('dialog', name='修改审查条件 快速审查')
+            dialog.get_by_label('谈判尺度', exact=True).select_option('弱势')
+            dialog.get_by_role('button', name='保存审查条件', exact=True).click()
+            expect(page.locator('.stale-review-notice')).to_have_count(2)
+            page.locator('summary').filter(has_text='审查设置').click()
+            page.get_by_role('button', name='修改审查条件', exact=True).click()
+            dialog.get_by_label('谈判尺度', exact=True).select_option('中立')
+            dialog.get_by_role('button', name='保存审查条件', exact=True).click()
+            expect(page.locator('.stale-review-notice')).to_have_count(0)
+            expect(page.locator('#card-payment')).to_be_visible()
+            page.reload()
+            expect(page.locator('#card-payment')).to_be_visible()
+            expect(page.locator('#review-summary-panel .wb-nav-issues')).to_be_visible()
+        finally:
+            browser.close()
+
+
 def test_changed_review_mode_blocks_regeneration(revision_client, monkeypatch):
     client = revision_client
     task, run = seed_review(client)

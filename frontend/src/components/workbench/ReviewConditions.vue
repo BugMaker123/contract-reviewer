@@ -43,21 +43,57 @@ const save = async () => {
 };
 </script>
 <template>
-  <div v-if="workspace.showConditions" class="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-6">
-    <div class="bg-white rounded-xl p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto">
-      <div class="flex justify-between"><h3 class="font-semibold">审查条件 · {{ workspace.modeName }}</h3><button aria-label="关闭审查条件" @click="workspace.showConditions = false">关闭</button></div>
-      <p class="text-xs text-slate-500 my-3">修改资料或要求后需重新确认制度要求，并重新审查；旧版本保留。</p>
-      <p v-if="error" role="alert" class="text-red-600 text-xs">{{ error }}</p>
-      <fieldset :disabled="workspace.historical || ['running','queued'].includes(workspace.task?.status) || workspace.verifying || importing || busy">
-        <label class="block text-xs">谈判尺度<select v-model="workspace.conditions.scale" class="field"><option>中立</option><option>强势</option><option>弱势</option></select></label>
+  <div v-if="workspace.showConditions" class="conditions-overlay">
+    <section class="conditions-dialog" role="dialog" aria-modal="true" aria-labelledby="conditions-title">
+      <div class="conditions-header">
+        <div><span class="conditions-eyebrow">REVIEW SETTINGS</span><h2 id="conditions-title">修改审查条件 <span>{{ workspace.modeName }}</span></h2><p>补充交易信息，让审查建议更贴合本次业务。</p></div>
+        <button class="conditions-close" aria-label="关闭审查条件" @click="workspace.showConditions = false">×</button>
+      </div>
+      <div class="conditions-body">
+      <div class="conditions-notice"><span aria-hidden="true">i</span><p>修改后需重新审查，旧版本将保留。涉及公司制度的要求，请重新核对并确认。</p></div>
+      <p v-if="error" role="alert" class="conditions-error">{{ error }}</p>
+      <fieldset class="conditions-fields" :disabled="workspace.historical || ['running','queued'].includes(workspace.task?.status) || workspace.verifying || importing || busy">
+        <div class="conditions-basics">
+          <div><h3>审查策略</h3><p>确定本次谈判中建议的取舍尺度</p></div>
+          <label>谈判尺度<select v-model="workspace.conditions.scale" aria-label="谈判尺度" class="field"><option>中立</option><option>强势</option><option>弱势</option></select></label>
+        </div>
+        <div v-if="workspace.conditions.checklist" class="conditions-checklist"><span class="conditions-checklist-icon" aria-hidden="true">✓</span><div><small>本次审查清单</small><strong>{{ workspace.conditions.checklist.name }}</strong></div><span class="conditions-version">v{{ workspace.conditions.checklist.version }} · 版本已固定</span></div>
         <ReviewBackground :context="editor" expanded />
-        <div v-if="workspace.conditions.mode === 'compare'" class="space-y-2">
+        <div v-if="workspace.conditions.mode === 'compare'" class="conditions-reference">
           <label class="text-xs">替换参考合同<input type="file" accept=".docx,.txt,.pdf" @change="importDocument($event,'reference')" /></label>
           <label class="block text-xs">参考合同正文<textarea v-model="workspace.conditions.reference_text" class="field h-40" /></label>
         </div>
-        <p v-if="workspace.conditions.checklist" class="text-xs text-slate-500">清单：{{ workspace.conditions.checklist.name }} · v{{ workspace.conditions.checklist.version }}（固定本次版本）</p>
-        <button @click="save" :disabled="workspace.saving" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs">保存审查条件</button>
       </fieldset>
-    </div>
+      </div>
+      <div class="conditions-footer"><span>{{ importing ? '正在读取资料…' : busy ? '正在提取审核要求…' : '条件保存后，点击「重新审查」应用更改' }}</span><button @click="save" :disabled="workspace.saving || workspace.historical || ['running','queued'].includes(workspace.task?.status) || workspace.verifying || importing || busy" class="conditions-save">{{ workspace.saving ? '保存中…' : '保存审查条件' }}</button></div>
+    </section>
   </div>
 </template>
+
+<style scoped>
+.conditions-overlay { position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; padding:28px; background:rgb(15 23 42 / 38%); backdrop-filter:blur(3px); }
+.conditions-dialog { width:860px; max-width:100%; max-height:calc(100dvh - 56px); display:flex; flex-direction:column; overflow:hidden; background:#fff; border:1px solid #e2e8f0; border-radius:18px; box-shadow:0 24px 80px #0f172a30; color:#334155; }
+.conditions-header { display:flex; justify-content:space-between; align-items:flex-start; padding:25px 30px 22px; border-bottom:1px solid #e8edf4; flex-shrink:0; }
+.conditions-eyebrow { color:#64748b; font-size:10px; font-weight:600; letter-spacing:1.8px; }
+.conditions-header h2 { display:flex; align-items:center; gap:12px; margin:7px 0 8px; color:#0f172a; font-size:21px; font-weight:650; }
+.conditions-header h2 span { padding:4px 9px; border-radius:6px; background:#eff6ff; color:#2563eb; font-size:11px; font-weight:500; }
+.conditions-header p { margin:0; color:#64748b; font-size:12px; }
+.conditions-close { display:grid; place-items:center; width:32px; height:32px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; font-size:23px; color:#64748b; cursor:pointer; }
+.conditions-close:hover { background:#f1f5f9; color:#0f172a; }
+.conditions-body { min-height:0; overflow-y:auto; padding:22px 30px 26px; background:#f8fafc; scrollbar-gutter:stable; }
+.conditions-notice { display:flex; gap:9px; align-items:center; padding:11px 13px; border:1px solid #dbeafe; border-radius:8px; background:#eff6ff; color:#42638d; font-size:12px; line-height:1.7; margin-bottom:20px; }
+.conditions-notice > span { display:grid; place-items:center; width:16px; height:16px; flex-shrink:0; border:1px solid #93b4df; border-radius:50%; font-size:11px; }.conditions-notice p { margin:0; }
+.conditions-fields { border:0; padding:0; margin:0; min-width:0; }
+.conditions-basics { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:18px 20px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; margin-bottom:14px; }
+.conditions-basics h3 { font-size:14px; font-weight:600; color:#1e293b; margin:0 0 5px; }.conditions-basics p { color:#94a3b8; font-size:11px; margin:0; }.conditions-basics label { width:230px; max-width:50%; font-size:11px; color:#64748b; }
+.conditions-checklist { display:flex; align-items:center; gap:12px; padding:14px 18px; border:1px solid #dbe6f4; background:#f0f5fc; border-radius:10px; margin-bottom:16px; }.conditions-checklist-icon { display:grid; place-items:center; background:#fff; width:32px; height:36px; border:1px solid #dbe6f4; border-radius:6px; color:#2563eb; }.conditions-checklist small { display:block; font-size:10px; color:#64748b; margin-bottom:3px; }.conditions-checklist strong { font-size:12px; font-weight:600; }.conditions-version { margin-left:auto; font-size:10px; color:#64748b; white-space:nowrap; }
+.conditions-footer { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:17px 30px; border-top:1px solid #e2e8f0; background:#fff; flex-shrink:0; }.conditions-footer > span { color:#94a3b8; font-size:11px; }.conditions-save { border:1px solid #2563eb; background:#2563eb; color:#fff; border-radius:8px; padding:10px 20px; font-size:12px; font-weight:600; cursor:pointer; }.conditions-save:hover { background:#1d4ed8; }.conditions-save:disabled { opacity:.5; cursor:not-allowed; }
+.conditions-error { color:#b91c1c; background:#fef2f2; border-radius:8px; padding:10px 13px; font-size:12px; margin-bottom:14px; }
+.conditions-reference { padding:20px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-top:16px; }
+.conditions-dialog :deep(.field) { display:block; box-sizing:border-box; width:100%; margin-top:7px; padding:10px 12px; border:1px solid #dce3ed; border-radius:7px; background:#fff; color:#334155; font:inherit; font-size:12px; line-height:1.7; outline:none; box-shadow:none; }
+.conditions-dialog :deep(.field:focus) { border-color:#7aa7f8; box-shadow:0 0 0 3px #2563eb0c; }.conditions-dialog :deep(textarea.field) { min-height:95px; resize:vertical; }.conditions-dialog :deep(.field::placeholder) { color:#a1adbd; }.conditions-dialog :deep(.label) { display:block; margin-bottom:0; color:#475569; font-size:12px; font-weight:500; }
+.conditions-fields > :deep(details) { padding:0; border:0; }.conditions-fields > :deep(details > summary) { padding:4px 0 14px; color:#334155; font-size:13px; font-weight:600; list-style:none; cursor:pointer; }.conditions-fields > :deep(details > summary::-webkit-details-marker) { display:none; }.conditions-fields > :deep(details > div) { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin:0; }.conditions-fields > :deep(details > div > label) { padding:18px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }.conditions-fields > :deep(details > div > div) { grid-column:1 / -1; padding:18px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
+.conditions-fields > :deep(details > div > *) { margin-top:0 !important; }
+.conditions-dialog :deep(.button) { padding:7px 12px; border:1px solid #dbe3ef; border-radius:6px; background:#fff; color:#2563eb; font-size:11px; line-height:1.6; cursor:pointer; }.conditions-dialog :deep(.button:hover) { background:#eff6ff; }.conditions-dialog :deep(button:focus-visible) { outline:2px solid #2563eb; outline-offset:3px; }.conditions-dialog :deep(button:disabled) { cursor:not-allowed; opacity:.5; }
+@media(max-width:640px) { .conditions-overlay { padding:12px; }.conditions-dialog { max-height:calc(100dvh - 24px); border-radius:12px; }.conditions-header,.conditions-body { padding:20px; }.conditions-footer { padding:15px 20px; }.conditions-footer > span { max-width:50%; line-height:1.7; }.conditions-fields > :deep(details > div) { grid-template-columns:1fr; }.conditions-basics { align-items:flex-start; flex-direction:column; gap:12px; }.conditions-basics label { width:100%; max-width:none; }.conditions-checklist { flex-wrap:wrap; }.conditions-version { margin-left:44px; }.conditions-header h2 { font-size:18px; } }
+</style>

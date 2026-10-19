@@ -61,6 +61,13 @@ export default {
     </div>
 
     <div
+      v-if="resultStale && useRevisionDocument"
+      class="px-6 py-3 text-xs text-amber-800 bg-amber-50 border-b border-amber-200"
+      role="status"
+    >
+      审查条件已改变，当前展示上次审查的文档与意见。请重新审查后再处理修订。
+    </div>
+    <div
       v-if="useRevisionDocument"
       class="revision-document-surface"
       data-testid="tracked-document-pane"

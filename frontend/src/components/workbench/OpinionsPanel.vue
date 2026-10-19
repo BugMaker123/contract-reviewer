@@ -2,8 +2,9 @@
 import PriorityReview from "./PriorityReview.vue";
 import ManualIssue from "./ManualIssue.vue";
 import RevisionActions from "./RevisionActions.vue";
+import StaleReviewNotice from "./StaleReviewNotice.vue";
 export default {
-  components: { RevisionActions, ManualIssue, PriorityReview },
+  components: { RevisionActions, ManualIssue, PriorityReview, StaleReviewNotice },
   props: { context: { type: Object, required: true } },
   setup: (props) => props.context,
 };
@@ -22,13 +23,13 @@ export default {
   >
     <div class="wb-sidebar-heading">
       <strong v-show="opinionsOpen" id="opinion-drawer-title">审查建议
-        <span class="wb-sidebar-count">{{
+        <span v-if="!resultStale" class="wb-sidebar-count">{{
           reviewIssues.length
         }}</span></strong
       >
 
       <button
-        v-if="opinionsOpen && reviewReady && revisionMode !== 'compare'"
+        v-if="opinionsOpen && reviewReady && !resultStale && revisionMode !== 'compare'"
         class="batch-accept"
         :disabled="revisionReadOnly || !pendingApplicableCount"
         @click="acceptAllRevisions"
@@ -42,6 +43,8 @@ export default {
       class="wb-opinion-content"
     >
 
+      <StaleReviewNotice v-if="resultStale" :context="context" />
+      <template v-else>
       <section class="wb-opinion-toolbar" aria-label="审查建议筛选">
         <input v-model="issueSearch" placeholder="搜索条款或意见" aria-label="搜索审查意见" class="wb-opinion-search" />
         <div class="wb-opinion-filter-row">
@@ -437,6 +440,7 @@ export default {
           </p>
         </div>
       </div>
+      </template>
     </div>
   </aside>
 </template>

@@ -36,7 +36,9 @@ export function useTrackedReview(context) {
     () =>
       !!reviewResult.value &&
       workspace.run?.status === "completed" &&
-      !resultStale.value &&
+      // Settings can invalidate findings without changing the document layout.
+      // Changed body text still needs the current document/editor instead.
+      workspace.run?.input?.text === context.contractText.value &&
       !isReviewing.value &&
       !workspace.loading,
   );

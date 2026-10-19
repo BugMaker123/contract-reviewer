@@ -21,6 +21,8 @@ export default {
       <span class="prototype-status">{{
         isReviewing
           ? reviewQueue?.status === "queued" ? "排队中" : "审查中"
+          : resultStale
+            ? "需重新审查"
           : workspace.task?.status === "completed"
             ? "已完成"
             : reviewReady
@@ -54,11 +56,10 @@ export default {
           </section>
           <section>
             <h3>审查方式与条件</h3>
-            <span
-              >{{ workspace.modeName }} · {{ workspace.conditions.scale }}</span
-            ><button @click="workspace.showConditions = true">
-              修改审查条件
-            </button>
+            <div class="wb-conditions-row">
+              <span>{{ workspace.modeName }} · {{ workspace.conditions.scale }}</span>
+              <button class="wb-conditions-edit" @click="workspace.showConditions = true">修改审查条件</button>
+            </div>
           </section>
           <section>
             <h3>审查模型</h3>
@@ -203,3 +204,9 @@ export default {
     </section>
   </div>
 </template>
+
+<style scoped>
+.wb-conditions-row { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.wb-conditions-row > .wb-conditions-edit { width:auto; flex-shrink:0; margin-left:auto; padding:4px 0; color:#2563eb; font-weight:700; text-align:right; background:transparent; }
+.wb-conditions-row > .wb-conditions-edit:hover { color:#1d4ed8; text-decoration:underline; }
+</style>
