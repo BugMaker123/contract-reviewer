@@ -1,4 +1,5 @@
 import os
+from .stance_policy import STANCE_INSTRUCTIONS, perspective, guard_generated_issues
 import re
 import json
 import logging
@@ -558,7 +559,8 @@ def node_balance_review(state: ContractReviewState) -> Dict[str, Any]:
     if llm:
         logger.info(f"[{engine_name}] 正在调用大模型进行一次性深度全案审查...")
         try:
-            prompt = f"""你是站在【{party_role}】立场的合同审查助手。请对该【{state.get('contract_type', '商务合同')}】进行专项审查。
+            prompt = f"""{STANCE_INSTRUCTIONS}
+你是站在【{perspective(party_role)}】立场的合同审查助手。请对该【{state.get('contract_type', '商务合同')}】进行专项审查。
 我方谈判尺度：{state.get('review_scale', '中立')}。强势时优先保护我方，弱势时优先给出可接受的必要修改，中立时重视权责对等。
 交易背景：{state.get('background', '')}
 重点要求：{json.dumps(state.get('review_focus', []), ensure_ascii=False)}
@@ -621,7 +623,7 @@ def node_balance_review(state: ContractReviewState) -> Dict[str, Any]:
             
             if "tax_settlement" in parsed and "issues" in parsed:
                 tax_audit = parsed["tax_settlement"]
-                balance_issues = parsed["issues"]
+                balance_issues = guard_generated_issues(parsed["issues"], text)
                 logger.info(f"[{engine_name}] 大模型一次性全案审查成功，检出 {len(balance_issues)} 项风险。")
             else:
                 raise ValueError("JSON 字段不匹配")

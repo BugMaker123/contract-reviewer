@@ -70,13 +70,14 @@ export default {
               class="border border-slate-200 rounded-lg px-3 py-2"
             >
               <option value="乙方(卖方/开发方/服务方)">
-                乙方 · 供应商 / 服务方
+                乙方立场
               </option>
               <option value="甲方(买方/采购方/委托方)">
-                甲方 · 买方 / 委托方
+                甲方立场
               </option>
               <option value="中立审慎">中立审查</option>
             </select>
+            <p class="text-xs text-slate-500">立场仅决定保护哪方利益，供需身份以合同正文为准。</p>
           </section>
           <section>
             <h3>审查方式与条件</h3>

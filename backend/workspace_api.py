@@ -13,6 +13,7 @@ from fastapi.responses import Response
 from .store import repository as repo, now
 from .revisions import revised_text, editable_run
 from .export_policy import exportable_run, exportable_report
+from .stance_policy import changes_identity, stance_as_fact, model_input
 from .revision_api import create_revision_router
 from .ui import PORTAL_PAGES
 from .workspace_models import (TaskInput, ChecklistInput, CategoryInput, RunRequest, HandlingInput, ArchiveInput,
@@ -386,6 +387,15 @@ def save_handling(run_id: str, request: HandlingInput):
         raise HTTPException(422, '处理条目不属于此审查版本')
     if any(len(comment) > 5000 for comment in request.comments.values()):
         raise HTTPException(422, '备注不能超过五千字')
+    for issue in run['result']['issues']:
+        if issue['id'] not in request.applied:
+            continue
+        history = run.get('revision_history', {}).get(issue['id'], [])
+        if history and history[-1].get('source') == 'manual':
+            continue
+        redline = issue.get('redline') or {}
+        if stance_as_fact(issue, run['input']['text']) or changes_identity(redline.get('original_text', ''), redline.get('suggested_text', '')):
+            raise HTTPException(409, '该建议将审查立场当作主体身份依据，或改变了合同供需关系；请先核对并手动调整，不能直接采纳。')
     revised_text(run, request.applied)
     decisions = dict(request.decisions)
     for identifier in identifiers:
@@ -569,7 +579,7 @@ async def followup(run_id: str, request: FollowupInput):
     try:
         data = await model_json(request.model_config_data.model_dump(), f'''针对合同的这一项意见回答问题。
 仅返回 {{"answer":"解释与处理建议","suggested_text":"可选替代条款，未要求改写时为空"}}。
-交易条件：{json.dumps(run['input'], ensure_ascii=False)}
+交易条件：{json.dumps(model_input(run['input']), ensure_ascii=False)}
 审查意见：{json.dumps(issue, ensure_ascii=False)}
 此前对话：{json.dumps(run['followups'].get(request.issue_id, [])[-6:], ensure_ascii=False)}
 用户问题：{request.question}''')

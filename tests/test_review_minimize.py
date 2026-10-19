@@ -36,7 +36,7 @@ def test_minimize_queued_task_leave_resume_and_finish_in_background(isolated_wor
             expect(dialog).to_have_count(0)
             expect(page.get_by_role('button',name='恢复审查进度')).to_contain_text('审查排队中')
             page.screenshot(path='artifacts/review-minimized-queued.png')
-            page.get_by_role('link',name='退出工作台',exact=True).click()
+            page.get_by_role('link',name='返回主页',exact=True).click()
             expect(page.get_by_role('heading',name='新建合同审查')).to_be_visible()
             saved=page.request.get(base+'/api/tasks/'+task['id']).json()
             assert saved['status']=='queued' and len(saved['runs'])==1

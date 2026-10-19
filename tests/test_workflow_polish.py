@@ -141,7 +141,7 @@ def test_browser_upload_and_rich_paste(isolated_workspace, monkeypatch):
         item = page.request.get(base+'/api/tasks/'+task_id).json()
         assert item['source_id'] and '设备交付' in item['text']
         expect(page.frame_locator('iframe[title="合同原件预览"]').locator('article table')).to_be_visible()
-        page.get_by_role('link',name='退出工作台',exact=True).click()
+        page.get_by_role('link',name='返回主页',exact=True).click()
         expect(page.get_by_role('heading',name='新建合同审查',exact=True)).to_be_visible()
         page.locator('.portal-sidebar nav').get_by_role('link', name='审查记录', exact=True).click()
         page.get_by_role('textbox', name='搜索审查记录', exact=True).fill('富文本浏览器验收')

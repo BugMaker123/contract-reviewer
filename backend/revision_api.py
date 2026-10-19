@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 
 from . import workspace_review
 from .store import now
+from .stance_policy import STANCE_INSTRUCTIONS, changes_identity, model_input
 from .export_policy import exportable_run
 from .word_export import paragraphs, visible_paragraph_text
 from .workspace_models import RevisionGenerate, RevisionEdit, RevisionRestore
@@ -37,13 +38,14 @@ def create_revision_router(repository, builder):
         if any(item.get('conflict_with') for item in run['result'].get('requirement_findings', [])):
             raise HTTPException(409, '审查要求存在冲突，请明确要求并重新审查后再生成修订。')
         original, kind = revision_anchor(run, issue)
-        prompt = f'''为合同中选定的一处条款重新生成可直接替换的完整修订文本。
+        prompt = f'''{STANCE_INSTRUCTIONS}
+为合同中选定的一处条款重新生成可直接替换的完整修订文本。
 仅返回 JSON {{"suggested_text":"完整替代条款","explanation":"本次调整说明"}}。
 保留原有条款编号和未涉及的内容；不得编造金额、日期、主体、税率等交易事实，不新增待确认占位符。
 所选条款：{original or '需补充的缺失条款'}
 原审查意见：{json.dumps(issue, ensure_ascii=False)}
 此前建议：{json.dumps(run.get('revision_history', {}).get(issue_id, [])[-3:], ensure_ascii=False)}
-审查立场与交易背景：{json.dumps(run['input'], ensure_ascii=False)}
+审查立场与交易背景：{json.dumps(model_input(run['input']), ensure_ascii=False)}
 本次调整要求：{request.instruction or '保留风险防控目标，换一种更清晰且可执行的表述。'}'''
         try:
             data = await workspace_review.model_json(request.model_config_data.model_dump(), prompt)
@@ -57,6 +59,8 @@ def create_revision_router(repository, builder):
                 raise ValueError('模型未返回有效的新修订')
         except Exception:
             raise HTTPException(502, 'AI 未能生成有效的新修订，请检查模型配置或调整要求后重试。上一版建议已保留。')
+        if changes_identity(original, suggested):
+            raise HTTPException(422, 'AI 修订改变了合同主体的供需身份或交易方向，已保留原建议；请依据正文人工核对。')
         requirements = requirements_for(run['input'])
         proposed = run['input']['text'].replace(original, suggested, 1) if original else run['input']['text'] + '\n' + suggested
         verification = await verify_requirements(run['input'], requirements, request.model_config_data.model_dump(), workspace_review.model_json, text=proposed)

@@ -1995,9 +1995,9 @@
 .workbench-view .prototype-nav-right > button:focus-visible, .workbench-view .prototype-back:focus-visible, .workbench-view .workbench-navigation > summary:focus-visible { outline: 2px solid #60a5fa; outline-offset: 3px; }
 .workbench-view .prototype-nav-right > button:disabled { cursor: not-allowed; }
 
-.workbench-view .workbench-global-brand > .workbench-exit { display: inline-flex; align-items: center; padding: 6px 12px; border: 1px solid #bfdbfe; border-radius: 6px; background: #eff6ff; color: #2563eb; font-size: 13px; font-weight: 600; }
-.workbench-view .workbench-global-brand > .workbench-exit:hover { background: #dbeafe; border-color: #93c5fd; }
-.workbench-view .workbench-exit:focus-visible { outline: 2px solid #60a5fa; outline-offset: 3px; }
+.workbench-view .workbench-home-link { display:inline-flex; align-items:center; gap:6px; flex-shrink:0; padding:6px 8px; border-radius:6px; color:#64748b; font-size:12px; font-weight:400; text-decoration:none; transition:background .15s,color .15s; }
+.workbench-view .workbench-home-link:hover { color:#1d4ed8; background:#f1f5f9; }
+.workbench-view .workbench-home-link:focus-visible { outline:2px solid #60a5fa; outline-offset:3px; }
 
 .workbench-view .wb-functional-overview { padding: 12px; background: #fff; border: 1px solid #dbe3ee; border-radius: 8px; margin-bottom: 12px; font-size: 12px; line-height: 1.7; }
 .workbench-view .wb-functional-overview summary { cursor: pointer; font-weight: 600; padding: 5px 0; }

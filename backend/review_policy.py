@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from typing import Literal
 
 from . import graph
+from .stance_policy import perspective
 from .review_progress import emit_progress
 
 
@@ -22,8 +23,10 @@ class Admission(BaseModel):
 
 
 def review_context(snapshot):
-    return {key: snapshot.get(key) for key in (
+    context = {key: snapshot.get(key) for key in (
         'type', 'role', 'scale', 'background', 'focus', 'references', 'requirements', 'checklist')}
+    context['role'] = perspective(context.get('role'))
+    return context
 
 
 async def admit(snapshot, config, model_json):
