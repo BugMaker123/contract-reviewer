@@ -22,7 +22,7 @@ export default {
     <div class="wb-sidebar-heading">
       <strong v-show="opinionsOpen" id="opinion-drawer-title">审查建议
         <span class="wb-sidebar-count">{{
-          filteredIssues.length
+          reviewIssues.length
         }}</span></strong
       >
 
@@ -41,94 +41,22 @@ export default {
       class="wb-opinion-content"
     >
 
-      <ManualIssue :context="context" />
-      <details class="opinion-filters">
-        <summary>
-          筛选建议
-          <span>已采纳 {{ appliedIssueIds.length }} · 待处理 {{ pendingRevisionCount }}</span>
-        </summary>
-        <div
-          class="border-b border-slate-200 px-4 py-3 flex flex-wrap gap-2 items-center justify-between shrink-0 bg-slate-50/50"
-        >
-          <div class="w-full text-[11px] text-slate-500">
-            已采纳 {{ appliedIssueIds.length }} 项 · 待处理 {{ pendingRevisionCount }} 项
-          </div>
-          <div class="flex items-center space-x-1 text-xs">
-            <button
-              @click="severityFilter = 'all'"
-              :class="
-                severityFilter === 'all'
-                  ? 'text-blue-600 font-bold'
-                  : 'text-slate-500'
-              "
-              class="px-2 py-0.5 cursor-pointer"
-            >
-              全部
-            </button>
-            <span class="text-slate-300">|</span>
-            <button
-              @click="severityFilter = 'critical'"
-              :class="
-                severityFilter === 'critical'
-                  ? 'text-red-600 font-bold'
-                  : 'text-slate-500'
-              "
-              class="px-2 py-0.5 cursor-pointer"
-            >
-              重大
-            </button>
-            <span class="text-slate-300">|</span>
-            <button
-              @click="severityFilter = 'warning'"
-              :class="
-                severityFilter === 'warning'
-                  ? 'text-amber-600 font-bold'
-                  : 'text-slate-500'
-              "
-              class="px-2 py-0.5 cursor-pointer"
-            >
-              一般
-            </button>
-          </div>
+      <section class="wb-opinion-toolbar" aria-label="审查建议筛选">
+        <input v-model="issueSearch" placeholder="搜索条款或意见" aria-label="搜索审查意见" class="wb-opinion-search" />
+        <div class="wb-opinion-filter-row">
+          <select v-model="severityFilter" aria-label="筛选风险等级">
+            <option value="all">全部风险等级</option><option value="critical">重大风险</option><option value="warning">一般风险</option><option value="info">优化建议</option><option value="favorable">有利条款</option>
+          </select>
+          <select v-model="handlingFilter" aria-label="筛选处理状态">
+            <option value="all">全部处理状态</option><option value="pending">待处理</option><option value="applied">已采纳</option><option value="rejected">不采纳</option><option value="needs_review">待复核</option>
+          </select>
+          <button v-if="severityFilter !== 'all' || handlingFilter !== 'all' || issueSearch" type="button" class="wb-opinion-reset" @click="severityFilter = 'all'; handlingFilter = 'all'; issueSearch = ''">重置</button>
         </div>
-
-        <div class="px-4 py-2 border-b border-slate-100 space-y-2">
-          <input
-            v-model="issueSearch"
-            placeholder="搜索条款、风险或审查意见"
-            aria-label="搜索审查意见"
-            class="w-full text-xs p-2 border border-slate-200 rounded-lg outline-none focus:border-blue-500"
-          />
-          <div class="flex gap-2 text-xs">
-            <select
-              v-model="handlingFilter"
-              class="border border-slate-200 rounded p-1"
-            >
-              <option value="all">全部处理状态</option>
-              <option value="pending">待处理</option>
-              <option value="applied">已采纳</option>
-              <option value="rejected">不采纳</option>
-              <option value="needs_review">待复核</option>
-            </select>
-            <button
-              @click="severityFilter = 'info'"
-              class="text-slate-600"
-              :class="{ 'font-bold text-blue-600': severityFilter === 'info' }"
-            >
-              优化建议
-            </button>
-            <button
-              @click="severityFilter = 'favorable'"
-              class="text-slate-600"
-              :class="{
-                'font-bold text-blue-600': severityFilter === 'favorable',
-              }"
-            >
-              有利条款
-            </button>
-          </div>
+        <div class="wb-opinion-secondary">
+          <ManualIssue :context="context" />
+          <span v-if="severityFilter !== 'all' || handlingFilter !== 'all' || issueSearch" class="wb-opinion-match-count" role="status">显示 {{ filteredIssues.length }} / {{ reviewIssues.length }} 项</span>
         </div>
-      </details>
+      </section>
       <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
         <div
           v-for="issue in filteredIssues"

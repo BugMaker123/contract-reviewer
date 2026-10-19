@@ -118,8 +118,15 @@ def test_browser_upload_and_rich_paste(isolated_workspace, monkeypatch):
         errors = []; page.on('pageerror',lambda err:errors.append(str(err)))
         page.goto(base)
         expect(page.get_by_role('button',name='📑 示例合同',exact=True)).to_have_count(0)
+        opened = []
+        page.on('filechooser', lambda chooser: opened.append(chooser))
+        page.get_by_role('button',name='✍️ 粘贴正文',exact=True).click()
+        page.get_by_role('button',name='📤 上传合同',exact=True).click()
+        expect(page.locator('.drop-area')).to_be_visible()
+        page.get_by_role('button',name='📤 上传合同',exact=True).click()
+        assert not opened
         with page.expect_file_chooser() as chooser:
-            page.get_by_role('button',name='📤 上传合同',exact=True).click()
+            page.locator('.drop-area').click()
         chooser.value.set_files({'name':'上传按钮.txt','mimeType':'text/plain','buffer':TEXT.encode()})
         expect(page.get_by_role('button',name='预览合同',exact=True)).to_be_visible()
         page.get_by_role('button',name='✍️ 粘贴正文',exact=True).click()
@@ -127,7 +134,7 @@ def test_browser_upload_and_rich_paste(isolated_workspace, monkeypatch):
         editor.evaluate("(el,html)=>{el.focus();const data=new DataTransfer();data.setData('text/html',html);el.dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true,cancelable:true}));}",HTML)
         expect(editor.locator('strong')).to_contain_text('设备交付')
         expect(editor.locator('table')).to_have_count(1)
-        page.get_by_placeholder('填写便于识别的合同名称').fill('富文本浏览器验收')
+        page.locator('.review-contract-name input').fill('富文本浏览器验收')
         page.get_by_role('button',name='进入工作台核对合同',exact=True).click()
         page.wait_for_url('**/workbench?task=*')
         task_id = page.url.split('task=')[1]

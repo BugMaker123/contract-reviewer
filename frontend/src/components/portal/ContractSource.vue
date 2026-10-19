@@ -1,14 +1,12 @@
 <script>
-import { ref, watch } from "vue";
+import { ref } from "vue";
 import RichContractEditor from "./RichContractEditor.vue";
 export default {
   components: { RichContractEditor },
   props: { context: { type: Object, required: true } },
   setup(props) {
     const previewOpen = ref(false), contractInput = ref(null);
-    const openFile = () => { if (!props.context.importing.value) contractInput.value?.click(); };
-    watch(() => props.context.contractUploadRequest.value, openFile);
-    return { ...props.context, previewOpen, contractInput, openFile };
+    return { ...props.context, previewOpen, contractInput };
   },
 };
 </script>

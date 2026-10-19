@@ -2112,3 +2112,13 @@
 .workbench-view .wb-nav-status-card .wb-nav-risk-grid strong { font-size:17px; }
 .workbench-view .wb-review-navigation > .wb-functional-overview { margin-bottom:8px; padding:8px 12px; }
 .workbench-view .wb-nav-issues { padding-top:8px; }
+
+.workbench-view .wb-opinion-toolbar { flex-shrink:0; padding:10px 12px 0; border-bottom:1px solid #e2e8f0; background:white; }
+.workbench-view .wb-opinion-search { width:100%; padding:8px 10px; font-size:12px; border:1px solid #dbe3ee; border-radius:6px; color:#1e293b; outline:none; }
+.workbench-view .wb-opinion-search:focus { border-color:#2563eb; }
+.workbench-view .wb-opinion-filter-row { display:flex; gap:8px; margin-top:8px; align-items:center; }
+.workbench-view .wb-opinion-filter-row select { min-width:0; flex:1; padding:6px 8px; border:1px solid #dbe3ee; border-radius:6px; font-size:12px; background:#f8fafc; color:#334155; }
+.workbench-view .wb-opinion-reset { font-size:12px; color:#2563eb; flex-shrink:0; }
+.workbench-view .wb-opinion-secondary { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+.workbench-view .wb-opinion-secondary .wb-manual-issue { flex:1; min-width:0; padding:8px 0; border:0; }
+.workbench-view .wb-opinion-match-count { flex-shrink:0; padding:8px 0; font-size:11px; color:#475569; }

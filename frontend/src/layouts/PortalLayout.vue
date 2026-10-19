@@ -32,9 +32,9 @@ export default {
           >⚖</span
         ><strong class="text-base text-slate-900">LexisGraph</strong>
       </RouterLink>
-      <h1 v-if="page === 'start'" class="portal-page-title">新建合同审查</h1>
       </div>
       <div class="flex gap-3 items-center">
+        <button @click="showHelp = true" class="portal-help-button"><span aria-hidden="true">?</span>操作手册</button>
         <button @click="showModel = true" class="button">⚙ 模型配置</button>
       </div>
     </header>
@@ -55,23 +55,20 @@ export default {
             >{{ item.name }}</RouterLink
           >
         </nav>
-        <section class="mt-6 card p-4 bg-slate-50 recent-work">
-          <div class="text-sm font-semibold mb-2 text-slate-700">最近工作</div>
-          <p v-if="recentError" class="text-xs text-amber-700">{{ recentError }} <button @click="refreshRecent">重试</button></p>
-          <p v-else-if="!recentTasks.length" class="text-xs text-slate-400">暂无工作记录</p>
+        <section v-if="false" class="recent-work" aria-labelledby="recent-work-title">
+          <div class="recent-work-heading"><h2 id="recent-work-title">最近工作</h2><RouterLink to="/records">全部记录 <span aria-hidden="true">→</span></RouterLink></div>
+          <p v-if="recentError" class="recent-work-empty">{{ recentError }} <button @click="refreshRecent">重试</button></p>
+          <p v-else-if="!recentTasks.length" class="recent-work-empty">暂无工作记录</p>
           <article v-for="task in recentTasks" :key="task.id" class="recent-work-item">
-            <RouterLink :to="'/workbench?task=' + task.id" class="text-sm text-slate-700 break-words leading-relaxed block">{{ task.title }}</RouterLink>
-            <div class="mt-2 text-xs text-slate-500">{{ statusName(task.status) }}</div>
-            <RouterLink :to="'/workbench?task=' + task.id" class="block mt-2 text-xs font-semibold text-blue-600">{{ recentAction(task.status) }} →</RouterLink>
+            <div class="recent-work-document">
+              <RouterLink :to="'/workbench?task=' + task.id" class="recent-work-title" :title="task.title">{{ task.title }}</RouterLink>
+            </div>
+            <div class="recent-work-meta">
+              <span class="recent-work-status">{{ statusName(task.status) }}</span>
+              <RouterLink :to="'/workbench?task=' + task.id" class="recent-work-action">{{ recentAction(task.status) }} →</RouterLink>
+            </div>
           </article>
         </section>
-        <div
-          class="mt-auto pt-6 text-xs text-slate-500 border-t border-slate-100"
-        >
-          <button @click="showHelp = true" class="text-slate-500 mb-3">
-            操作说明
-          </button>
-        </div>
       </aside>
 
       <main class="portal-main flex-1 overflow-y-auto p-8">

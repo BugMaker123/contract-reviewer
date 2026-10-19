@@ -35,6 +35,7 @@ export default {
   <PageFrame :context="context">
     <section class="review-start">
       <section class="review-settings card review-conditions-first">
+        <h1 class="review-page-title">新建合同审查</h1>
         <div class="review-section-heading">
           <div>
             <h2>审查条件</h2>

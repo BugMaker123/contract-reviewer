@@ -41,7 +41,6 @@ export function setup(context) {
   };
   const switchSource = (next) => {
     if (importing.value) return;
-    if (next === "file") context.contractUploadRequest.value++;
     if (next === inputMethod.value) return;
     sourceDrafts[inputMethod.value] = {
       text: form.text,
