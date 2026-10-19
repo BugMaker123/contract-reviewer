@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from . import workspace_review
 from .store import now
 from .stance_policy import STANCE_INSTRUCTIONS, changes_identity, model_input
+from .rewrite_policy import REWRITE_INSTRUCTIONS, REWRITE_WARNING, adds_signing_reminder
 from .export_policy import exportable_run
 from .word_export import paragraphs, visible_paragraph_text
 from .workspace_models import RevisionGenerate, RevisionEdit, RevisionRestore
@@ -38,7 +39,7 @@ def create_revision_router(repository, builder):
         if any(item.get('conflict_with') for item in run['result'].get('requirement_findings', [])):
             raise HTTPException(409, '审查要求存在冲突，请明确要求并重新审查后再生成修订。')
         original, kind = revision_anchor(run, issue)
-        prompt = f'''{STANCE_INSTRUCTIONS}
+        prompt = f'''{STANCE_INSTRUCTIONS}{REWRITE_INSTRUCTIONS}
 为合同中选定的一处条款重新生成可直接替换的完整修订文本。
 仅返回 JSON {{"suggested_text":"完整替代条款","explanation":"本次调整说明"}}。
 保留原有条款编号和未涉及的内容；不得编造金额、日期、主体、税率等交易事实，不新增待确认占位符。
@@ -61,6 +62,8 @@ def create_revision_router(repository, builder):
             raise HTTPException(502, 'AI 未能生成有效的新修订，请检查模型配置或调整要求后重试。上一版建议已保留。')
         if changes_identity(original, suggested):
             raise HTTPException(422, 'AI 修订改变了合同主体的供需身份或交易方向，已保留原建议；请依据正文人工核对。')
+        if adds_signing_reminder(original, suggested):
+            raise HTTPException(422, REWRITE_WARNING + '原建议已保留。')
         requirements = requirements_for(run['input'])
         proposed = run['input']['text'].replace(original, suggested, 1) if original else run['input']['text'] + '\n' + suggested
         verification = await verify_requirements(run['input'], requirements, request.model_config_data.model_dump(), workspace_review.model_json, text=proposed)

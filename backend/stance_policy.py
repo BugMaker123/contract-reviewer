@@ -1,5 +1,6 @@
 """A review perspective is not evidence of the parties' transaction identities."""
 import re
+from .rewrite_policy import adds_signing_reminder, REWRITE_WARNING
 
 STANCE_INSTRUCTIONS = (
     '审查立场仅表示优先保护哪一方利益，不是合同事实，也不是改写甲乙方身份的指令。'
@@ -68,6 +69,9 @@ def guard_generated_issues(issues, text):
         if stance_as_fact(issue, text):
             continue
         redline = issue.get('redline') or {}
+        if adds_signing_reminder(redline.get('original_text', ''), redline.get('suggested_text', '')):
+            issue = {**issue, 'redline': None, 'rewrite_warning': REWRITE_WARNING}
+            redline = {}
         if changes_identity(redline.get('original_text', ''), redline.get('suggested_text', '')):
             issue = {**issue, 'redline': None,
                      'rewrite_warning': '自动修订改变了合同主体的供需身份或交易方向，已停止应用；请依据正文人工核对。'}

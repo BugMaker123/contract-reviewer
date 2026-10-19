@@ -14,6 +14,7 @@ from .store import repository as repo, now
 from .revisions import revised_text, editable_run
 from .export_policy import exportable_run, exportable_report
 from .stance_policy import changes_identity, stance_as_fact, model_input
+from .rewrite_policy import adds_signing_reminder, REWRITE_WARNING
 from .revision_api import create_revision_router
 from .ui import PORTAL_PAGES
 from .workspace_models import (TaskInput, ChecklistInput, CategoryInput, RunRequest, HandlingInput, ArchiveInput,
@@ -394,6 +395,8 @@ def save_handling(run_id: str, request: HandlingInput):
         if history and history[-1].get('source') == 'manual':
             continue
         redline = issue.get('redline') or {}
+        if adds_signing_reminder(redline.get('original_text', ''), redline.get('suggested_text', '')):
+            raise HTTPException(409, REWRITE_WARNING)
         if stance_as_fact(issue, run['input']['text']) or changes_identity(redline.get('original_text', ''), redline.get('suggested_text', '')):
             raise HTTPException(409, '该建议将审查立场当作主体身份依据，或改变了合同供需关系；请先核对并手动调整，不能直接采纳。')
     revised_text(run, request.applied)

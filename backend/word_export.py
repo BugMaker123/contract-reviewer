@@ -131,6 +131,12 @@ def contract_document(run, final_text, repo, default_builder, tracked=False, bas
             continue
         if tag == 'insert':
             template = source_paragraphs[max(0, a - 1)] if source_paragraphs else None
+            if template is not None and not visible_paragraph_text(template._p).strip():
+                # Blank separators often have default fonts. Inherit the nearest
+                # actual text paragraph instead of shrinking newly inserted text.
+                candidates = sorted(range(len(source_paragraphs)), key=lambda index: (abs(index - (a - 1)), index))
+                template = next((source_paragraphs[index] for index in candidates
+                                 if visible_paragraph_text(source_paragraphs[index]._p).strip()), template)
             for line in after[c:d]:
                 if a < len(source_paragraphs):
                     p = source_paragraphs[a].insert_paragraph_before()

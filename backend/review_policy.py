@@ -8,6 +8,7 @@ from typing import Literal
 
 from . import graph
 from .stance_policy import perspective
+from .text_search import search_excerpt
 from .review_progress import emit_progress
 
 
@@ -156,7 +157,7 @@ async def evidence_loop(snapshot, findings, config, model_json):
         try:
             action = await model_json({**config, 'max_retries': 0},
                 '''对待确认要求进行证据核验。每次选择一项动作，只返回JSON。
-工具 search: {"action":"search","query":"需要逐字搜索的短语"}，在本次合同和附件检索。
+工具 search: {"action":"search","query":"短语或关键词"}，在本次合同和附件检索，优先完整短语，其次分词定位；分词命中不代表满足要求，必须阅读原文核验。
 工具 read: {"action":"read","document":0,"start":0}，从指定文档字符位置读取最多4000字。
 结束: {"action":"finish","findings":[{"id":"要求id","status":"pass/fail/needs_review/not_applicable","evidence":"合同连续原文","explanation":"简洁结论","conflict_with":[]}]}。
 只能根据观察结果判断，未见证据不得通过，不得编造法律依据。最多三轮；不要输出内部推理。
@@ -180,10 +181,9 @@ async def evidence_loop(snapshot, findings, config, model_json):
                     raise ValueError('无效搜索词')
                 matches = []
                 for index, document in enumerate(documents):
-                    position = document['text'].find(query)
-                    if position >= 0:
-                        matches.append({'document': index, 'start': max(0, position - 200),
-                                        'text': document['text'][max(0, position - 200):position + 1000]})
+                    excerpt = search_excerpt(document['text'], query)
+                    if excerpt:
+                        matches.append({'document': index, **excerpt})
                 steps.append({'tool': 'search', 'query': query, 'matches': matches})
             elif kind == 'read':
                 index, start = action.get('document'), action.get('start')
