@@ -47,6 +47,9 @@ def test_workbench_primary_actions_are_visible(isolated_workspace, monkeypatch):
             expect(page.get_by_role('button', name='完成审核', exact=True)).to_be_enabled()
             expect(page.locator('#review-summary-panel')).to_be_visible()
             expect(page.get_by_text('处理进度', exact=True)).to_be_visible()
+            expect(page.locator('.wb-functional-overview')).not_to_have_attribute('open', '')
+            expect(page.locator('.wb-sidebar-toggle')).to_have_count(0)
+            assert page.locator('.wb-nav-status-card').bounding_box()['height'] < 130
             if page.locator('.wb-nav-issue').count() > 1:
                 page.locator('.wb-nav-issue').nth(1).click()
                 expect(page.locator('.wb-nav-issue').nth(1)).to_have_class(re.compile(r'active'))
@@ -361,9 +364,6 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
                 return page.locator('#card-'+issue['id'])
             for label in ['开始审查', '重新审查']:
                 if label=='开始审查':page.route('**/api/sources/*/file',delay_original)
-                else:
-                    page.get_by_role('button',name='收起审查概览',exact=True).click()
-                    page.get_by_role('button',name='收起审查意见与修订清单',exact=True).click()
                 page.get_by_role('button', name=label, exact=True).click()
                 if label == "重新审查": confirm_original_review(page)
                 expect(page.locator('[data-public-analysis]')).to_contain_text('付款金额正在结合正文核对')
@@ -383,7 +383,7 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
                 expect(page.locator('.review-dialog')).to_have_count(0)
                 expect(page.locator('#review-summary-content')).to_be_visible()
                 expect(page.locator('#review-opinion-content')).to_be_visible()
-                expect(page.get_by_role('button',name='收起审查概览',exact=True).locator('svg')).to_have_count(1)
+                expect(page.locator('.wb-sidebar-toggle')).to_have_count(0)
                 if label=='开始审查':
                     expect(right.locator('article p').first).to_have_text('Payment: 200 USD',timeout=30000)
                     original_response=page.request.fetch(held_original[0].request)
@@ -442,10 +442,7 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             assert panel_box['x']+panel_box['width'] <= 1920
             assert page.get_by_test_id('review-summary').bounding_box()['width'] >= 320
             assert 380 <= page.locator('#opinion-drawer').bounding_box()['width'] <= 460
-            for panel_name,button_name in [('review-summary-panel','收起审查概览'),('opinion-drawer','收起审查意见与修订清单')]:
-                panel=page.locator('#'+panel_name).bounding_box()
-                handle=page.get_by_role('button',name=button_name,exact=True).bounding_box()
-                assert panel['y'] <= handle['y'] and handle['y']+handle['height'] <= panel['y']+48
+            expect(page.locator('.wb-sidebar-toggle')).to_have_count(0)
             action_row=page.locator('.wb-issue-actions').first
             positions=[button.bounding_box()['y'] for button in action_row.get_by_role('button').all()]
             assert max(positions)-min(positions)<2
@@ -464,23 +461,8 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
                     expect(preview.locator('section.docx').first).to_be_visible()
                     expect(preview.locator('#zoom-percent')).to_have_text('80%')
             expect(page.get_by_role('button', name='审查概览', exact=True)).to_have_count(0)
-            page.get_by_role('button', name='收起审查概览', exact=True).click()
-            expect(page.locator('#review-summary-content')).to_be_hidden()
-            assert page.get_by_test_id('review-summary').bounding_box()['width'] == 36
-            for preview in [left, right]:
-                expect(preview.locator('#zoom-percent')).to_have_text('100%')
-            page.get_by_role('button', name='收起审查意见与修订清单', exact=True).click()
-            expect(page.locator('#review-opinion-content')).to_be_hidden()
-            assert page.locator('#opinion-drawer').bounding_box()['width'] == 36
-            expect(right.locator('#zoom-percent')).to_have_text('100%')
-            page.get_by_role('button', name='展开审查概览', exact=True).click()
             expect(page.locator('#review-summary-content')).to_be_visible()
-            expect(page.locator('#review-opinion-content')).to_be_hidden()
-            for preview in [left, right]:
-                expect(preview.locator('#zoom-percent')).to_have_text('100%')
-            page.get_by_role('button', name='展开审查意见与修订清单', exact=True).click()
             expect(page.locator('#review-opinion-content')).to_be_visible()
-            expect(page.locator('#review-summary-content')).to_be_visible()
             page.keyboard.press('Escape')
             expect(page.locator('#opinion-drawer')).to_be_visible()
             expect(page.get_by_role('button', name='收起审查意见面板', exact=True)).to_have_count(0)

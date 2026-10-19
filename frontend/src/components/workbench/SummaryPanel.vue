@@ -20,23 +20,15 @@ export default {
 <template>
   <aside id="review-summary-panel" data-testid="review-summary" class="wb-sidebar wb-summary-panel" :class="{ 'is-collapsed': !summaryOpen }">
     <div class="wb-sidebar-heading">
-      <button @click="toggleSummary" :aria-expanded="summaryOpen" aria-controls="review-summary-content" :aria-label="summaryOpen ? '收起审查概览' : '展开审查概览'" :title="summaryOpen ? '收起审查概览' : '展开审查概览'" class="wb-sidebar-toggle">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-5 5 5 5" /></svg>
-      </button>
       <strong v-show="summaryOpen">审查导航</strong>
     </div>
     <div v-show="summaryOpen" id="review-summary-content" class="wb-summary-content wb-review-navigation">
       <ReviewOverview :context="context" />
-      <section class="wb-nav-card">
-        <div class="wb-nav-section-title">处理进度</div>
-        <div v-if="reviewResult" class="wb-nav-progress-number"><strong>{{ handledCount }}</strong><span>/ {{ reviewIssues.length }} 项已处理</span></div>
-        <p v-else class="wb-nav-empty">开始审查后，这里会显示审查进度和问题位置。</p>
+      <section class="wb-nav-card wb-nav-status-card">
+        <div class="wb-nav-status-heading"><span class="wb-nav-section-title">处理进度</span><div v-if="reviewResult" class="wb-nav-progress-number"><strong>{{ handledCount }}</strong><span>/ {{ reviewIssues.length }} 项已处理</span></div></div>
+        <p v-if="!reviewResult" class="wb-nav-empty">开始审查后，这里会显示审查进度和问题位置。</p>
         <div v-if="reviewResult" class="wb-nav-progress-track"><span :style="{ width: reviewIssues.length ? `${handledCount / reviewIssues.length * 100}%` : '100%' }"></span></div>
-      </section>
-
-      <section v-if="reviewResult" class="wb-nav-card">
-        <div class="wb-nav-section-title">风险分布</div>
-        <div class="wb-nav-risk-grid">
+        <div v-if="reviewResult" class="wb-nav-risk-grid" aria-label="风险分布">
           <div><strong class="wb-nav-critical">{{ reviewIssues.filter(issue => issue.severity === 'critical').length }}</strong><span>重大</span></div>
           <div><strong class="wb-nav-warning">{{ reviewIssues.filter(issue => issue.severity === 'warning').length }}</strong><span>一般</span></div>
           <div><strong>{{ reviewIssues.filter(issue => issue.severity === 'info').length }}</strong><span>提示</span></div>

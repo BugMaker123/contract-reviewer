@@ -11,7 +11,7 @@ const groups = computed(() => [
 ]);
 </script>
 <template>
-  <details class="wb-functional-overview" open>
+  <details class="wb-functional-overview">
     <summary>审查结论与要求核验</summary>
     <label>审查版本<select aria-label="审查历史版本" :value="workspace.run?.id || ''" @change="workspace.selectVersion($event.target.value)"><option value="">当前任务</option><option v-for="version in workspace.versions" :key="version.id" :value="version.id">第 {{ version.number }} 次 · {{ ({running:'审查中',completed:'审查完成',failed:'失败',interrupted:'中断'})[version.status] || version.status }}</option></select></label>
     <div v-if="workspace.task?.running_run"><p>审查正在后台执行，刷新不会停止任务。</p><button @click="context.startReview(workspace.task.running_run)">重新连接审查进度</button><button @click="context.cancelReview()">取消后台审查</button></div>

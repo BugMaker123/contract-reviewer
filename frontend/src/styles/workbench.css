@@ -47,27 +47,7 @@
 }
 
 /* 打印报告 */
-@media print {
-  .workbench-view * {
-    visibility: hidden;
-  }
 
-  .workbench-view #printable-report,
-  .workbench-view #printable-report * {
-    visibility: visible;
-  }
-
-  .workbench-view #printable-report {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-  }
-
-  .workbench-view .no-print {
-    display: none !important;
-  }
-}
 
 .workbench-view [v-cloak] {
   display: none;
@@ -142,41 +122,7 @@
   }
 }
 
-@media print {
-  .workbench-view,
-  .workbench-view,
-  .workbench-view {
-    height: auto !important;
-    overflow: visible !important;
-  }
 
-  .workbench-view > :not(:has(#printable-report)) {
-    display: none !important;
-  }
-
-  .workbench-view > :has(#printable-report),
-  .workbench-view > :has(#printable-report) > div {
-    position: static !important;
-    display: block !important;
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-    background: white !important;
-    border: 0 !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-  }
-
-  .workbench-view > :has(#printable-report) > div > :not(#printable-report) {
-    display: none !important;
-  }
-
-  .workbench-view #printable-report {
-    position: static !important;
-    overflow: visible !important;
-    padding: 0 !important;
-  }
-}
 
 .workbench-view .wb-menu {
   position: relative;
@@ -2070,14 +2016,7 @@
 .workbench-view .wb-export-menu .wb-popover > button:hover { background: #f1f5f9; }
 .workbench-view .wb-export-menu .wb-popover > button:disabled { opacity: .45; }
 
-@media print {
-  .workbench-view { height: auto !important; overflow: visible !important; display: block !important; background: white; }
-  .workbench-view > :not(.wb-report-overlay) { display: none !important; }
-  .workbench-view .wb-report-overlay, .workbench-view .wb-report-dialog { position: static !important; display: block !important; max-height: none !important; height: auto !important; overflow: visible !important; padding: 0 !important; background: white !important; box-shadow: none !important; }
-  .workbench-view #printable-report { position: static !important; max-height: none !important; overflow: visible !important; padding: 0 !important; }
-  .workbench-view #printable-report h2 { break-after: avoid; }
-  @page { margin: 18mm; }
-}
+
 
 .workbench-view .review-dialog-status .review-elapsed { margin-left: auto; flex-shrink: 0; font-variant-numeric: tabular-nums; color: #64748b; }
 
@@ -2106,7 +2045,7 @@
 .workbench-view .wb-report-content h2 { font-size:17px; font-weight:700; color:#172b47; margin:30px 0 16px; padding-bottom:10px; border-bottom:1px solid #dbe3ee; break-after:avoid; }
 .workbench-view .wb-report-notice { padding:12px 16px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; color:#92400e; font-size:12px; margin-bottom:20px; }
 @media(max-width:700px) { .workbench-view .wb-report-scroll { padding:12px; } .workbench-view .wb-report-paper { padding:28px 20px; } .workbench-view .wb-report-metadata { grid-template-columns:1fr; } }
-@media print { .workbench-view .wb-report-toolbar { display:none !important; } .workbench-view .wb-report-scroll { overflow:visible; padding:0; } .workbench-view .wb-report-paper { max-width:none; border:0; box-shadow:none; margin:0; } }
+
 
 .workbench-view .wb-report-paper { color:#111827; }
 .workbench-view .wb-report-paper h1 { color:#0f172a; font-size:30px; font-weight:800; }
@@ -2119,4 +2058,57 @@
 .workbench-view .wb-report-content .report-risk-low { color:#1e40af; background:#eff6ff; border-left:4px solid #2563eb; }
 .workbench-view .wb-report-content .report-risk-favorable { color:#065f46; background:#ecfdf5; border-left:4px solid #059669; }
 .workbench-view .wb-report-content [class*="report-risk-"] { padding:12px 16px; font-weight:600; border-radius:0 5px 5px 0; }
-@media print { .workbench-view .wb-report-paper { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
+
+
+.workbench-view .wb-report-dialog { width:min(1380px,96vw); }
+.workbench-view .wb-report-body { display:flex; flex:1; min-height:0; }
+.workbench-view .wb-report-scroll { flex:1; min-width:0; }
+.workbench-view .wb-report-directory { width:230px; flex-shrink:0; overflow-y:auto; padding:22px 16px; background:white; border-right:1px solid #dbeafe; }
+.workbench-view .wb-report-directory h2 { color:#1d4ed8; font-size:16px; font-weight:700; padding:0 10px 14px; }
+.workbench-view .wb-report-directory a { display:block; font-size:12px; line-height:1.7; padding:9px 10px; margin-bottom:5px; border-radius:6px; color:#1e40af; text-decoration:none; overflow-wrap:anywhere; }
+.workbench-view .wb-report-directory a:hover, .workbench-view .wb-report-directory a:focus-visible { background:#dbeafe; outline:2px solid #93c5fd; }
+.workbench-view .wb-report-directory .report-risk-high { color:#b91c1c; background:#fff1f2; }
+.workbench-view .wb-report-directory .report-risk-medium { color:#9a3412; }
+.workbench-view .wb-report-directory .report-risk-favorable { color:#047857; background:#ecfdf5; }
+.workbench-view .wb-report-paper h1 { color:#1d4ed8; }
+.workbench-view .wb-report-eyebrow { color:#047857; font-weight:700; }
+.workbench-view .wb-report-metadata { background:#eff6ff; border-color:#bfdbfe; border-top:4px solid #2563eb; }
+.workbench-view .wb-report-metadata dt { color:#1e40af; }
+.workbench-view .wb-report-metadata dd { color:#064e3b; }
+.workbench-view .wb-report-content h2 { color:#1d4ed8; border-bottom-color:#93c5fd; scroll-margin-top:20px; }
+.workbench-view .wb-report-content h2.report-risk-high { color:#991b1b; }
+.workbench-view .wb-report-content h2.report-risk-medium { color:#9a3412; }
+.workbench-view .wb-report-content h2.report-risk-favorable { color:#065f46; }
+@media(max-width:900px) { .workbench-view .wb-report-body { flex-direction:column; } .workbench-view .wb-report-directory { width:auto; max-height:150px; border-right:0; border-bottom:1px solid #dbeafe; padding:12px; } }
+
+
+/* One print layout: remove app chrome from flow, preserve the report and directory. */
+@media print {
+  html, body, #app { height:auto !important; overflow:visible !important; background:white !important; }
+  .workbench-view { display:block !important; height:auto !important; overflow:visible !important; background:white !important; }
+  .workbench-view > :not(.wb-report-overlay) { display:none !important; }
+  .workbench-view .wb-report-overlay, .workbench-view .wb-report-dialog, .workbench-view .wb-report-body, .workbench-view .wb-report-scroll {
+    position:static !important; display:block !important; width:auto !important; height:auto !important; min-height:0 !important; max-height:none !important; overflow:visible !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; background:white !important; box-shadow:none !important;
+  }
+  .workbench-view .wb-report-toolbar, .workbench-view .no-print { display:none !important; }
+  .workbench-view .wb-report-directory { display:block !important; visibility:visible !important; width:auto; max-height:none; overflow:visible; padding:0; border:0; break-after:page; }
+  .workbench-view .wb-report-directory h2 { font-size:24px; padding:0 0 16px; }
+  .workbench-view .wb-report-directory a { display:block; padding:7px 10px; break-inside:avoid; }
+  .workbench-view #printable-report { position:static !important; max-width:none; width:auto; padding:0 !important; margin:0; border:0; box-shadow:none; overflow:visible !important; }
+  .workbench-view #printable-report h2 { break-after:avoid; }
+  .workbench-view .wb-report-metadata { break-inside:avoid; }
+  .workbench-view .wb-report-body { print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+  @page { size:A4; margin:18mm; }
+}
+
+/* Keep issue navigation near the top of the sidebar. */
+.workbench-view .wb-nav-status-card { padding:12px; margin-bottom:8px; }
+.workbench-view .wb-nav-status-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+.workbench-view .wb-nav-status-heading .wb-nav-section-title, .workbench-view .wb-nav-status-heading .wb-nav-progress-number { margin:0; }
+.workbench-view .wb-nav-status-heading .wb-nav-progress-number strong { font-size:20px; }
+.workbench-view .wb-nav-status-card .wb-nav-progress-track { height:5px; }
+.workbench-view .wb-nav-status-card .wb-nav-risk-grid { margin-top:10px; gap:6px; }
+.workbench-view .wb-nav-status-card .wb-nav-risk-grid > div { flex-direction:row; align-items:center; justify-content:center; gap:6px; padding:6px 2px; }
+.workbench-view .wb-nav-status-card .wb-nav-risk-grid strong { font-size:17px; }
+.workbench-view .wb-review-navigation > .wb-functional-overview { margin-bottom:8px; padding:8px 12px; }
+.workbench-view .wb-nav-issues { padding-top:8px; }

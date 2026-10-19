@@ -205,6 +205,7 @@ def test_browser_rereview_baseline_choice_and_history(isolated_workspace, monkey
         assert latest['run']['baseline_kind'] == 'accepted'
         assert '验收后15日付款' in latest['run']['input']['text']
         expect(page.locator('.wb-functional-overview')).to_contain_text('上一版已采纳修订稿')
+        page.locator('.wb-functional-overview > summary').click()
         page.get_by_label('审查历史版本',exact=True).select_option(run['id'])
         expect(page.get_by_text('正在查看历史审查版本，原文和结果保留不变。',exact=False)).to_be_visible()
         expect(page.get_by_role('button',name='编辑正文',exact=True)).to_be_disabled()
