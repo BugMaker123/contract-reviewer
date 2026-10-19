@@ -211,7 +211,7 @@ class Repository:
                 previous = db.execute("SELECT revision,data FROM objects WHERE id=? AND kind='run'", (parent_run_id,)).fetchone()
                 if previous is None or previous['revision'] != expected_run_revision or json.loads(previous['data'])['status'] != 'completed':
                     raise HTTPException(409, '采纳状态已改变，请刷新后重新选择稿件')
-            if task.get('status') == 'running':
+            if task.get('status') in ('running', 'queued'):
                 raise HTTPException(409, '此任务已在审查中')
             if task.get('archived'):
                 raise HTTPException(409, '请先恢复已归档任务')
@@ -234,8 +234,11 @@ class Repository:
     def interrupt_running(self):
         for kind in ('task', 'run', 'draft'):
             for obj in self.list(kind):
-                if obj.get('status') == 'running':
-                    self.update(obj['id'], {'status': 'interrupted', 'error': '服务重启，任务已中断，请重试'})
+                if obj.get('status') in ('running', 'queued'):
+                    data = {'status': 'interrupted', 'error': '服务重启，任务已中断，请重试'}
+                    if obj.get('queue'):
+                        data['queue'] = {**obj['queue'], 'status':'interrupted', 'position':0, 'finished_at':now()}
+                    self.update(obj['id'], data)
 
 
 repository = Repository()

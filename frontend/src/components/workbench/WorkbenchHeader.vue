@@ -20,7 +20,7 @@ export default {
       <h1 :title="contractTitle">{{ contractTitle }}</h1>
       <span class="prototype-status">{{
         isReviewing
-          ? "审查中"
+          ? reviewQueue?.status === "queued" ? "排队中" : "审查中"
           : workspace.task?.status === "completed"
             ? "已完成"
             : reviewReady
@@ -30,7 +30,7 @@ export default {
 
     </div>
     <div class="prototype-nav-right">
-      <button @click="openEditor" :disabled="documentSaving || workspace.historical || workspace.loading || revisionBusy" class="wb-edit-action">编辑正文</button>
+      <button @click="openEditor" :disabled="documentSaving || workspace.historical || workspace.loading || revisionBusy || isReviewing || ['running','queued'].includes(workspace.task?.status)" class="wb-edit-action">编辑正文</button>
       <button @click="showReportModal = true" :disabled="!reviewResult" class="wb-report-action">审查意见书</button>
       <details class="wb-menu">
         <summary>审查设置 <ChevronIcon /></summary>
@@ -40,7 +40,7 @@ export default {
             <select
               v-model="partyRole"
               aria-label="审查立场"
-              :disabled="workspace.historical || workspace.loading"
+              :disabled="workspace.historical || workspace.loading || isReviewing || ['running','queued'].includes(workspace.task?.status)"
               class="border border-slate-200 rounded-lg px-3 py-2"
             >
               <option value="乙方(卖方/开发方/服务方)">
@@ -117,6 +117,7 @@ export default {
         </div>
       </details>
 
+      <button v-if="!isReviewing && workspace.task?.running_run" class="wb-background-progress" @click="startReview(workspace.task.running_run)">查看后台进度</button>
       <button
         @click="requestReview"
         :disabled="
@@ -124,7 +125,7 @@ export default {
           revisionBusy ||
           workspace.loading ||
           workspace.historical ||
-          workspace.task?.status === 'running' ||
+          ['running','queued'].includes(workspace.task?.status) ||
           !contractText.trim()
         "
         class="wb-review-action flex items-center space-x-2 text-sm font-semibold px-5 py-2 rounded-lg transition shadow-sm cursor-pointer"
@@ -163,7 +164,7 @@ export default {
           <polygon points="5 3 19 12 5 21 5 3"></polygon>
         </svg>
         <span>{{
-          isReviewing ? "正在审查…" : reviewResult ? "重新审查" : "开始审查"
+          isReviewing ? reviewQueue?.status === "queued" ? "排队等待…" : "正在审查…" : reviewResult ? "重新审查" : "开始审查"
         }}</span>
       </button>
       <button

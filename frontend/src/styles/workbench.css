@@ -2159,3 +2159,11 @@
 .workbench-view .review-finding-enter-active { transition:opacity .22s ease, transform .22s ease; }
 .workbench-view .review-finding-enter-from { opacity:0; transform:translateY(6px); }
 @media(prefers-reduced-motion:reduce) { .workbench-view .review-finding-enter-active { transition:none; }.workbench-view .review-activity-list .is-latest .review-activity-dot { animation:none; } }
+
+.workbench-view .review-dialog-actions { display:flex; gap:10px; align-items:center; }
+.workbench-view .review-minimize { display:flex; align-items:center; gap:6px; padding:8px 12px; border:1px solid #dbe3ee; background:white; border-radius:6px; color:#475569; font-size:12px; }
+.workbench-view .review-minimize > span { font-size:17px; line-height:1; }
+.workbench-view .review-background-indicator { position:fixed; right:24px; bottom:22px; z-index:45; display:flex; align-items:center; gap:12px; padding:14px 18px; border:1px solid #bfdbfe; border-radius:10px; background:white; box-shadow:0 6px 28px #0f172a1a; color:#334155; text-align:left; }
+.workbench-view .review-background-indicator strong { display:block; font-size:12px; font-weight:600; }.workbench-view .review-background-indicator small { display:block; margin-top:4px; font-size:10px; color:#64748b; }
+.workbench-view .review-background-dot { width:7px; height:7px; background:#2563eb; border-radius:50%; animation:review-pulse 1.4s infinite; }.workbench-view .review-background-dot.done { background:#059669; animation:none; }
+.workbench-view .review-background-open { font-size:11px; color:#2563eb; }.workbench-view .wb-background-progress { color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; padding:8px 12px; border-radius:6px; font-size:12px; }

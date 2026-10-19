@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from .models import ContractReviewRequest, ModelConfig
 from .graph import review_graph_app, get_llm_client
+from .review_queue import review_slot
 from .sample_contracts import SAMPLE_CONTRACTS
 from .workspace_api import router as workspace_router
 from .store import repository
@@ -205,32 +206,33 @@ async def legacy_admission(req):
 @app.post("/api/review")
 async def review_contract_sync(req: ContractReviewRequest):
     """标准同步审查接口"""
-    await legacy_admission(req)
-    initial_state = {
-        "contract_title": req.contract_title,
-        "contract_type": req.contract_type,
-        "party_role": req.party_role,
-        "contract_text": req.contract_text,
-        "model_config": req.model_config_data.model_dump(),
-        "review_focus": req.review_focus or [],
-        "segments": [],
-        "compliance_issues": [],
-        "balance_issues": [],
-        "all_issues": [],
-        "overall_summary": {},
-        "execution_logs": []
-    }
-    final_state = await review_graph_app.ainvoke(initial_state)
-    return {
-        "success": True,
-        "data": {
-            "segments": final_state.get("segments"),
-            "issues": final_state.get("all_issues"),
-            "tax_settlement": final_state.get("tax_settlement_audit"),
-            "summary": final_state.get("overall_summary"),
-            "logs": final_state.get("execution_logs")
+    async with review_slot(req.model_config_data.model_dump()):
+        await legacy_admission(req)
+        initial_state = {
+            "contract_title": req.contract_title,
+            "contract_type": req.contract_type,
+            "party_role": req.party_role,
+            "contract_text": req.contract_text,
+            "model_config": req.model_config_data.model_dump(),
+            "review_focus": req.review_focus or [],
+            "segments": [],
+            "compliance_issues": [],
+            "balance_issues": [],
+            "all_issues": [],
+            "overall_summary": {},
+            "execution_logs": []
         }
-    }
+        final_state = await review_graph_app.ainvoke(initial_state)
+        return {
+            "success": True,
+            "data": {
+                "segments": final_state.get("segments"),
+                "issues": final_state.get("all_issues"),
+                "tax_settlement": final_state.get("tax_settlement_audit"),
+                "summary": final_state.get("overall_summary"),
+                "logs": final_state.get("execution_logs")
+            }
+        }
 
 @app.post("/api/review/stream")
 async def review_contract_stream(req: ContractReviewRequest):
@@ -238,7 +240,6 @@ async def review_contract_stream(req: ContractReviewRequest):
     基于 SSE (Server-Sent Events) 的流式状态机审查接口。
     随着 LangGraph 逐步执行每个节点，实时向前端推送节点状态、进度日志与阶段性审查成果！
     """
-    await legacy_admission(req)
     initial_state = {
         "contract_title": req.contract_title,
         "contract_type": req.contract_type,
@@ -260,58 +261,60 @@ async def review_contract_stream(req: ContractReviewRequest):
         await asyncio.sleep(0.1)
 
         try:
-            # 使用 LangGraph astream 捕获节点状态变更
-            current_state = initial_state
-            async for output in review_graph_app.astream(initial_state):
-                for node_name, node_output in output.items():
-                    # 提取该节点产出的最新日志
-                    latest_log = None
-                    if "execution_logs" in node_output and node_output["execution_logs"]:
-                        latest_log = node_output["execution_logs"][-1]
+            async with review_slot(req.model_config_data.model_dump()):
+                await legacy_admission(req)
+                # 使用 LangGraph astream 捕获节点状态变更
+                current_state = initial_state
+                async for output in review_graph_app.astream(initial_state):
+                    for node_name, node_output in output.items():
+                        # 提取该节点产出的最新日志
+                        latest_log = None
+                        if "execution_logs" in node_output and node_output["execution_logs"]:
+                            latest_log = node_output["execution_logs"][-1]
                     
-                    event_data = {
-                        "node": node_name,
-                        "status": "completed",
-                        "log": latest_log,
-                        "data_preview": {}
-                    }
-                    current_state.update(node_output)
+                        event_data = {
+                            "node": node_name,
+                            "status": "completed",
+                            "log": latest_log,
+                            "data_preview": {}
+                        }
+                        current_state.update(node_output)
 
-                    if node_name == "segment_contract":
-                        event_data["data_preview"] = {
-                            "segment_count": len(node_output.get("segments", [])),
-                            "segments": node_output.get("segments", [])
-                        }
-                    elif node_name == "compliance_check":
-                        event_data["data_preview"] = {
-                            "compliance_issues_count": len(node_output.get("compliance_issues", []))
-                        }
-                    elif node_name == "balance_review":
-                        event_data["data_preview"] = {
-                            "balance_issues_count": len(node_output.get("balance_issues", []))
-                        }
-                    elif node_name == "aggregate_and_redline":
-                        event_data["data_preview"] = {
-                            "all_issues_count": len(node_output.get("all_issues", [])),
-                            "issues": node_output.get("all_issues", [])
-                        }
-                    elif node_name == "synthesize_summary":
-                        event_data["data_preview"] = {
-                            "summary": node_output.get("overall_summary", {})
-                        }
+                        if node_name == "segment_contract":
+                            event_data["data_preview"] = {
+                                "segment_count": len(node_output.get("segments", [])),
+                                "segments": node_output.get("segments", [])
+                            }
+                        elif node_name == "compliance_check":
+                            event_data["data_preview"] = {
+                                "compliance_issues_count": len(node_output.get("compliance_issues", []))
+                            }
+                        elif node_name == "balance_review":
+                            event_data["data_preview"] = {
+                                "balance_issues_count": len(node_output.get("balance_issues", []))
+                            }
+                        elif node_name == "aggregate_and_redline":
+                            event_data["data_preview"] = {
+                                "all_issues_count": len(node_output.get("all_issues", [])),
+                                "issues": node_output.get("all_issues", [])
+                            }
+                        elif node_name == "synthesize_summary":
+                            event_data["data_preview"] = {
+                                "summary": node_output.get("overall_summary", {})
+                            }
 
-                    yield f"event: node_update\ndata: {json.dumps(event_data, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(0.3)
+                        yield f"event: node_update\ndata: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+                        await asyncio.sleep(0.3)
 
-            # 最终全量汇聚通知
-            result = {
-                "segments": current_state.get("segments", []),
-                "issues": current_state.get("all_issues", []),
-                "tax_settlement": current_state.get("tax_settlement_audit"),
-                "summary": current_state.get("overall_summary", {}),
-                "logs": current_state.get("execution_logs", [])
-            }
-            yield f"event: complete\ndata: {json.dumps({'success': True, 'data': result}, ensure_ascii=False)}\n\n"
+                # 最终全量汇聚通知
+                result = {
+                    "segments": current_state.get("segments", []),
+                    "issues": current_state.get("all_issues", []),
+                    "tax_settlement": current_state.get("tax_settlement_audit"),
+                    "summary": current_state.get("overall_summary", {}),
+                    "logs": current_state.get("execution_logs", [])
+                }
+                yield f"event: complete\ndata: {json.dumps({'success': True, 'data': result}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
             yield f"event: error\ndata: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"

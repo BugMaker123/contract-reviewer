@@ -225,7 +225,7 @@ def review_report(format: str = 'json'):
             json_array_length(data,'$.result.issues') AS issues,
             json_array_length(data,'$.applied') AS applied
             FROM objects WHERE kind='run' ORDER BY created DESC''').fetchall()]
-    totals = {status: sum(row['status'] == status for row in rows) for status in ('completed', 'failed', 'interrupted', 'running')}
+    totals = {status: sum(row['status'] == status for row in rows) for status in ('completed', 'failed', 'interrupted', 'running', 'queued')}
     if format == 'json':
         return {'total': len(rows), 'statuses': totals, 'items': rows, 'scope': '全部审查尝试（含归档任务）'}
     stream = StringIO(newline='')
@@ -247,8 +247,8 @@ def create_task(request: TaskInput):
 def get_task(task_id: str):
     task = repo.get(task_id, 'task')
     task['source_matches'] = bool(task.get('source_id')) and repo.get(task['source_id'], 'source')['text'] == task['text']
-    task['runs'] = [{key: run.get(key) for key in ('id', 'number', 'status', 'created_at', 'error', 'baseline_kind', 'parent_run_id')} for run in repo.list('run', task_id)]
-    task['running_run'] = next((r['id'] for r in task['runs'] if r['status'] == 'running'), None)
+    task['runs'] = [{key: run.get(key) for key in ('id', 'number', 'status', 'created_at', 'error', 'baseline_kind', 'parent_run_id', 'queue')} for run in repo.list('run', task_id)]
+    task['running_run'] = next((r['id'] for r in task['runs'] if r['status'] in ('running', 'queued')), None)
     task['run'] = run_view(repo.get(task['active_run'], 'run')) if task.get('active_run') else None
     return task
 
@@ -256,7 +256,7 @@ def get_task(task_id: str):
 @router.put('/api/tasks/{task_id}')
 def update_task(task_id: str, request: TaskInput):
     task = repo.get(task_id, 'task')
-    if task['status'] == 'running':
+    if task['status'] in ('running', 'queued'):
         raise HTTPException(409, '审查中不能修改输入')
     if request.revision is None:
         raise HTTPException(422, '保存需要记录版本号')
@@ -268,7 +268,7 @@ def update_task(task_id: str, request: TaskInput):
 @router.post('/api/tasks/{task_id}/archive')
 def archive_task(task_id: str, request: ArchiveInput):
     task = repo.get(task_id, 'task')
-    if task['status'] == 'running':
+    if task['status'] in ('running', 'queued'):
         raise HTTPException(409, '审查中不能归档')
     return repo.update(task_id, {'archived': request.archived}, request.revision)
 
@@ -350,7 +350,7 @@ def export_audit(run_id: str):
 def save_handling(run_id: str, request: HandlingInput):
     run = repo.get(run_id, 'run')
     task = repo.get(run['task_id'], 'task')
-    if run['status'] != 'completed' or task.get('active_run') != run_id or task['status'] == 'running':
+    if run['status'] != 'completed' or task.get('active_run') != run_id or task['status'] in ('running', 'queued'):
         raise HTTPException(409, '只能处理当前已完成的审查结果，历史版本只读')
     # Decisions/notes still describe this fixed review input even when a new draft is being edited.
     if run['revision'] != request.revision:

@@ -88,6 +88,7 @@ export function useTrackedReview(context) {
       workspace.historical ||
       workspace.loading ||
       isReviewing.value ||
+      ["running","queued"].includes(workspace.task?.status) ||
       resultStale.value,
   );
   let toastTimer;

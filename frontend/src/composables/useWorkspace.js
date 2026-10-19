@@ -107,9 +107,9 @@ export function createWorkspaceWorkbench(refs) {
   });
   const flush = async () => {
     clearTimeout(timer);
-    if (hydrating.value || historical.value || refs.isReviewing.value || task.value?.status === "running") return;
+    if (hydrating.value || historical.value || refs.isReviewing.value || ["running","queued"].includes(task.value?.status)) return;
     const job = async () => {
-      if (refs.isReviewing.value || task.value?.status === "running") return;
+      if (refs.isReviewing.value || ["running","queued"].includes(task.value?.status)) return;
       saving.value = true;
       error.value = "";
       refs.saveStatus.value = "正在保存…";
@@ -255,8 +255,8 @@ export function createWorkspaceWorkbench(refs) {
           source_id: record.source_id || null,
         };
         versions.value = task.value.runs;
-        if (task.value.status === "running")
-          error.value = "后台正在审查，可点击重新连接查看进度。";
+        if (["running","queued"].includes(task.value.status))
+          error.value = task.value.status === "queued" ? "任务已排队，可查看后台进度或取消排队。" : "后台正在审查，可点击重新连接查看进度。";
         lastInput = JSON.stringify(input());
         refs.saveStatus.value = "已从本机服务恢复";
       }

@@ -26,6 +26,7 @@ onActivated(refresh);
       <span>已出结果 <strong class="is-success">{{ report.statuses.completed }}</strong></span>
       <span>失败 <strong class="is-danger">{{ report.statuses.failed }}</strong></span>
       <span>已中断 <strong>{{ report.statuses.interrupted }}</strong></span>
+      <span>排队中 <strong>{{ report.statuses.queued || 0 }}</strong></span>
       <span>执行中 <strong class="is-running">{{ report.statuses.running }}</strong></span>
     </div>
     <span class="records-statistics-scope">含历史版本与归档任务</span>

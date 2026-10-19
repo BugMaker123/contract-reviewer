@@ -376,7 +376,7 @@ export default {
             :disabled="
               workspace.loading ||
               workspace.historical ||
-              workspace.task?.status === 'running' ||
+              ['running','queued'].includes(workspace.task?.status) ||
               !contractText.trim()
             "
             class="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 cursor-pointer"
@@ -409,9 +409,9 @@ export default {
             ></path>
           </svg>
           <span class="font-semibold text-slate-700"
-            >正在进行法务深度研判...</span
+            >{{ reviewQueue?.status === "queued" ? "正在排队等待审查" : "正在进行法务深度研判…" }}</span
           >
-          <span class="text-xs text-slate-400 mt-1">请查看中央浮动进度条</span>
+          <span class="text-xs text-slate-400 mt-1">可通过进度窗口或右下角入口查看进展</span>
         </div>
 
         <div

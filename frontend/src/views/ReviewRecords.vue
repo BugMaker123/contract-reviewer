@@ -84,13 +84,13 @@ export default {
                   <button v-if="task.active_run" class="text-blue-600" @click="comparisonTask = task">前后对比</button>
                   <button
                     @click="archive('tasks', task)"
-                    :disabled="task.status === 'running' || busy"
+                    :disabled="['running','queued'].includes(task.status) || busy"
                     class="text-slate-400"
                   >
                     {{ task.archived ? "恢复" : "归档" }}
                   </button>
                 </div>
-                <p v-if="task.active_run && ['draft','failed','interrupted','running'].includes(task.status)" class="text-xs text-amber-700 mt-2">导出及对比使用第 {{ task.run_number }} 次已留档结果</p>
+                <p v-if="task.active_run && ['draft','failed','interrupted','running','queued'].includes(task.status)" class="text-xs text-amber-700 mt-2">导出及对比使用第 {{ task.run_number }} 次已留档结果</p>
               </td>
             </tr>
           </tbody>

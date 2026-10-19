@@ -24,7 +24,12 @@ export function useWorkbench() {
 
   const isReviewing = ref(false);
   const reviewDialogOpen = ref(false);
+  const reviewMinimized = ref(false);
+  const reviewQueue = ref(null);
+  const minimizeReview = () => { reviewMinimized.value = true; reviewDialogOpen.value = false; };
+  const restoreReview = () => { reviewMinimized.value = false; reviewDialogOpen.value = true; };
   const closeReviewDialog = () => {
+    reviewMinimized.value = false;
     reviewDialogOpen.value = false;
   };
   const viewMode = ref("raw");
@@ -716,6 +721,8 @@ export function useWorkbench() {
       previousApplied = [...appliedIssueIds.value];
 
     reviewDialogOpen.value = true;
+    reviewMinimized.value = false;
+    reviewQueue.value = null;
     isReviewing.value = true;
     resetNodeStates();
     appliedIssueIds.value = [];
@@ -791,6 +798,7 @@ export function useWorkbench() {
             comparisonTexts.original = data.document.text;
           }
         }
+        if (event === "queue") { reviewQueue.value = data; }
         if (event === "progress") {
           reviewTrace.value.push(data);
           latestLogMessage.value = data.detail;
@@ -1411,6 +1419,10 @@ export function useWorkbench() {
     reviewTrace,
     publicAnalysis,
     reviewDialogOpen,
+    reviewMinimized,
+    reviewQueue,
+    minimizeReview,
+    restoreReview,
     closeReviewDialog,
     modelConfig,
     sampleContracts,

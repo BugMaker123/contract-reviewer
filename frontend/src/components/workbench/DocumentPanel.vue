@@ -111,7 +111,7 @@ export default {
         >
           修改后的文档<small>{{
             isReviewing
-              ? "正在生成修订建议…"
+              ? reviewQueue?.status === "queued" ? "排队等待中…" : "正在生成修订建议…"
               : resultStale
                 ? "当前编辑稿"
                 : revisionScope === "all"
@@ -123,7 +123,7 @@ export default {
           v-if="documentCompare && isReviewing"
           class="wb-review-placeholder"
         >
-          <strong>正在审查合同</strong><span>完成后在此展示修订后的文档</span>
+          <strong>{{ reviewQueue?.status === "queued" ? "审查任务排队中" : "正在审查合同" }}</strong><span>完成后在此展示修订后的文档</span>
         </div>
         <iframe
           v-else-if="viewMode === 'original' && workspace.conditions.source_id"

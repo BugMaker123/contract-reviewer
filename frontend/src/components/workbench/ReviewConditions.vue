@@ -48,7 +48,7 @@ const save = async () => {
       <div class="flex justify-between"><h3 class="font-semibold">审查条件 · {{ workspace.modeName }}</h3><button aria-label="关闭审查条件" @click="workspace.showConditions = false">关闭</button></div>
       <p class="text-xs text-slate-500 my-3">修改资料或要求后需重新确认制度要求，并重新审查；旧版本保留。</p>
       <p v-if="error" role="alert" class="text-red-600 text-xs">{{ error }}</p>
-      <fieldset :disabled="workspace.historical || workspace.task?.status === 'running' || workspace.verifying || importing || busy">
+      <fieldset :disabled="workspace.historical || ['running','queued'].includes(workspace.task?.status) || workspace.verifying || importing || busy">
         <label class="block text-xs">谈判尺度<select v-model="workspace.conditions.scale" class="field"><option>中立</option><option>强势</option><option>弱势</option></select></label>
         <ReviewBackground :context="editor" expanded />
         <div v-if="workspace.conditions.mode === 'compare'" class="space-y-2">

@@ -25,6 +25,7 @@ export function createPresentation() {
   const taskStatuses = {
     draft: "待审查",
     running: "审查中",
+    queued: "排队中",
     pending_review: "待复核",
     completed: "已完成",
     failed: "失败",
@@ -42,7 +43,7 @@ export function createPresentation() {
       ? "green"
       : ["failed", "interrupted", "pending_review"].includes(status)
         ? "amber"
-        : status === "running"
+        : ["running","queued"].includes(status)
           ? "blue"
           : "";
   const modeName = (id) => modes.find((mode) => mode.id === id)?.name || id;

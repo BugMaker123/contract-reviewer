@@ -5,6 +5,8 @@ import PriorityReview from "./PriorityReview.vue";
 const props = defineProps({ context: { type: Object, required: true } });
 const value = (key) => unref(props.context[key]);
 const running = computed(() => value("isReviewing"));
+const queued = computed(() => running.value && value("reviewQueue")?.status === "queued");
+const queuePosition = computed(() => value("reviewQueue")?.position || 1);
 const trace = computed(() => value("reviewTrace") || []);
 const clock = ref(Date.now());
 const startedAt = ref(Date.now());
@@ -20,6 +22,9 @@ watch(running, (active) => {
     clock.value = Date.now();
   }
 }, { immediate: true });
+watch(() => value('reviewQueue')?.started_at, (stamp) => {
+  if (stamp && Number.isFinite(Date.parse(stamp))) { startedAt.value = Date.parse(stamp); clock.value = Date.now(); }
+});
 onUnmounted(() => clearInterval(timer));
 const elapsed = computed(() => {
   const seconds = Math.max(0, Math.floor((clock.value - startedAt.value) / 1000));
@@ -84,7 +89,7 @@ const phaseDescriptions = [
   '正在汇总重点要求结论与全文意见，准备本轮审查结果。',
 ];
 const activity = computed(() => reviewActivities(trace.value, running.value ? items.value.length : 0));
-const phaseDescription = computed(() => running.value ? phaseDescriptions[Math.min(activeStep.value,6)] : value('reviewError') ? '本次处理已停止，已有结果会保留。' : '重点要求与全文分析已整理完成，可进入工作台逐项复核。');
+const phaseDescription = computed(() => queued.value ? `当前排队第 ${queuePosition.value} 位，轮到后自动开始；可最小化窗口继续其他工作，也可取消排队。` : running.value ? phaseDescriptions[Math.min(activeStep.value,6)] : value('reviewError') ? '本次处理已停止，已有结果会保留。' : '重点要求与全文分析已整理完成，可进入工作台逐项复核。');
 const metrics = computed(() => {
   const prepare = trace.value.find(item => item.stage === 'prepare') || {};
   const segment = [...trace.value].reverse().find(item => Number.isInteger(item.segment_count));
@@ -113,12 +118,14 @@ const severityName = (severity) =>
     >
       <header class="review-dialog-header">
         <h3 id="review-dialog-title">合同合规性审查分析</h3>
+        <div class="review-dialog-actions">
+        <button v-if="running" @click="context.minimizeReview" class="review-minimize" aria-label="最小化审查进度"><span aria-hidden="true">−</span>最小化</button>
         <button
           v-if="running"
           @click="context.cancelReview"
           class="review-cancel"
         >
-          取消审查
+          {{ queued ? '取消排队' : '取消审查' }}
         </button>
         <button
           v-else
@@ -128,14 +135,15 @@ const severityName = (severity) =>
         >
           ✕
         </button>
+        </div>
       </header>
       <div class="review-dialog-body">
         <ol class="review-stage-list" aria-label="审查处理阶段">
           <li
             v-for="(step, index) in steps"
             :key="step"
-            :class="{ done: index < activeStep, active: index === activeStep }"
-            :aria-current="index === activeStep ? 'step' : undefined"
+            :class="{ done: index < activeStep, active: !queued && index === activeStep }"
+            :aria-current="!queued && index === activeStep ? 'step' : undefined"
           >
             <span class="review-stage-icon">{{
               index < activeStep ? "✓" : index + 1
@@ -146,8 +154,8 @@ const severityName = (severity) =>
         <section class="review-process" aria-label="实时处理过程">
           <div class="review-dialog-status" role="status">
             <i v-if="running"></i>
-            <span>{{ running ? '正在处理：' + steps[activeStep] : value('reviewError') ? '本次审查已停止' : '审查完成，意见和修订建议已生成。' }}</span>
-            <time class="review-elapsed" aria-label="累计处理用时">已用时 {{ elapsed }}</time>
+            <span>{{ queued ? '等待执行 · 排队第 ' + queuePosition + ' 位' : running ? '正在处理：' + steps[activeStep] : value('reviewError') ? '本次审查已停止' : '审查完成，意见和修订建议已生成。' }}</span>
+            <time class="review-elapsed" aria-label="累计处理用时">{{ queued ? '已等待' : '已用时' }} {{ elapsed }}</time>
           </div>
           <div class="review-current-activity"><p>{{ phaseDescription }}</p><div v-if="metrics.length" class="review-activity-metrics"><span v-for="metric in metrics" :key="metric">{{ metric }}</span></div></div>
           <ol v-if="activity.length" class="review-activity-list" aria-label="审查动态" aria-live="polite" aria-relevant="additions text">
@@ -161,9 +169,9 @@ const severityName = (severity) =>
         </div>
         <div v-if="!items.length" class="review-waiting">
           <div v-if="running" class="review-waiting-line"></div>
-          <h4>{{ running ? "正在形成条款意见" : "本次未识别出审查问题" }}</h4>
+          <h4>{{ queued ? "任务已加入本地队列" : running ? "正在形成条款意见" : "本次未识别出审查问题" }}</h4>
           <p v-if="running">
-            完成的条款意见将逐项出现在这里，初步意见仍需后续校验。
+            {{ queued ? '同一服务凭证最多并发 5 个审查任务，排队期间尚未开始分析。' : '完成的条款意见将逐项出现在这里，初步意见仍需后续校验。' }}
           </p>
         </div>
         <TransitionGroup
@@ -204,7 +212,7 @@ const severityName = (severity) =>
       <footer class="review-dialog-footer">
         <span>{{
           running
-            ? "正在处理：" + steps[activeStep]
+            ? queued ? "排队第 " + queuePosition + " 位" : "正在处理：" + steps[activeStep]
             : "共 " + items.length + " 项审查意见"
         }}</span
         ><button
@@ -217,4 +225,9 @@ const severityName = (severity) =>
       </footer>
     </section>
   </div>
+  <button v-if="value('reviewMinimized') && !value('reviewDialogOpen')" class="review-background-indicator" @click="context.restoreReview" aria-label="恢复审查进度">
+    <span class="review-background-dot" :class="{done:!running}" aria-hidden="true"></span>
+    <span><strong>{{ queued ? '审查排队中 · 第 ' + queuePosition + ' 位' : running ? '审查正在后台进行' : value('reviewError') ? '审查已停止' : '审查已完成' }}</strong><small>{{ running ? '已等待 / 处理 ' + elapsed : '点击查看本轮结果' }}</small></span>
+    <span class="review-background-open">{{ running ? '查看进度' : '查看结果' }}</span>
+  </button>
 </template>

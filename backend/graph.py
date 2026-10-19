@@ -153,9 +153,13 @@ def model_failure_reason(error):
     return '模型调用失败，请检查模型配置或服务日志'
 
 
+def resolved_api_key(model_cfg):
+    return (model_cfg.get("api_key") or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY") or "").strip()
+
+
 def get_llm_client(model_cfg: Dict[str, Any]) -> Optional[ChatOpenAI]:
     """根据前端动态配置实例化 ChatOpenAI 客户端"""
-    api_key = model_cfg.get("api_key") or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    api_key = resolved_api_key(model_cfg)
     if not api_key or not api_key.strip():
         logger.info("未提供 API Key，将采用内置专业法务规则引擎进行毫秒级审查。")
         return None
