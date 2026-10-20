@@ -20,7 +20,8 @@ export default {
 </script>
 <template>
   <div
-    class="h-screen flex flex-col overflow-hidden bg-slate-50 text-slate-800 antialiased"
+    class="portal-shell h-screen flex flex-col overflow-hidden bg-slate-50 text-slate-800 antialiased"
+    :class="{'portal-review-shell': $route.path.match(/templates\/[^/]+/)}"
   >
     <header
       class="portal-header h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0"

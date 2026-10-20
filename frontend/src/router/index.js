@@ -16,7 +16,7 @@ export const router = createRouter({
     {
       path: "/",
       component: () => import("../layouts/PortalLayout.vue"),
-      children: Object.entries(pages).map(([path, page]) => ({
+      children: [...Object.entries(pages).map(([path, page]) => ({
         path,
         name: page.key,
         meta: { page: page.key, title: page.name },
@@ -27,7 +27,7 @@ export const router = createRouter({
           ]);
           return view;
         },
-      })),
+      })), {path: '/templates/:id/review', name: 'template-review', meta: {page: 'templates', title: '模板核验'}, component: () => import('../views/TemplateReview.vue')}],
     },
     {
       path: "/workbench",

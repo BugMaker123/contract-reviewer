@@ -85,10 +85,13 @@ def template_detail(identifier: str):
 
 @router.put('/api/contract-templates/{identifier}')
 def update_template(identifier: str, body: TemplateInput):
-    workspace_api.repo.get(identifier, 'contract_template')
+    existing = workspace_api.repo.get(identifier, 'contract_template')
     if body.revision is None:
         raise HTTPException(422, '缺少记录版本，请刷新后重试')
-    return workspace_api.repo.update(identifier, template_data(body), body.revision)
+    data = template_data(body)
+    if existing['source_id'] != body.source_id:
+        data.update(review_draft=None, review_status='draft', release_id=None)
+    return workspace_api.repo.update(identifier, data, body.revision)
 
 
 @router.delete('/api/contract-templates/{identifier}')

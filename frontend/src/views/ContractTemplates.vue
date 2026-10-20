@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, onActivated, watch } from 'vue';
 import { readDocument } from '../portal/services/documents.js';
 import { usePortalShell } from '../stores/portal.js';
 
@@ -27,6 +27,7 @@ async function load() {
 watch([search, group], () => { if (page.value !== 1) page.value = 1; else load(); });
 watch(page, load);
 onMounted(load);
+onActivated(load);
 function edit(kind, row = null) {
   modalError.value = ''; selectedFile.value = null;
   Object.assign(form, {name: row?.name || '', description: row?.description || '', group_id: row?.group_id || group.value || groups.value[0]?.id || '', source_id: row?.source_id || '', revision: row?.revision || null});
@@ -105,9 +106,9 @@ const previewUrl = computed(() => !preview.value ? '' : preview.value.extension 
         <div class="checklists-table-scroll">
           <table class="data-table"><thead><tr><th>模板名称</th><th>所属分组</th><th>更新时间</th><th>操作</th></tr></thead>
             <tbody><tr v-for="row in rows" :key="row.id">
-              <td><strong>{{ row.name }}</strong><small>{{ row.filename }}</small><small v-if="row.description">{{ row.description }}</small></td>
+              <td><strong>{{ row.name }}</strong><small>{{ row.filename }} · {{row.review_status === 'published' ? '已发布规则' : '待核验'}}</small><small v-if="row.description">{{ row.description }}</small></td>
               <td>{{ groupName(row.group_id) }}</td><td>{{ new Date(row.updated_at).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}) }}</td>
-              <td><div class="checklists-row-actions"><button @click="showPreview(row)">预览</button><a :href="'/api/contract-templates/' + row.id + '/download'">导出</a><button @click="edit('template', row)">编辑</button><button class="muted" @click="askDelete('template', row)">删除</button></div></td>
+              <td><div class="checklists-row-actions"><RouterLink v-if="row.extension === '.docx'" :to="'/templates/'+row.id+'/review'">模板核验</RouterLink><button @click="showPreview(row)">预览</button><a :href="'/api/contract-templates/' + row.id + '/download'">导出</a><button @click="edit('template', row)">编辑</button><button class="muted" @click="askDelete('template', row)">删除</button></div></td>
             </tr></tbody>
           </table>
         </div>
