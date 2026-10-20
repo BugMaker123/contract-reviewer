@@ -31,4 +31,8 @@ export const pages = {
     states: ["categories", "checklists"],
     features: ["catalog", "records", "uploads", "checklists"],
   },
+  "/templates": {
+    key: "templates", name: "合同模板", icon: "▧",
+    data: [], states: [], features: [],
+  },
 };

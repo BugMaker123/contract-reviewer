@@ -3,6 +3,7 @@ import { pages } from "../portal/pages.js";
 import { loadPageModules } from "../portal/modules.js";
 
 const views = {
+  templates: () => import("../views/ContractTemplates.vue"),
   start: () => import("../views/StartReview.vue"),
   records: () => import("../views/ReviewRecords.vue"),
   categories: () => import("../views/BusinessCategories.vue"),
@@ -30,7 +31,6 @@ export const router = createRouter({
     },
     {
       path: "/workbench",
-      alias: "/workbench.html",
       name: "workbench",
       meta: { title: "合同审查工作台" },
       component: () => import("../views/Workbench.vue"),

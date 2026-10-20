@@ -31,7 +31,7 @@ def test_spa_history_fallback_and_assets():
         index = client.get('/').text
         assert '/assets/index-' in index
         assert '/static/portal.js' not in index
-        for path in [*PORTAL_PAGES, '/workbench', '/workbench.html', '/unknown-page']:
+        for path in [*PORTAL_PAGES, '/workbench', '/unknown-page']:
             response = client.get(path)
             assert response.status_code == 200
             assert response.text == index
@@ -41,6 +41,10 @@ def test_spa_history_fallback_and_assets():
         assert client.get(asset).status_code == 200
         assert client.get('/api/no-such-endpoint').status_code == 404
         assert client.get('/assets/no-such-file.js').status_code == 404
+        for path in ['/index.html', '/workbench.html', '/static/index.html', '/static/workbench.html',
+                     '/static/vendor/vue.global.prod.js', '/static/vendor/lucide.min.js']:
+            assert client.get(path).status_code == 404
+        assert client.get('/static/document-preview.html').status_code == 200
 
 
 def test_missing_build_explains_how_to_start(tmp_path, monkeypatch):

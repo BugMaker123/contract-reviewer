@@ -41,6 +41,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 app.include_router(workspace_router)
+from .template_api import router as template_router
+app.include_router(template_router)
 from .document_import import ImportBodyLimit
 app.add_middleware(ImportBodyLimit)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost', '[::1]', 'testserver'])
@@ -343,7 +345,6 @@ async def serve_index():
 
 
 @app.get("/workbench")
-@app.get("/workbench.html")
 async def serve_workbench():
     from .ui import render_workbench
     return HTMLResponse(render_workbench(), headers={'Cache-Control': 'no-store'})
@@ -351,7 +352,7 @@ async def serve_workbench():
 
 @app.get('/{path:path}')
 async def spa_fallback(path: str):
-    if path.split('/', 1)[0] in {'api', 'static', 'assets'}:
+    if path.split('/', 1)[0] in {'api', 'static', 'assets'} or path.endswith('.html'):
         raise HTTPException(404, 'Not Found')
     from .ui import render_portal
     return HTMLResponse(render_portal(), headers={'Cache-Control': 'no-store'})

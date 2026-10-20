@@ -5,7 +5,7 @@ from fastapi import HTTPException
 
 FRONTEND = Path(__file__).parent.parent / 'frontend'
 DIST = FRONTEND / 'dist'
-PORTAL_PAGES = {'/': 'start', '/records': 'records', '/categories': 'categories', '/checklists': 'checklists'}
+PORTAL_PAGES = {'/': 'start', '/records': 'records', '/categories': 'categories', '/checklists': 'checklists', '/templates': 'templates'}
 
 
 def render_portal(path: str = '/') -> str:

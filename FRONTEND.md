@@ -75,6 +75,9 @@ frontend/src/
 
 `backend/ui.py` 只提供构建后的入口 HTML；`backend/frontend_build.py` 管理启动时构建。
 `backend/static/document-preview.html` 继续独立承担 Word/PDF 预览和版式编辑。
+第一版 HTML 业务页面及其独立脚本已移除，工作台统一使用 `/workbench`；
+`/index.html`、`/workbench.html` 等旧页面地址返回 404。
+Vue 通过 Vite 打包，已移除旧版静态 Vue 和 Lucide 脚本；Tailwind 样式及文档预览依赖仍由后端提供。
 
 ## 验证
 

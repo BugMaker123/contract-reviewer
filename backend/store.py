@@ -116,12 +116,21 @@ class Repository:
                 raise HTTPException(409, '记录已被修改，请刷新后重试')
             if kind == 'category' and db.execute("SELECT 1 FROM objects WHERE kind='checklist' AND json_extract(data,'$.category_id')=? LIMIT 1", (identifier,)).fetchone():
                 raise HTTPException(409, '该分类下仍有清单（含已归档清单），请先迁移或删除清单')
+            if kind == 'template_group' and db.execute("SELECT 1 FROM objects WHERE kind='contract_template' AND json_extract(data,'$.group_id')=? LIMIT 1", (identifier,)).fetchone():
+                raise HTTPException(409, '该分组下仍有模板，请先迁移或删除模板')
             db.execute('DELETE FROM objects WHERE id=?', (identifier,))
             if kind == 'checklist':
                 db.execute("DELETE FROM objects WHERE kind='checklist_version' AND parent=?", (identifier,))
         return {'deleted': identifier}
 
     def _catalog_constraints(self, db, kind, data, identifier=None):
+        if kind == 'template_group':
+            if any(json.loads(row['data'])['name'].strip().casefold() == data['name'].strip().casefold()
+                   for row in db.execute("SELECT data FROM objects WHERE kind='template_group' AND id!=?", (identifier or '',))):
+                raise HTTPException(409, '分组名称已存在')
+        if kind == 'contract_template':
+            if not db.execute("SELECT 1 FROM objects WHERE kind='template_group' AND id=?", (data['group_id'],)).fetchone():
+                raise HTTPException(409, '分组已删除，请重新选择')
         if kind == 'category':
             for field in ('name', 'code'):
                 value = data.get(field, '').strip().casefold()
