@@ -103,6 +103,7 @@
     }
 
     #download {
+      display: none !important;
       display: flex;
       align-items: center;
       gap: 4px;
@@ -333,6 +334,34 @@
       color: #2563eb;
       font-weight: 600
     }
+    .review-document #pages ins { color: #c32b38 !important; text-decoration: underline !important; text-decoration-thickness: 1px; text-underline-offset: 3px; background: #fff5f5; }
+    .review-document #pages del { color: #c32b38 !important; text-decoration: line-through !important; background: #fff1f2; }
+    .review-document #pages ins *, .review-document #pages del * { color: inherit !important; }
+    .review-document #pages .review-clause { cursor: pointer; }
+    .review-document, .review-document #pages { background: #eef1f5; }
+    body.review-document { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+    .review-document #viewport { flex: 1; min-height: 0; overflow: auto; }
+    .review-document > header, .review-document #hint { display: none !important; }
+    .review-document .docx-wrapper { padding: 16px 16px 32px !important; }
+    .review-document section.docx { box-shadow: 0 2px 12px #33415514 !important; }
+    .review-document #pages .review-active { background: #f0efff; }
+    .review-document #pages ins { color: #245bdb !important; background: #f0f5ff; }
+    .review-document #pages .review-active ins { font-weight: 600; }
+    .review-document #pages del { color: #9b5660 !important; background: #fff5f5; }
+    #review-selection { position: fixed; pointer-events: none; border: 2px solid #7566ff; border-radius: 4px; z-index: 5; }
+    #review-callout { position: fixed; z-index: 6; border: 1px solid #ef4444; border-radius: 6px; background: white; color: #dc2626; padding: 8px 10px; font: 600 12px system-ui; box-shadow: 0 3px 10px #0f172a12; cursor: pointer; }
+    #review-callout::before { content: ''; position: absolute; width: 14px; height: 1px; background: #ef4444; top: 50%; left: -15px; }
+    @media print { #review-selection, #review-callout { display: none; } .review-document #pages .review-active { background: transparent; } }
+
+
+    .review-document #pages .review-applied,
+    .review-document #pages .review-applied.review-active { background: #eaf8ef; }
+    .review-document #pages .review-applied ins,
+    .review-document #pages .review-applied span { color: #167343 !important; background: transparent; }
+    .review-document #pages .review-applied { color: #167343 !important; }
+    #review-selection.is-applied { border-color: #22a663; }
+    #review-callout.is-applied { border-color: #22a663; color: #15803d; background: #f0fdf4; }
+    #review-callout.is-applied::before { background: #22a663; }
   </style>
 </head>
 
@@ -363,7 +392,7 @@
   <script src="/static/vendor/docx-preview.min.js"></script>
   <script>
     (async () => {
-      const params = new URLSearchParams(location.search), id = params.get('source'), run = params.get('run'), scope = params.get('scope') || 'current', readOnly = params.get('readonly') === '1'; const status = document.querySelector('#status'), pages = document.querySelector('#pages'), zoom = { value: 'fit' }, zoomControls = document.querySelector('#zoom-controls');
+      const params = new URLSearchParams(location.search), tracking = params.get('review') === '1', display = params.get('display') || 'markup', id = params.get('source'), run = params.get('run'), scope = params.get('scope') || 'current', readOnly = params.get('readonly') === '1'; const status = document.querySelector('#status'), pages = document.querySelector('#pages'), zoom = { value: 'fit' }, zoomControls = document.querySelector('#zoom-controls');
       const resize = () => {
         const sheets = [...pages.querySelectorAll('section.docx')]; if (!sheets.length) return;
         const width = Math.max(...sheets.map(page => Math.max(page.offsetWidth, page.scrollWidth)));
@@ -381,7 +410,192 @@
       label.textContent = pane === 'revised' ? '修订文档' : '原始文档';
       if (readOnly) { badge.hidden = false; badge.textContent = '只读'; }
       if (pane === 'revised') { badge.hidden = false; badge.textContent = params.get('edited') === '1' ? '编辑稿' : '全部建议'; badge.title = params.get('edited') === '1' ? '当前人工编辑稿' : '全部修改建议，未自动采纳'; }
-      let info, editable = [], anchors = [], documentRendered = false, pendingMarks = null;
+      if (tracking) { label.textContent = '合同修订'; badge.hidden = false; badge.textContent = display === 'markup' ? '所有标记' : display === 'current' ? '仅已接受' : '原始稿'; }
+      let info, editable = [], anchors = [], documentRendered = false, pendingMarks = null, followPausedUntil = 0;
+      const reviewElements = new Map();
+      let selectedReviewId = null, selectionFrame = 0;
+      const selectionBox = document.createElement('div'), selectionCallout = document.createElement('button');
+      selectionBox.id = 'review-selection'; selectionCallout.id = 'review-callout';
+      selectionCallout.textContent = '⚠ 建议修订';
+      selectionBox.hidden = selectionCallout.hidden = true;
+      document.body.append(selectionBox, selectionCallout);
+      selectionCallout.onclick = () => parent.postMessage({type: 'lexis-review-select', run, issue: selectedReviewId}, location.origin);
+      const drawSelection = () => {
+        selectionFrame = 0;
+        const applied = info?.review_items?.find(item => item.id === selectedReviewId)?.state === 'applied';
+        selectionBox.classList.toggle('is-applied', applied);
+        selectionCallout.classList.toggle('is-applied', applied);
+        selectionCallout.textContent = applied ? '✓ 已采纳' : '⚠ 建议修订';
+        const viewport = document.querySelector('#viewport').getBoundingClientRect();
+        const rects = (reviewElements.get(selectedReviewId) || []).map(el => el.getBoundingClientRect()).filter(r => r.bottom > viewport.top && r.top < viewport.bottom);
+        selectionBox.hidden = selectionCallout.hidden = !rects.length;
+        if (!rects.length) return;
+        const left = Math.min(...rects.map(r => r.left)) - 6, right = Math.max(...rects.map(r => r.right)) + 6;
+        const top = Math.max(viewport.top, Math.min(...rects.map(r => r.top)) - 4);
+        const bottom = Math.min(viewport.bottom, Math.max(...rects.map(r => r.bottom)) + 4);
+        Object.assign(selectionBox.style, {left: left+'px', top: top+'px', width: (right-left)+'px', height: (bottom-top)+'px'});
+        const calloutLeft = right + 18;
+        // Keep the one callout outside the text; suppress it when the gutter cannot fit it.
+        selectionCallout.hidden = calloutLeft + 100 > document.documentElement.clientWidth - 10 || bottom-top < 24;
+        Object.assign(selectionCallout.style, {left: calloutLeft+'px', top: Math.max(top, (top+bottom)/2-18)+'px'});
+      };
+      const scheduleSelection = () => { if (!selectionFrame) selectionFrame = requestAnimationFrame(drawSelection); };
+      document.querySelector('#viewport').addEventListener('scroll', scheduleSelection, {passive: true});
+      window.addEventListener('resize', scheduleSelection);
+      new ResizeObserver(scheduleSelection).observe(pages);
+
+      const focusReview = (issueId, scroll = true) => {
+        pages.querySelectorAll('.review-active').forEach(element => element.classList.remove('review-active'));
+        selectedReviewId = issueId;
+        const targets = reviewElements.get(issueId) || [];
+        targets.forEach(element => element.classList.add('review-active'));
+        scheduleSelection();
+        if (scroll) followPausedUntil = Date.now() + 1000;
+        if (scroll) targets[0]?.scrollIntoView({behavior: 'smooth', block: 'center'});
+      };
+      let reviewListenersAttached = false;
+      const reviewOrder = () => [...reviewElements].filter(([, els]) => els.length).sort((a, b) => {
+        if (a[1][0] === b[1][0]) return 0;
+        return a[1][0].compareDocumentPosition(b[1][0]) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+      }).map(([id]) => id);
+      const annotateReview = () => {
+        reviewElements.clear();
+        pages.querySelectorAll('.review-clause').forEach(el => {
+          el.classList.remove('review-clause', 'review-active', 'review-pending', 'review-applied', 'review-rejected');
+          delete el.dataset.reviewIssue;
+          el.removeAttribute('title'); el.removeAttribute('tabindex');
+        });
+        const elements = [...pages.querySelectorAll('article p')];
+        const snapshots = elements.map(element => {
+          const old = element.cloneNode(true), current = element.cloneNode(true);
+          old.querySelectorAll('ins').forEach(node => node.remove());
+          current.querySelectorAll('del').forEach(node => node.remove());
+          return {element, before: normalize(old.textContent), after: normalize(current.textContent)};
+        });
+        for (const issue of info.review_items || []) {
+          const old = normalize(issue.redline?.original_text || issue.evidence || '');
+          const after = normalize(issue.redline?.suggested_text || '');
+          let hits = snapshots.filter(item => (old && item.before === old) || (after && item.after === after));
+          if (!hits.length) {
+            // Match whole consecutive paragraph ranges before considering a containing paragraph.
+            // Individual fragments can repeat in unrelated headings and must not all be selected.
+            for (const [field, target] of [['before', old], ['after', after]]) {
+              if (!target || hits.length) continue;
+              for (let start = 0; start < snapshots.length && !hits.length; start++) {
+                let joined = '';
+                for (let end = start; end < snapshots.length; end++) {
+                  joined += snapshots[end][field];
+                  if (!target.startsWith(joined)) break;
+                  if (joined === target) { hits = snapshots.slice(start, end + 1); break; }
+                }
+              }
+            }
+          }
+          if (!hits.length) {
+            const containing = snapshots.filter(item => [item.before, item.after].some(text =>
+              (old.length >= 12 && text.includes(old)) || (after.length >= 12 && text.includes(after))));
+            if (containing.length === 1) hits = containing;
+          }
+          reviewElements.set(issue.id, hits.map(item => item.element));
+          for (const {element} of hits) {
+            element.classList.add('review-clause');
+            if (issue.state === 'applied') element.classList.add('review-applied');
+            if (issue.state === 'rejected') element.classList.add('review-rejected');
+            if (issue.state === 'pending' || issue.state === 'needs_review') element.classList.add('review-pending');
+            element.dataset.reviewIssue = element.dataset.reviewIssue || issue.id;
+            element.title = issue.issue_title + ' · ' + (issue.state === 'applied' ? '已采纳' : issue.state === 'rejected' ? '已拒绝' : '待采纳');
+            element.tabIndex = 0;
+          }
+        }
+        if (reviewListenersAttached) return;
+        reviewListenersAttached = true;
+        const select = (event, edit = false) => {
+          const target = event.target.closest('[data-review-issue]');
+          if (!target) return;
+          focusReview(target.dataset.reviewIssue, false);
+          parent.postMessage({type: edit ? 'lexis-review-edit' : 'lexis-review-select', run, issue: target.dataset.reviewIssue}, location.origin);
+        };
+        let followTimer;
+        document.querySelector('#viewport').addEventListener('scroll', () => {
+          clearTimeout(followTimer);
+          followTimer = setTimeout(() => {
+            if (Date.now() < followPausedUntil) return;
+            const viewport = document.querySelector('#viewport').getBoundingClientRect();
+            const visible = [...reviewElements].map(([id, elements]) => ({id, rect: elements[0]?.getBoundingClientRect()})).filter(item => item.rect && item.rect.bottom > viewport.top && item.rect.top < viewport.bottom);
+            visible.sort((a,b) => Math.abs(a.rect.top - (viewport.top + viewport.height * .35)) - Math.abs(b.rect.top - (viewport.top + viewport.height * .35)));
+            if (visible[0]) { focusReview(visible[0].id, false); parent.postMessage({type:'lexis-review-select', run, issue:visible[0].id}, location.origin); }
+          }, 160);
+        }, {passive:true});
+        pages.addEventListener('click', event => select(event));
+        pages.addEventListener('dblclick', event => select(event, true));
+        pages.addEventListener('keydown', event => { if (event.key === 'Enter') select(event); });
+        window.addEventListener('keydown', event => {
+          if (event.altKey && ['ArrowUp','ArrowDown'].includes(event.key) && !event.target.closest('input, textarea, select, [contenteditable]')) {
+            event.preventDefault();
+            parent.postMessage({type:'lexis-review-navigate', run, direction:event.key === 'ArrowUp' ? -1 : 1}, location.origin);
+          }
+        });
+      };
+      // Reconcile changed nodes in place; the iframe, unchanged paragraphs and scroll position survive decisions.
+      let updateSequence = 0;
+      const reconcile = (current, incoming) => {
+        if (current.nodeType !== incoming.nodeType || current.nodeName !== incoming.nodeName) {
+          current.replaceWith(incoming.cloneNode(true)); return;
+        }
+        if (current.nodeType === Node.TEXT_NODE) {
+          if (current.data !== incoming.data) current.data = incoming.data;
+          return;
+        }
+        if (current.nodeType !== Node.ELEMENT_NODE) return;
+        for (const attr of [...current.attributes]) if (!incoming.hasAttribute(attr.name)) current.removeAttribute(attr.name);
+        for (const attr of incoming.attributes) if (current.getAttribute(attr.name) !== attr.value) current.setAttribute(attr.name, attr.value);
+        const existing = [...current.childNodes], fresh = [...incoming.childNodes];
+        for (let i = 0; i < Math.max(existing.length, fresh.length); i++) {
+          if (!fresh[i]) existing[i].remove();
+          else if (!existing[i]) current.append(fresh[i].cloneNode(true));
+          else reconcile(existing[i], fresh[i]);
+        }
+      };
+      const updateReview = async () => {
+        if (!tracking || !documentRendered) return;
+        const sequence = ++updateSequence;
+        try {
+          const [metadata, file] = await Promise.all([
+            fetch('/api/runs/' + run + '/review-document/info?display=' + encodeURIComponent(display)),
+            fetch('/api/runs/' + run + '/review-document/preview?display=' + encodeURIComponent(display))
+          ]);
+          if (!metadata.ok || !file.ok) throw Error('无法获取最新修订');
+          const nextInfo = await metadata.json(), blob = await file.blob();
+          const staging = document.createElement('div');
+          await docx.renderAsync(blob, staging, null, {ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true, renderAltChunks: false, useBase64URL: true, renderChanges: true});
+          if (sequence !== updateSequence) return;
+          staging.querySelectorAll('a').forEach(a => { a.removeAttribute('href'); a.removeAttribute('target'); });
+          const viewport = document.querySelector('#viewport');
+          const paragraphs = [...pages.querySelectorAll('article p')];
+          const visibleIndex = paragraphs.findIndex(el => el.getBoundingClientRect().bottom > viewport.getBoundingClientRect().top);
+          const previousTop = paragraphs[visibleIndex]?.getBoundingClientRect().top;
+          const previousScroll = viewport.scrollTop;
+          const incoming = document.createElement('div'); incoming.append(...staging.childNodes);
+          // Keep the pages element's zoom and sizing; reconcile only its rendered contents.
+          const oldChildren = [...pages.childNodes], newChildren = [...incoming.childNodes];
+          for (let i = 0; i < Math.max(oldChildren.length, newChildren.length); i++) {
+            if (!newChildren[i]) oldChildren[i].remove();
+            else if (!oldChildren[i]) pages.append(newChildren[i].cloneNode(true));
+            else reconcile(oldChildren[i], newChildren[i]);
+          }
+          info = nextInfo;
+          annotateReview();
+          if (selectedReviewId) focusReview(selectedReviewId, false);
+          resize();
+          const anchor = pages.querySelectorAll('article p')[visibleIndex];
+          followPausedUntil = Date.now() + 500;
+          viewport.scrollTop = previousScroll + (anchor && previousTop != null ? anchor.getBoundingClientRect().top - previousTop : 0);
+          scheduleSelection();
+          parent.postMessage({type: 'lexis-review-updated', run, revision: info.revision, order: reviewOrder()}, location.origin);
+        } catch (error) {
+          if (sequence === updateSequence) parent.postMessage({type: 'lexis-review-update-error', run, message: error.message}, location.origin);
+        }
+      };
       const hint = document.querySelector('#locate-status'), save = document.querySelector('#save-edit'), cancel = document.querySelector('#cancel-edit');
       new MutationObserver(() => hint.classList.toggle('quiet', /^(已定位|已取消|直接点击)/.test(hint.textContent))).observe(hint, { childList: true, characterData: true, subtree: true });
       let editing = false, draftFrame = 0;
@@ -471,6 +685,8 @@
       };
       window.addEventListener('message', event => {
         if (event.origin !== location.origin || event.source !== parent) return;
+        if (tracking && event.data?.type === 'lexis-review-update' && event.data.run === run) { updateReview(); return; }
+        if (tracking && event.data?.type === 'lexis-review-focus') { focusReview(event.data.issue, event.data.scroll !== false); return; }
         if (event.data?.type === 'lexis-fit-width') { zoom.value = 'fit'; resize(); return; }
         if (event.data?.type === 'lexis-set-zoom' && Number.isFinite(event.data.scale)) { zoom.value = String(Math.max(.3, Math.min(2, event.data.scale))); resize(); return; }
         if (event.data?.type === 'lexis-sync-scroll') {
@@ -537,13 +753,17 @@
       document.addEventListener('click', event => { if (!zoomControls.contains(event.target)) closeZoom(); });
       document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeZoom(); zoomButton.focus(); } });
       try {
-        if (!/^[a-f0-9]{32}$/.test(id || '')) throw Error('原件标识无效');
-        const response = await fetch('/api/sources/' + id + '?include_text=true' + (run ? '&run=' + encodeURIComponent(run) + '&scope=' + encodeURIComponent(scope) : '')); if (!response.ok) throw Error('原件记录不存在'); info = await response.json(); document.querySelector('#name').textContent = info.name; label.title = info.name;
-        const url = run ? '/api/runs/' + encodeURIComponent(run) + '/preview-file?scope=' + encodeURIComponent(scope) : '/api/sources/' + id + '/file'; const link = document.querySelector('#download'); link.href = url; link.download = info.name;
+        if (tracking ? !/^[a-f0-9]{32}$/.test(run || '') : !/^[a-f0-9]{32}$/.test(id || '')) throw Error('文档标识无效');
+        const metadata = tracking ? '/api/runs/' + run + '/review-document/info?display=' + encodeURIComponent(display) : '/api/sources/' + id + '?include_text=true' + (run ? '&run=' + encodeURIComponent(run) + '&scope=' + encodeURIComponent(scope) : '');
+        const response = await fetch(metadata);
+        if (!response.ok) { const data = await response.json(); throw Error(data.detail || '文档记录不存在'); }
+        info = await response.json(); document.querySelector('#name').textContent = info.name; label.title = info.name;
+        const url = tracking ? '/api/runs/' + run + '/review-document/preview?display=' + encodeURIComponent(display) : run ? '/api/runs/' + encodeURIComponent(run) + '/preview-file/inline?scope=' + encodeURIComponent(scope) : '/api/sources/' + id + '/file';
+        const link = document.querySelector('#download'); link.href = url; link.download = info.name;
         const file = await fetch(url); if (!file.ok) throw Error('原件文件缺失，请重新上传'); const blob = await file.blob();
         if (info.extension === '.docx') {
           zoomControls.hidden = false;
-          await docx.renderAsync(blob, pages, null, { ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true, renderAltChunks: false, useBase64URL: true });
+          await docx.renderAsync(blob, pages, null, { ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true, renderAltChunks: false, useBase64URL: true, renderChanges: tracking });
           // Original document links must never navigate or load resources outside the internal preview.
           pages.querySelectorAll('a').forEach(a => { a.removeAttribute('href'); a.removeAttribute('target'); });
           const elements = [...pages.querySelectorAll('article p')]; let cursor = 0;
@@ -565,13 +785,18 @@
           resize();
         } else if (info.extension === '.pdf') { zoomControls.hidden = true; const frame = document.createElement('iframe'); frame.title = 'PDF 原件'; frame.src = URL.createObjectURL(blob); pages.append(frame); }
         else { zoomControls.hidden = true; pages.style.width = 'auto'; pages.style.whiteSpace = 'pre-wrap'; pages.style.padding = '24px'; (info.text || '').split('\n').forEach((text, index) => { const p = document.createElement('p'); p.textContent = text || ' '; pages.append(p); anchors.push({ index, end: index + 1, element: p }); }); }
+        if (tracking) {
+          document.body.classList.add('review-document');
+          annotateReview();
+          hint.textContent = info.layout === 'reconstructed' ? '当前来源按统一版式排版 · 点击修订条款定位，双击调整建议' : '点击修订条款定位，双击可手动调整建议';
+        }
         status.hidden = true;
         if (info.preview_warnings?.length) { hint.textContent = info.preview_warnings.length + ' 处建议尚未完整应用，请在意见栏核对'; hint.title = info.preview_warnings.join('；'); }
         await document.fonts.ready;
         resize();
         documentRendered = true;
         if (pendingMarks) { applyDifferenceMarks(pendingMarks); pendingMarks = null; }
-        requestAnimationFrame(() => requestAnimationFrame(() => parent.postMessage({ type: 'lexis-document-ready', source: id, run, text: info.text }, location.origin)));
+        requestAnimationFrame(() => requestAnimationFrame(() => parent.postMessage({ type: tracking ? 'lexis-review-ready' : 'lexis-document-ready', source: id, run, text: info.text, warnings: info.revision_warnings || [], token: params.get('v'), revision: info.revision, order: tracking ? reviewOrder() : [] }, location.origin)));
       } catch (error) { status.textContent = '预览失败：' + error.message + '。可切换至审查文本继续核对。'; }
     })();</script>
 </body>

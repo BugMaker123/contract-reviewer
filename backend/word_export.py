@@ -3,6 +3,7 @@ from copy import deepcopy
 from difflib import SequenceMatcher
 from io import BytesIO
 from pathlib import Path
+import os
 
 from docx import Document
 from docx.oxml import OxmlElement
@@ -10,7 +11,7 @@ from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 
 
-SOURCES = Path(__file__).parent.parent / 'data' / 'sources'
+SOURCES = Path(os.environ.get('LEXIS_DATA_DIR') or Path(os.environ.get('LEXIS_DB_PATH') or Path(__file__).parent.parent / 'data' / 'lexis.db').parent) / 'sources'
 
 
 def visible_paragraph_text(element):
@@ -31,14 +32,31 @@ def paragraphs(document):
     return [Paragraph(node, document) for node in document.element.body.iter(qn('w:p'))]
 
 
+def paragraph_run_properties(paragraph):
+    """Use visible text formatting, falling back to paragraph-mark formatting."""
+    for run in paragraph.runs:
+        if run.text and run._r.rPr is not None:
+            return deepcopy(run._r.rPr)
+    if paragraph._p.pPr is not None:
+        properties = paragraph._p.pPr.find(qn('w:rPr'))
+        if properties is not None:
+            return deepcopy(properties)
+    for run in paragraph.runs:
+        if run._r.rPr is not None:
+            return deepcopy(run._r.rPr)
+    return None
+
+
 def add_revision(paragraph, old, new, counter, date):
-    properties = deepcopy(paragraph.runs[0]._r.rPr) if paragraph.runs and paragraph.runs[0]._r.rPr is not None else None
+    properties = paragraph_run_properties(paragraph)
     paragraph.clear()
     def append(text, kind=None):
         if not text:
             return
         if kind is None:
-            paragraph.add_run(text)
+            run = paragraph.add_run(text)
+            if properties is not None:
+                run._r.insert(0, deepcopy(properties))
             return
         wrapper = OxmlElement('w:' + kind)
         wrapper.set(qn('w:id'), str(counter[0])); counter[0] += 1
@@ -60,12 +78,12 @@ def add_revision(paragraph, old, new, counter, date):
             append(old[a:b], 'del'); append(new[c:d], 'ins')
 
 
-def contract_document(run, final_text, repo, default_builder, tracked=False):
+def contract_document(run, final_text, repo, default_builder, tracked=False, base_document=None, base_layout=None):
     original = run['input']['text']
     source_id = run['input'].get('source_id')
-    document = None
-    layout = 'reconstructed'
-    if source_id:
+    document = base_document
+    layout = base_layout or 'reconstructed'
+    if document is None and source_id:
         source = repo.get(source_id, 'source')
         if source['extension'] == '.docx' and source['text'] == original:
             document = Document(SOURCES / (source_id + '.docx'))
@@ -81,6 +99,11 @@ def contract_document(run, final_text, repo, default_builder, tracked=False):
             source_paragraphs.insert(0, title_paragraph)
     else:
         source_paragraphs = paragraphs(document)
+        if base_document is not None and layout == 'reconstructed':
+            # The builder sometimes reuses the input's leading title rather than
+            # adding a separate heading. Only skip a genuinely extra heading.
+            if '\n'.join(visible_paragraph_text(p._p) for p in source_paragraphs) != original:
+                source_paragraphs = source_paragraphs[1:]
     before = [visible_paragraph_text(p._p) for p in source_paragraphs]
     # Soft line breaks remain within paragraphs; applying revisions uses a character-to-paragraph mapping.
     if '\n'.join(before) != original:
@@ -89,31 +112,65 @@ def contract_document(run, final_text, repo, default_builder, tracked=False):
         before = [p.text for p in source_paragraphs]
         layout = 'reconstructed'
     after = final_text.split('\n')
+    # Extracted text uses the same newline for soft breaks and paragraph boundaries.
+    # When their count is unchanged, retain the source paragraph grouping (including tables).
+    line_counts = [len(text.split('\n')) for text in before]
+    if sum(line_counts) == len(after):
+        grouped, offset = [], 0
+        for count in line_counts:
+            grouped.append('\n'.join(after[offset:offset + count]))
+            offset += count
+        after = grouped
     ids = [int(value) for value in document.element.xpath('//@w:id') if str(value).isdigit()]
     counter = [max(ids, default=0) + 1]
     stamp = run.get('completed_at', run['created_at'])
     # Reverse iteration keeps the original paragraph anchors stable while inserting new paragraphs.
-    for tag, a, b, c, d in reversed(SequenceMatcher(None, before, after, autojunk=False).get_opcodes()):
+    opcodes = [] if final_text == original else SequenceMatcher(None, before, after, autojunk=False).get_opcodes()
+    for tag, a, b, c, d in reversed(opcodes):
         if tag == 'equal':
             continue
         if tag == 'insert':
+            template = source_paragraphs[max(0, a - 1)] if source_paragraphs else None
+            if template is not None and not visible_paragraph_text(template._p).strip():
+                # Blank separators often have default fonts. Inherit the nearest
+                # actual text paragraph instead of shrinking newly inserted text.
+                candidates = sorted(range(len(source_paragraphs)), key=lambda index: (abs(index - (a - 1)), index))
+                template = next((source_paragraphs[index] for index in candidates
+                                 if visible_paragraph_text(source_paragraphs[index]._p).strip()), template)
             for line in after[c:d]:
                 if a < len(source_paragraphs):
                     p = source_paragraphs[a].insert_paragraph_before()
                 else:
                     p = document.add_paragraph()
+                properties = paragraph_run_properties(template) if template is not None else None
+                if template is not None:
+                    p.style = template.style
+                    if template._p.pPr is not None:
+                        paragraph_properties = deepcopy(template._p.pPr)
+                        for section in list(paragraph_properties.findall(qn('w:sectPr'))):
+                            paragraph_properties.remove(section)
+                        if p._p.pPr is not None:
+                            p._p.remove(p._p.pPr)
+                        p._p.insert(0, paragraph_properties)
+                r = p.add_run('' if tracked else line)
+                if properties is not None:
+                    r._r.insert(0, properties)
                 if tracked:
                     add_revision(p, '', line, counter, stamp)
-                else:
-                    p.add_run(line)
         else:
-            replacement = '\n'.join(after[c:d])
             for index, p in enumerate(source_paragraphs[a:b]):
-                new = replacement if index == 0 else ''
+                # Adjacent revisions belong to their own paragraph/cell. Do not
+                # combine the full replacement block into its first paragraph.
+                if index >= d - c:
+                    new = ''
+                elif index == b - a - 1:
+                    new = '\n'.join(after[c + index:d])
+                else:
+                    new = after[c + index]
                 if tracked:
                     add_revision(p, before[a + index], new, counter, stamp)
                 else:
-                    properties = deepcopy(p.runs[0]._r.rPr) if p.runs and p.runs[0]._r.rPr is not None else None
+                    properties = paragraph_run_properties(p)
                     p.clear(); r = p.add_run(new)
                     if properties is not None:
                         r._r.insert(0, properties)
@@ -121,7 +178,7 @@ def contract_document(run, final_text, repo, default_builder, tracked=False):
         setting = OxmlElement('w:trackRevisions')
         document.settings.element.append(setting)
     # Native Word comments remain anchored to the relevant current paragraph when it can be matched.
-    for issue in run['result']['issues']:
+    for issue in ([] if base_document is not None else run['result']['issues']):
         note = run.get('comments', {}).get(issue['id'])
         if not note:
             continue

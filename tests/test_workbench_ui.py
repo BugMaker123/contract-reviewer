@@ -10,6 +10,19 @@ from backend import workspace_api, graph
 from backend.sample_contracts import SAMPLE_CONTRACTS
 
 
+def confirm_original_review(page):
+    dialog = page.get_by_role('dialog', name='选择重新审查稿件')
+    dialog.locator('input[value="task"]').check()
+    dialog.get_by_role('button', name='确认并开始审查', exact=True).click()
+
+
+def choose_comparison(page):
+    # Comparison is an explicit choice; reviews open in the revision document.
+    expect(page.get_by_test_id('tracked-document-pane')).to_be_visible()
+    page.get_by_label('更多文档视图').click()
+    page.get_by_role('tab', name='前后对比', exact=True).click()
+
+
 def open_opinions(page):
     expect(page.locator('#opinion-drawer')).to_be_visible()
 
@@ -17,6 +30,44 @@ def open_opinions(page):
 def close_opinions(page):
     # Opinion handling is now a permanent workspace region.
     expect(page.locator('#opinion-drawer')).to_be_visible()
+
+
+def test_workbench_primary_actions_are_visible(isolated_workspace, monkeypatch):
+    monkeypatch.setattr(graph, 'get_llm_client', lambda config: None)
+    sock = socket.socket()
+    sock.bind(('127.0.0.1', 0))
+    server = uvicorn.Server(uvicorn.Config(app, log_level='error'))
+    thread = threading.Thread(target=server.run, kwargs={'sockets': [sock]}, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page(viewport={'width': 1920, 'height': 900})
+            base = f'http://127.0.0.1:{sock.getsockname()[1]}'
+            task = page.request.post(base + '/api/tasks', data={
+                'title': '工作台按钮布局', 'text': '第一条 双方约定验收后付款。', 'mode': 'quick',
+            }).json()
+            page.request.post(base + '/api/tasks/' + task['id'] + '/review/stream', data={})
+            page.goto(base + '/workbench?task=' + task['id'])
+            expect(page.get_by_role('button', name='审查意见书', exact=True)).to_be_visible()
+            expect(page.get_by_role('button', name='编辑正文', exact=True)).to_be_visible()
+            expect(page.get_by_role('button', name='完成审核', exact=True)).to_be_enabled()
+            expect(page.locator('#review-summary-panel')).to_be_visible()
+            expect(page.get_by_text('处理进度', exact=True)).to_be_visible()
+            expect(page.locator('.wb-functional-overview')).not_to_have_attribute('open', '')
+            expect(page.locator('.wb-sidebar-toggle')).to_have_count(0)
+            assert page.locator('.wb-nav-status-card').bounding_box()['height'] < 130
+            if page.locator('.wb-nav-issue').count() > 1:
+                page.locator('.wb-nav-issue').nth(1).click()
+                expect(page.locator('.wb-nav-issue').nth(1)).to_have_class(re.compile(r'active'))
+            expect(page.get_by_label('更多文档操作')).to_have_count(0)
+            page.get_by_role('button', name='审查意见书', exact=True).click()
+            expect(page.get_by_text('合同审查意见书', exact=True)).to_be_visible()
+            page.get_by_role('button', name='关闭意见书').click()
+            browser.close()
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
 
 
 def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
@@ -31,6 +82,7 @@ def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
         with sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page()
+            page.add_init_script("sessionStorage.setItem('LEXIS_REVIEW_DISPLAY','compare')")
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             base = f'http://127.0.0.1:{port}'
@@ -42,12 +94,16 @@ def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
             task = response.json()
             page.request.post(base + '/api/tasks/' + task['id'] + '/review/stream', data={})
             page.goto(base + '/workbench?task=' + task['id'])
+            choose_comparison(page)
             expect(page.locator('iframe[title="合同原件预览"]')).to_be_visible()
-            page.get_by_role('button', name='重新审查', exact=True).click()
+            page.locator('.prototype-navbar').get_by_role('button', name='重新审查', exact=True).click()
+            confirm_original_review(page)
+            page.get_by_role('button', name='查看审查修订稿', exact=True).click()
+            choose_comparison(page)
             expect(page.get_by_test_id('original-document-pane')).to_be_visible()
             expect(page.frame_locator('iframe[title="合同原件预览"]').locator('article')).not_to_have_count(0, timeout=30000)
             open_opinions(page)
-            page.get_by_role('button', name='采纳此项修订').first.click()
+            page.get_by_role('button', name='采纳').first.click()
             expect(page.locator('iframe[title="合同原件预览"]')).to_be_visible()
             expect(page.get_by_test_id('original-document-pane')).to_be_visible()
             preview = page.frame_locator('iframe[title="合同原件预览"]')
@@ -63,6 +119,7 @@ def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
             page.reload()
             open_opinions(page)
             expect(page.get_by_test_id('original-document-pane')).to_be_visible()
+            page.locator('.revision-more-actions>summary').first.click()
             page.get_by_role('button', name='撤销采纳').click()
             expect(page.get_by_role('button', name='撤销采纳', exact=True)).to_have_count(0)
             page.get_by_role('button', name='编辑条款', exact=True).first.click()
@@ -71,7 +128,7 @@ def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
             updated = original + '【浏览器核验修改】'
             editor.fill(updated)
             page.get_by_role('button', name='保存条款', exact=True).click()
-            expect(page.locator('#contract-viewer')).to_contain_text(updated)
+            page.wait_for_function("expected => [...document.querySelectorAll('#contract-viewer .whitespace-pre-wrap')].map(el => el.textContent).join('\\n').includes(expected)", arg=updated)
             expect(page.locator('iframe[title="合同原件预览"]')).to_have_count(0)
             expect(page.locator('#contract-viewer .clause-active')).to_have_count(0)
             close_opinions(page)
@@ -80,7 +137,7 @@ def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
             expect(page.get_by_text('工作内容已保存', exact=True)).to_be_visible()
             page.reload()
             open_opinions(page)
-            expect(page.locator('#contract-viewer')).to_contain_text(updated)
+            page.wait_for_function("expected => [...document.querySelectorAll('#contract-viewer .whitespace-pre-wrap')].map(el => el.textContent).join('\\n').includes(expected)", arg=updated)
             close_opinions(page)
             page.get_by_role('button', name='编辑正文', exact=True).click()
             body_editor = page.get_by_role('textbox', name='编辑合同正文')
@@ -94,13 +151,15 @@ def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
             page.reload()
             open_opinions(page)
             expect(page.locator('#contract-viewer')).to_contain_text('【整篇正文修改】')
-            page.get_by_role('button', name='重新审查', exact=True).click()
+            page.locator('.prototype-navbar').get_by_role('button', name='重新审查', exact=True).click()
+            confirm_original_review(page)
             close_opinions(page)
-            expect(page.get_by_role('button', name='重新审查', exact=True)).to_be_enabled(timeout=30000)
+            expect(page.locator('.prototype-navbar').get_by_role('button', name='重新审查', exact=True)).to_be_enabled(timeout=30000)
             assert len(page.request.get(base+'/api/tasks/'+task['id']).json()['runs']) == 3
             page.reload()
             open_opinions(page)
-            expect(page.locator('#contract-viewer')).to_contain_text('【整篇正文修改】')
+            expect(page.get_by_test_id('tracked-document-pane')).to_be_visible()
+            expect(page.frame_locator('iframe[title="合同修订文档"]').locator('article')).to_contain_text('【整篇正文修改】')
             assert not errors, errors
             browser.close()
     finally:
@@ -133,6 +192,7 @@ def test_docx_inline_edit_stays_in_document(isolated_workspace, monkeypatch):
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()
             page = browser.new_page(viewport={'width':1600,'height':1000})
+            page.add_init_script("sessionStorage.setItem('LEXIS_REVIEW_DISPLAY','compare')")
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             base = f'http://127.0.0.1:{sock.getsockname()[1]}'
@@ -146,6 +206,7 @@ def test_docx_inline_edit_stays_in_document(isolated_workspace, monkeypatch):
             result['issues'][0]['redline'] = None
             workspace_api.repo.update(run['id'], {'result': result})
             page.goto(base+'/workbench?task='+task['id'])
+            choose_comparison(page)
             frame = page.frame_locator('iframe[title="合同原件预览"]')
             expect(frame.locator('article p').first).to_contain_text('Payment: 100 USD')
             close_opinions(page)
@@ -225,13 +286,14 @@ def test_docx_inline_edit_stays_in_document(isolated_workspace, monkeypatch):
 
 
             close_opinions(page)
-            expect(page.get_by_role('button', name='导出', exact=True)).to_be_enabled()
+            page.locator('.wb-export-menu > summary').click()
+            expect(page.get_by_role('button', name='待审正文', exact=True)).to_be_enabled()
             with page.expect_download() as download:
-                page.get_by_role('button', name='导出', exact=True).click()
+                page.get_by_role('button', name='待审正文', exact=True).click()
             assert download.value.suggested_filename.endswith('.docx')
             page.keyboard.press('Escape')
             page.get_by_role('button', name='审查意见书', exact=True).click()
-            expect(page.locator('#printable-report')).to_contain_text('后续编辑尚未重新审查')
+            expect(page.locator('#printable-report')).to_contain_text('正文或审查条件已改变')
             page.get_by_role('button', name='关闭意见书', exact=True).click()
             page.locator('summary').filter(has_text='审查设置').click()
             expect(page.get_by_role('button', name='修改审查条件', exact=True)).to_be_visible()
@@ -288,6 +350,7 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()
             page = browser.new_page(viewport={'width':1920,'height':1080})
+            page.add_init_script("sessionStorage.setItem('LEXIS_REVIEW_DISPLAY','compare')")
             errors=[]
             page.on('pageerror', lambda error: errors.append(str(error)))
             base=f'http://127.0.0.1:{sock.getsockname()[1]}'
@@ -299,33 +362,40 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             expect(page.get_by_test_id('review-summary')).to_be_visible()
             expect(page.locator('#opinion-drawer')).to_be_visible()
             expect(page.get_by_role('button', name='审查意见面板', exact=True)).to_have_count(0)
-            assert page.locator('.wb-toolbar').bounding_box()['height'] <= 60
+            assert page.locator('.prototype-navbar').bounding_box()['height'] <= 60
             expect(page.get_by_test_id('original-document-pane')).to_have_count(0)
             expect(right.locator('article p').first).to_have_text('Payment: 100 USD')
             held_original=[]
             def delay_original(route):
                 if not held_original: held_original.append(route)
                 else: route.continue_()
+            def payment_card():
+                run = page.request.get(base+'/api/tasks/'+task['id']).json()['run']
+                issue = next(item for item in run['result']['issues'] if (item.get('redline') or {}).get('original_text') == 'Payment: 100 USD')
+                return page.locator('#card-'+issue['id'])
             for label in ['开始审查', '重新审查']:
                 if label=='开始审查':page.route('**/api/sources/*/file',delay_original)
-                else:
-                    page.get_by_role('button',name='收起审查概览',exact=True).click()
-                    page.get_by_role('button',name='收起审查意见与修订清单',exact=True).click()
                 page.get_by_role('button', name=label, exact=True).click()
+                if label == "重新审查": confirm_original_review(page)
                 expect(page.locator('[data-public-analysis]')).to_contain_text('付款金额正在结合正文核对')
                 if label=='开始审查':
                     page.set_viewport_size({'width':1366,'height':600})
-                    page.locator('.review-execution>summary').click()
+                    expect(page.locator('.review-execution')).to_have_count(0)
+                    expect(page.get_by_label('累计处理用时')).to_contain_text('已用时')
+                    expect(page.locator('.review-stage-list li')).to_have_count(7)
                     bounds=page.locator('.review-dialog').bounding_box()
                     assert bounds['y']>=10 and bounds['y']+bounds['height']<=590
-                    assert page.locator('[data-review-trace]').bounding_box()['height']<=161
+                    expect(page.locator('[data-review-trace]')).to_have_count(0)
                     page.locator('.review-dialog-body').evaluate('(el)=>el.scrollTop=el.scrollHeight')
                     expect(page.get_by_role('button',name='取消审查',exact=True)).to_be_in_viewport()
                     page.screenshot(path='artifacts/review-processing.png')
                     page.set_viewport_size({'width':1920,'height':1080})
+                page.get_by_role('button',name='查看审查修订稿',exact=True).click()
+                choose_comparison(page)
+                expect(page.locator('.review-dialog')).to_have_count(0)
                 expect(page.locator('#review-summary-content')).to_be_visible()
                 expect(page.locator('#review-opinion-content')).to_be_visible()
-                expect(page.get_by_role('button',name='收起审查概览',exact=True).locator('svg')).to_have_count(1)
+                expect(page.locator('.wb-sidebar-toggle')).to_have_count(0)
                 if label=='开始审查':
                     expect(right.locator('article p').first).to_have_text('Payment: 200 USD',timeout=30000)
                     original_response=page.request.fetch(held_original[0].request)
@@ -383,11 +453,8 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             assert revised_box['x']+revised_box['width'] <= panel_box['x']
             assert panel_box['x']+panel_box['width'] <= 1920
             assert page.get_by_test_id('review-summary').bounding_box()['width'] >= 320
-            assert page.locator('#opinion-drawer').bounding_box()['width'] == 360
-            for panel_name,button_name in [('review-summary-panel','收起审查概览'),('opinion-drawer','收起审查意见与修订清单')]:
-                panel=page.locator('#'+panel_name).bounding_box()
-                handle=page.get_by_role('button',name=button_name,exact=True).bounding_box()
-                assert abs(handle['y']+handle['height']/2-panel['y']-panel['height']/2)<2
+            assert 380 <= page.locator('#opinion-drawer').bounding_box()['width'] <= 460
+            expect(page.locator('.wb-sidebar-toggle')).to_have_count(0)
             action_row=page.locator('.wb-issue-actions').first
             positions=[button.bounding_box()['y'] for button in action_row.get_by_role('button').all()]
             assert max(positions)-min(positions)<2
@@ -406,34 +473,24 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
                     expect(preview.locator('section.docx').first).to_be_visible()
                     expect(preview.locator('#zoom-percent')).to_have_text('80%')
             expect(page.get_by_role('button', name='审查概览', exact=True)).to_have_count(0)
-            page.get_by_role('button', name='收起审查概览', exact=True).click()
-            expect(page.locator('#review-summary-content')).to_be_hidden()
-            assert page.get_by_test_id('review-summary').bounding_box()['width'] == 36
-            for preview in [left, right]:
-                expect(preview.locator('#zoom-percent')).to_have_text('100%')
-            page.get_by_role('button', name='收起审查意见与修订清单', exact=True).click()
-            expect(page.locator('#review-opinion-content')).to_be_hidden()
-            assert page.locator('#opinion-drawer').bounding_box()['width'] == 36
-            expect(right.locator('#zoom-percent')).to_have_text('100%')
-            page.get_by_role('button', name='展开审查概览', exact=True).click()
             expect(page.locator('#review-summary-content')).to_be_visible()
-            expect(page.locator('#review-opinion-content')).to_be_hidden()
-            for preview in [left, right]:
-                expect(preview.locator('#zoom-percent')).to_have_text('100%')
-            page.get_by_role('button', name='展开审查意见与修订清单', exact=True).click()
             expect(page.locator('#review-opinion-content')).to_be_visible()
-            expect(page.locator('#review-summary-content')).to_be_visible()
             page.keyboard.press('Escape')
             expect(page.locator('#opinion-drawer')).to_be_visible()
             expect(page.get_by_role('button', name='收起审查意见面板', exact=True)).to_have_count(0)
-            expect(page.locator('summary').filter(has_text='更多操作')).to_have_count(0)
+            for more in page.locator('.revision-more-actions').all():
+                assert more.get_attribute('open') is None
+            page.locator('.wb-export-menu > summary').click()
             with page.expect_download() as download:
-                page.get_by_role('button', name='导出', exact=True).click()
-            assert Document(download.value.path()).paragraphs[0].text == 'Payment: 200 USD'
+                page.get_by_role('button', name='全部建议稿（未自动采纳）', exact=True).click()
+            from backend.word_export import visible_paragraph_text
+            assert visible_paragraph_text(Document(download.value.path()).paragraphs[0]._p) == 'Payment: 200 USD'
             for button in page.get_by_role('button', name='不采纳', exact=True).all():
                 button.click()
-            page.get_by_role('button', name='完成复核', exact=True).click()
-            expect(page.get_by_role('button', name='已完成复核', exact=True)).to_be_visible()
+            page.get_by_role('button', name='完成审核', exact=True).click()
+            expect(page.get_by_role('heading', name='新建合同审查', exact=True)).to_be_visible()
+            page.goto(base+'/workbench?task='+task['id'])
+            expect(page.get_by_role('button', name='已完成审核', exact=True)).to_be_visible()
             assert page.request.get(base+'/api/tasks/'+task['id']).json()['status'] == 'completed'
             expect(right.locator('#zoom-percent')).to_have_text('80%')
             right.get_by_role('button', name='选择文档缩放比例').click()
@@ -458,7 +515,7 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             right.locator('[contenteditable="plaintext-only"]').nth(1).fill('Section 0: body edit must survive')
             expect(right.locator('.lexis-diff-revised')).to_have_count(2)
             expect(left.locator('.lexis-diff-original')).to_have_count(2)
-            page.get_by_role('button', name='编辑条款', exact=True).first.click()
+            payment_card().get_by_role('button', name='编辑条款', exact=True).click()
             clause_editor=page.locator('.fixed textarea').last
             expect(clause_editor).to_have_value('Payment: 350 USD')
             clause_editor.fill('Payment: 400 USD')
@@ -478,7 +535,7 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             page.get_by_role('button', name='保存', exact=True).click()
             expect(right.locator('#save-edit')).to_be_hidden()
             expect(right.locator('article p').nth(2)).to_have_text('Section 1: saved from toolbar')
-            page.get_by_role('button', name='编辑条款', exact=True).first.click()
+            payment_card().get_by_role('button', name='编辑条款', exact=True).click()
             clause_editor=page.locator('.fixed textarea').last
             expect(clause_editor).to_have_value('Payment: 400 USD')
             clause_editor.fill('Payment: 500 USD')
@@ -492,7 +549,8 @@ def test_review_activates_original_and_all_suggestions_comparison(isolated_works
             expect(right.locator('article p').first).to_have_text('Payment: 500 USD')
             expect(right.locator('article p').nth(2)).to_have_text('Section 1: saved from toolbar')
             expect(right.locator('article p').nth(1)).to_have_text('Section 0: body edit must survive')
-            page.get_by_role('button',name='重新审查',exact=True).click()
+            page.locator('.prototype-navbar').get_by_role('button',name='重新审查',exact=True).click()
+            confirm_original_review(page)
             expect(page.locator('.review-dialog')).to_be_visible()
             page.get_by_role('button',name='取消审查',exact=True).click()
             expect(page.locator('.review-dialog')).to_have_count(0)

@@ -25,24 +25,30 @@ def emit_progress(stage, detail, **fields):
 async def observable_events(events, snapshot, config):
     """Forward progress emitted by graph worker threads before a node completes."""
     loop = asyncio.get_running_loop()
-    queue = asyncio.Queue()
+    queue = asyncio.Queue(maxsize=256)
     owner = threading.get_ident()
     stopped = threading.Event()
     started = time.monotonic()
+
+    def offer(data):
+        if not stopped.is_set() and not queue.full():
+            queue.put_nowait(('progress', data))
 
     def observe(data):
         if stopped.is_set():
             return
         if threading.get_ident() == owner:
-            queue.put_nowait(('progress', data))
+            offer(data)
         elif not loop.is_closed():
-            loop.call_soon_threadsafe(queue.put_nowait, ('progress', data))
+            loop.call_soon_threadsafe(offer, data)
 
     async def produce():
         token = _observer.set(observe)
         cancel_token = _cancelled.set(stopped)
         try:
-            emit_progress('prepare', f"已接收合同，共 {len(snapshot.get('text', ''))} 字；正在解析原文与审查条件。")
+            emit_progress('prepare', f"已接收合同，共 {len(snapshot.get('text', ''))} 字；正在解析原文与审查条件。",
+                          contract_chars=len(snapshot.get('text', '')), reference_count=len(snapshot.get('references') or []),
+                          priority_count=len(snapshot.get('requirements') or []) + len([line for line in (snapshot.get('focus') or '').splitlines() if line.strip()]) + len((snapshot.get('checklist') or {}).get('items', [])))
             async for item in events(snapshot, config):
                 await queue.put(item)
         except Exception as error:

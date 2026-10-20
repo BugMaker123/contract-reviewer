@@ -1,32 +1,48 @@
 # LexisGraph 内部合同工作系统
 
-保留蓝白灰视觉风格与三栏审查工作台，提供长期审查记录、企业审查清单、合同对比、Word 交付及分阶段起草。
+保留蓝白灰视觉风格与三栏审查工作台，提供长期审查记录、企业审查清单、合同对比、Word 交付。
 
 ## 启动
 
+使用 Python 3.14、Node.js 22。发布前安装锁定依赖并构建；默认启动不联网安装、不热重载，仅支持一个 worker。
+
 ```powershell
 uv venv
-uv pip install --python .venv/Scripts/python.exe -r requirements.txt
+uv pip install --python .venv/Scripts/python.exe -r requirements-lock.txt
+npm --prefix frontend ci
+npm --prefix frontend run build
 .venv/Scripts/python.exe run.py
 ```
 
-访问 http://127.0.0.1:8000。当前默认是仅本机可访问的单个内部实例，尚未接入组织账号、权限和审批流。
+访问 http://127.0.0.1:8001。当前默认是仅本机可访问的单个内部实例，尚未接入组织账号、权限和审批流。
 
 ## 功能
 
 - 主页支持上传 DOCX、文字型 PDF、TXT 或粘贴正文，设置立场、审查尺度、交易背景及重点要求。
+- 默认采用通用中立立场，背景与重点要求选填。公司制度资料可提取审核要求或手工录入，逐项指定硬性要求／优先偏好，核对确认后随本次审查快照留档。上传后修改制度正文需要重新核对引用与要求。
+- 审查先检查合同属性和请求用途；模型拒绝或无法判断时不会进入正式审查。有违法风险的条款、政治相关词语本身不会触发拒绝。未配置模型时仅作合同结构检查，内容安全明确标为待人工复核，深度审查仍需可用模型。
+- 自定义要求逐项显示符合、不符合、待确认、不适用及原文证据；冲突要求保留待确认并暂停自动修订。全部建议稿另作要求核验，不代表当前采纳稿已经核验；修改修订后旧建议稿结论会失效。
+- 默认按计划执行，可选择工具辅助证据核验：模型在本次合同与附件内搜索、读取证据并返回核验结果，最多三轮；不访问互联网，不执行任意代码，达到上限保留待确认项。
 - 快速审查执行基础规则；深度审查结合配置的模型与参考资料。结果会标明模型来源、规则回退和覆盖范围。
 - 企业清单支持文件提取草稿、人工编辑、发布和版本固定；核验结果区分通过、未通过、待确认及不适用。
 - 对比审查识别新增、删除和修改；可用模型进一步评估变化，无模型时明确保留待人工评估。
-- Workbench 支持定位、采纳/撤销、人工备注、处理状态、条款编辑、单条追问和历史版本查看。
+- Workbench 默认使用 Word 式单文档修订视图，支持采纳、拒绝、按要求重新生成、手动调整、建议版本恢复及原生 Word 修订稿导出；仍保留双栏对照和原排版编辑。
 - Word 可导出当前稿、含修订痕迹的稿件、全部建议稿及不同范围的意见书；保留匹配的原 DOCX 版式，其他来源按统一版式重排。
-- 起草按背景、交易信息、大纲和正文分阶段保存；支持参考模板、资料、定向改写提案、历史草稿和送审。
+- 业务分类与审查清单支持服务端分页、搜索及增删改查；可在一个分类下添加多份清单，删除分类前须移除或迁移其关联清单。
+- 审查概览展示准入结果、执行计划与要求覆盖情况；可下载本次 JSON 审核记录。Word 意见书包含背景、资料校验值及要求核验。审查记录页提供全部审查尝试统计及 CSV 报表（含失败、中断、历史版本和归档任务，独立于列表筛选）。
+- 合同起草及起草记录功能已移除，已有历史数据保留在数据库中。
 
 生成、语义检查和追问需要可用模型。配置可在页面填写，或由服务端的 DEEPSEEK_API_KEY / OPENAI_API_KEY 环境变量提供。浏览器配置不写入案件数据库。
 
 数据保存在 `data/lexis.db`，原始文件保存在 `data/sources/`；备份时应一起备份。任务可归档和恢复。服务重启时未完成的审查标记中断，旧结果保留。
 
-详细步骤见 [内部系统使用说明](docs/内部系统使用说明.md)，设计取舍见 [功能对照与实施方案](docs/参考网站功能对照与实施方案.md)。
+新增功能与验证说明见 [审查闭环说明](docs/审查闭环说明.md) 、[功能完整性修复清单](docs/功能完整性修复清单.md) 和 [工作流与版本管理修复](docs/工作流与版本管理修复.md)。
+
+开发时使用 `.venv/Scripts/python.exe run.py --dev`，按需安装及构建前端并启用后端热重载。
+
+可设置 `LEXIS_DATA_DIR` 统一数据库和源文件目录；仅设置 `LEXIS_DB_PATH` 时源文件跟随数据库所在目录。旧数据无需搬迁；更换目录前停服并复制数据库与 sources。迁移回滚只需停服后恢复原目录配置。分类名称/编码增加唯一索引，已有重复项会明确阻止启动，需先备份并人工合并。
+
+停服后执行 `python -m backend.data_maintenance verify` 核对文件、哈希和数据库；`python -m backend.data_maintenance backup <新备份目录>` 创建备份。在新的空 `LEXIS_DATA_DIR` 下执行 `python -m backend.data_maintenance restore <备份目录>` 并再次 verify，验证后再切换服务目录。旧文件无历史哈希时只能核对存在性。归档保留所有源文件和历史快照；暂不自动彻底删除，verify 只报告未引用文件，不自动清理。健康检查：`/api/health`；响应携带 `X-Request-ID`，异常日志不打印合同正文或凭据。
 
 ## 开发与验证
 
@@ -36,14 +52,15 @@ uv pip install --python .venv/Scripts/python.exe -r requirements-dev.txt
 npx --yes tailwindcss@3.4.17 -i ./backend/static/styles.input.css -o ./backend/static/vendor/tailwind.css --minify
 ```
 
-样式和 Vue 均本地加载，正常运行无需外部 CDN 或 Node 构建服务。后端热重载仅监控 `backend/`，避免测试和临时转换工具触发服务重启。
+Vue 和路由通过 Vite 打包后由本机服务提供，运行时无需外部 CDN。前端开发和扩展见 [前端架构说明](FRONTEND.md)。后端热重载仅监控 `backend/`，避免测试和临时转换工具触发服务重启。
 
 ## 主要文件
 
 - `backend/main.py`：服务入口、文件提取与兼容审查接口。
 - `backend/store.py`：SQLite 存储、版本冲突和运行恢复。
-- `backend/workspace_api.py`：任务、清单、起草和交付接口。
+- `backend/workspace_api.py`：任务、分类、清单和交付接口。
 - `backend/workspace_review.py`：审查模式、逐项核验与差异分析。
 - `backend/word_export.py`：Word 版式保留、修订标记和批注。
-- `backend/static/index.html` 与 `portal.js`：内部业务入口及记录页面。
-- `backend/static/workbench.html` 与 `workbench-workspace.js`：三栏审查工作台和持久化适配。
+- `frontend/src/views/`、`layouts/` 与 `components/`：Vue 页面、公共布局及业务组件。
+- `frontend/src/composables/`：工作台流程、页面生命周期与持久化适配。
+- `frontend/src/router/`：无刷新路由及页面懒加载。
