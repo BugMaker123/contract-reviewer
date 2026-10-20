@@ -104,11 +104,11 @@ def test_review_browser_manual_mark_persist_publish():
         dialog.get_by_role('button', name='保存位置').click()
         page.get_by_label('字段名称', exact=True).fill('甲方名称')
         page.get_by_label('免审处理', exact=True).select_option('conditional')
-        expect(page.get_by_role('button', name='试算验证', exact=True)).to_be_disabled()
+        expect(page.get_by_role('button', name='验证合同', exact=True)).to_be_disabled()
         expect(page.locator('.tr-readiness')).to_have_text('待核验 1 项')
         expect(page.get_by_role('button', name='发布版本', exact=True)).to_have_attribute('title', '还有 1 个区域待核验，请在右侧逐项点击“确认并下一项”')
         page.get_by_role('button', name='确认并下一项').click()
-        expect(page.get_by_role('button', name='试算验证', exact=True)).to_be_enabled()
+        expect(page.get_by_role('button', name='验证合同', exact=True)).to_be_enabled()
         expect(page.locator('.tr-readiness')).to_have_text('全部已确认')
         page.get_by_role('button', name='保存草稿').click()
         expect(page.locator('.tr-foot span')).to_have_text('已保存')
@@ -194,7 +194,7 @@ def test_review_browser_extraction_feedback(monkeypatch):
         expect(page.locator('.tr-extraction-status')).to_contain_text('已识别 1 个填写区域')
         page.locator('.tr-extraction-status summary').click()
         expect(page.locator('.tr-extraction-status')).to_contain_text('无法定位字段')
-        expect(page.locator('.tr-mark')).to_have_text('____')
+        expect(page.locator('.tr-mark')).to_have_text('{{ 甲方名称 }}')
         page.get_by_label('搜索填写区域').fill('找不到')
         expect(page.locator('.tr-no-matches')).to_have_text('没有匹配的填写区域')
         page.get_by_label('搜索填写区域').fill('')
@@ -256,7 +256,7 @@ def test_browser_bulk_confirm_and_cancel_persist():
         expect(page.locator('.tr-field')).to_have_count(1)
         page.get_by_role('button', name='全部确认', exact=True).click()
         expect(page.locator('.tr-readiness')).to_have_text('全部已确认')
-        expect(page.get_by_role('button', name='试算验证', exact=True)).to_be_enabled()
+        expect(page.get_by_role('button', name='验证合同', exact=True)).to_be_enabled()
         expect(page.get_by_role('button', name='发布版本', exact=True)).to_be_enabled()
         page.get_by_role('button', name='保存草稿', exact=True).click()
         expect(page.locator('.tr-foot span')).to_have_text('已保存')
@@ -273,4 +273,115 @@ def test_browser_bulk_confirm_and_cancel_persist():
         page.get_by_role('button', name='全部确认', exact=True).click()
         page.get_by_label('字段名称', exact=True).fill('改动后的甲方')
         expect(page.locator('.tr-readiness')).to_have_text('待核验 1 项')
+        browser.close()
+
+
+@pytest.mark.parametrize('policy,text,status,manual,issues', [
+    ('conditional', '甲方：某公司；期限：30日。', 'pass', 0, 0),
+    ('manual', '甲方：某公司；期限：30日。', 'needs_review', 1, 0),
+    ('conditional', '甲方：____；期限：30日。', 'needs_changes', 0, 1),
+])
+def test_validation_report_explains_field_results(policy, text, status, manual, issues):
+    with TestClient(app) as client:
+        record, base = setup_template(client)
+        client.put(base+'/review', json={'revision':1,'source_id':record['source_id'],'fields':[region(policy=policy)]})
+        candidate = upload(client, text)
+        result = client.post(base+'/trial', json={'revision':2,'source_id':candidate}).json()
+        report = result['report']
+        assert report['status'] == status
+        assert report['counts']['manual'] == manual
+        assert report['counts']['issue'] == issues
+        assert report['counts']['total'] == 1
+        assert report['fields'][0]['template_value'] == '____'
+        assert report['fields'][0]['unchanged'] is (issues == 1)
+        assert result['eligible_for_skip'] is False
+
+
+def test_validation_report_preserves_issues_with_complex_document(monkeypatch):
+    original = template_review.document_blocks
+    def with_warning(source):
+        result = original(source)
+        result['warnings'] = ['合同含图片，图片内容未检查']
+        return result
+    monkeypatch.setattr(template_review, 'document_blocks', with_warning)
+    with TestClient(app) as client:
+        record, base = setup_template(client)
+        client.put(base+'/review',json={'revision':1,'source_id':record['source_id'],'fields':[region()]})
+        candidate=upload(client,'甲方：____；期限：30日。')
+        report=client.post(base+'/trial',json={'revision':2,'source_id':candidate}).json()['report']
+        assert report['status']=='needs_changes'
+        assert report['counts']['issue']==1
+        assert report['counts']['differences']==0
+        assert len(report['limitations'])==1
+        candidate=upload(client,'完全不同的段落')
+        report=client.post(base+'/trial',json={'revision':2,'source_id':candidate}).json()['report']
+        assert report['counts']['not_checked']==1
+        assert report['fields'][0]['value'] is None
+
+
+def test_browser_validation_report_and_return_to_region(monkeypatch):
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright, expect
+    original = template_review.document_blocks
+    def with_warning(source):
+        result=original(source)
+        result['warnings']=['合同含图片，图片内容未检查']
+        return result
+    monkeypatch.setattr(template_review,'document_blocks',with_warning)
+    with TestClient(app) as client:
+        record,base=setup_template(client)
+        client.put(base+'/review',json={'revision':1,'source_id':record['source_id'],'fields':[region(policy='manual')]})
+    doc=Document();doc.add_paragraph('甲方：某某公司；期限：30日。')
+    data=BytesIO();doc.save(data)
+    with live_server() as address,sync_playwright() as p:
+        browser=p.chromium.launch()
+        page=browser.new_page(viewport={'width':1536,'height':864})
+        page.goto(address+'/templates/'+record['id']+'/review')
+        page.locator('input[type=file]').set_input_files({'name':'已填写的采购合同.docx','mimeType':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','buffer':data.getvalue()})
+        dialog=page.get_by_role('dialog',name='合同验证结果')
+        expect(dialog).to_be_visible()
+        expect(dialog.get_by_role('heading',name='检查未完成，部分内容需人工核对')).to_be_visible()
+        expect(dialog).to_contain_text('已填写的采购合同.docx')
+        expect(dialog.locator('.validation-table')).to_contain_text('某某公司')
+        expect(dialog.locator('.validation-badge')).to_have_text('需人工审核')
+        dialog.get_by_role('button',name='检查范围',exact=True).click()
+        expect(dialog.locator('.validation-scope')).to_contain_text('图片内容未检查')
+        dialog.get_by_role('button',name='全部填写内容').click()
+        dialog.get_by_role('button',name='查看标记').click()
+        expect(dialog).to_have_count(0)
+        expect(page.locator('.tr-mark.selected')).to_be_visible()
+        browser.close()
+
+
+def test_browser_template_placeholders_preserve_source_offsets():
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright, expect
+    with TestClient(app) as client:
+        record,base=setup_template(client)
+        client.put(base+'/review',json={'revision':1,'source_id':record['source_id'],'fields':[region(name='甲方公司名称',confirmed=False)]})
+    with live_server() as address,sync_playwright() as p:
+        browser=p.chromium.launch()
+        page=browser.new_page(viewport={'width':1536,'height':864})
+        page.goto(address+'/templates/'+record['id']+'/review')
+        expect(page.locator('.tr-mark')).to_have_text('{{ 甲方公司名称 }}')
+        expect(page.locator('.tr-rule .tr-quote')).to_have_count(0)
+        page.get_by_label('字段名称',exact=True).fill('供方')
+        expect(page.locator('.tr-mark')).to_have_text('{{ 供方 }}')
+        page.locator('[data-block="b0"] [data-source-start="7"]').evaluate("""el=>{
+            const range=document.createRange();range.setStart(el.firstChild,4);range.setEnd(el.firstChild,6);
+            const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
+            el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));
+        }""")
+        page.get_by_role('button',name='＋ 添加填写区域',exact=True).click()
+        expect(page.locator('.tr-mark')).to_have_count(2)
+        page.get_by_role('button',name='保存草稿',exact=True).click()
+        expect(page.locator('.tr-foot span')).to_have_text('已保存')
+        with TestClient(app) as client:
+            fields=client.get(base+'/review').json()['fields']
+            assert fields[0]['start']==3 and fields[0]['end']==7
+            assert fields[1]['start']==11 and fields[1]['end']==13
+        page.get_by_role('button',name='原文对照',exact=True).click()
+        expect(page.get_by_title('上传原文对照',exact=True)).to_be_visible()
+        page.get_by_role('button',name='模板预览',exact=True).click()
+        expect(page.locator('.tr-mark')).to_have_count(2)
         browser.close()

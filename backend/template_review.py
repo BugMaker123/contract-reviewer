@@ -317,6 +317,32 @@ def compare_blocks(original, candidate, fields):
     return {'result': 'DIFFERENT' if differences or any(v['reason'] for v in values) else 'PASS', 'differences': differences, 'values': values, 'reason': '仅检查已支持的文档文字结构及配置规则；不判断合同整体风险'}
 
 
+def validation_report(result, fields, original, warnings):
+    """Explain the existing comparison without treating manual review as invalid input."""
+    values = {v['id']: v for v in result['values']}
+    blocks = {b['id']: b['text'] for b in original['blocks']}
+    rows = []
+    for field in fields:
+        value = values.get(field['id'])
+        reason = value['reason'] if value else '未能从合同中定位此区域，可能是段落结构或固定内容发生了变化'
+        status = ('not_checked' if value is None else 'manual' if reason == '该字段配置为转人工'
+                  else 'issue' if reason else 'pass')
+        template_value = blocks[field['block_id']][field['start']:field['end']]
+        rows.append({'id': field['id'], 'name': field['name'], 'value': value['value'] if value else None,
+                     'status': status, 'reason': reason, 'template_value': template_value,
+                     'unchanged': value is not None and value['value'] == template_value})
+    counts = {key: sum(row['status'] == key for row in rows) for key in ('pass', 'manual', 'issue', 'not_checked')}
+    counts.update(total=len(rows), differences=len(result['differences']))
+    limitations = list(dict.fromkeys(warnings))
+    if result['result'] == 'UNDETERMINED' and not limitations:
+        limitations.append(result['reason'])
+    status = ('needs_changes' if counts['issue'] or counts['differences'] else
+              'incomplete' if limitations or counts['not_checked'] else
+              'needs_review' if counts['manual'] else 'pass')
+    return {'status': status, 'counts': counts, 'fields': rows, 'limitations': limitations,
+            'differences': result['differences'], 'same_source': False}
+
+
 @router.post('/{identifier}/trial')
 def trial(identifier: str, body: TrialInput):
     record = current(identifier, body.revision)
@@ -330,7 +356,13 @@ def trial(identifier: str, body: TrialInput):
         raise HTTPException(422, '试算前请保存并确认全部字段')
     result = compare_blocks(original['blocks'], candidate['blocks'], fields)
     warnings = original['warnings'] + candidate['warnings']
+    comparison_reason = result['reason'] if result['result'] == 'UNDETERMINED' else None
+    if comparison_reason:
+        warnings.append(comparison_reason)
     if warnings:
         result.update(result='UNDETERMINED', reason='；'.join(sorted(set(warnings))))
+    report = validation_report(result, fields, original, warnings)
+    report['same_source'] = body.source_id == record['source_id']
+    result['report'] = report
     result.update(eligible_for_skip=False, coverage='文字和段落结构试算，尚未接入 BPM；格式、合并单元格与复杂对象不作为自动免审依据')
     return result
