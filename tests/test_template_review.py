@@ -140,7 +140,7 @@ def test_ai_partial_results_and_typographic_location(monkeypatch):
         assert len(data['fields']) == 1
         assert data['fields'][0]['start'] == 3 and data['fields'][0]['end'] == 7
         assert data['fields'][0]['policy'] == 'manual' and not data['fields'][0]['confirmed']
-        assert len(data['skipped']) == 3
+        assert len(data['skipped']) == 2
         assert client.get(base+'/review').json()['fields'] == []
 
 
@@ -385,3 +385,165 @@ def test_browser_template_placeholders_preserve_source_offsets():
         page.get_by_role('button',name='模板预览',exact=True).click()
         expect(page.locator('.tr-mark')).to_have_count(2)
         browser.close()
+
+
+def test_blank_form_labels_and_signature_columns_are_covered():
+    texts=['甲方：甲公司','法定代表人：','地址:', '乙方：乙公司','法定代表人：王某','地址：某市',
+           '甲方：甲公司  乙方：乙公司','法定代表人或授权代表：             法定代表人或授权代表：','日期：                             日期：',
+           '按照如下日期：收到货物后30日内付款。', '双方应在15日内提供书面证明。']
+    blocks=[{'id':f'b{i}','text':t,'section':'正文','kind':'paragraph'} for i,t in enumerate(texts)]
+    candidates=template_review.blank_field_candidates(blocks)
+    fields=[f for f,_,_ in candidates]
+    assert [f['name'] for f in fields]==['甲方法定代表人','甲方地址','甲方法定代表人或授权代表','乙方法定代表人或授权代表','甲方日期','乙方日期']
+    assert fields[0]['start']==fields[0]['end']==6
+    assert fields[1]['start']==fields[1]['end']==3
+    assert all(not f['confirmed'] and f['policy']=='manual' for f in fields)
+    template_review.validate_regions(fields,blocks)
+
+
+def test_extraction_supplements_blanks_preserving_existing_rules(monkeypatch):
+    async def fake_model(config,prompt):
+        return {'fields':[{'name':'重命名甲方','block_id':'b0','text':'甲公司'},
+                          {'name':'错误空栏','block_id':'b1','text':'法定代表人：'}]}
+    monkeypatch.setattr(template_review,'model_json',fake_model)
+    with TestClient(app) as client:
+        record,base=setup_template(client)
+        doc=Document()
+        for text in ['甲方：甲公司','法定代表人：','地址:']:
+            doc.add_paragraph(text)
+        data=BytesIO();doc.save(data)
+        source=client.post('/api/contracts/import',files={'file':('blank.docx',data.getvalue())}).json()['source_id']
+        client.put(base,json={'name':'模板','group_id':record['group_id'],'source_id':source,'revision':1})
+        existing=region(name='自定义甲方名称',start=3,end=6)
+        client.put(base+'/review',json={'revision':2,'source_id':source,'fields':[existing]})
+        response=client.post(base+'/extract-fields',json={'revision':3})
+        assert response.status_code==200
+        result=response.json()
+        assert result['preserved']==1 and result['supplemented']==2
+        assert len(result['fields'])==3
+        assert result['fields'][0]['id']=='f1'
+        assert result['fields'][0]['name']=='自定义甲方名称'
+        assert result['fields'][0]['confirmed'] is True
+        assert all(not f['confirmed'] for f in result['fields'][1:])
+        assert template_review.rules_for(template_review.repo().get(record['id']))==[template_review.Region(**existing).model_dump()]
+
+
+def test_empty_insertion_fields_can_save_publish_and_validate():
+    with TestClient(app) as client:
+        record,base=setup_template(client)
+        source=upload(client,'法定代表人：')
+        client.put(base,json={'name':'模板','group_id':record['group_id'],'source_id':source,'revision':1})
+        field=region(name='法定代表人',start=6,end=6)
+        response=client.put(base+'/review',json={'revision':2,'source_id':source,'fields':[field]})
+        assert response.status_code==200
+        filled=upload(client,'法定代表人：张三')
+        result=client.post(base+'/trial',json={'revision':3,'source_id':filled}).json()
+        assert result['result']=='PASS'
+        assert result['values'][0]['value']=='张三'
+        empty=client.post(base+'/trial',json={'revision':3,'source_id':source}).json()
+        assert empty['report']['counts']['issue']==1
+        duplicate=client.put(base+'/review',json={'revision':3,'source_id':source,'fields':[field,{**field,'id':'duplicate'}]})
+        assert duplicate.status_code==422
+        assert client.post(base+'/publish',json={'revision':3}).status_code==200
+
+
+def test_browser_extract_empty_labels_and_manual_blank_insertion(monkeypatch):
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright,expect
+    async def fake_model(config,prompt):return {'fields':[]}
+    monkeypatch.setattr(template_review,'model_json',fake_model)
+    with TestClient(app) as client:
+        record,base=setup_template(client)
+        source=upload(client,'法定代表人：')
+        client.put(base,json={'name':'模板','group_id':record['group_id'],'source_id':source,'revision':1})
+    with live_server() as address,sync_playwright() as p:
+        browser=p.chromium.launch();page=browser.new_page(viewport={'width':1536,'height':864})
+        page.goto(address+'/templates/'+record['id']+'/review')
+        page.get_by_role('button',name='AI 提取',exact=True).click()
+        page.get_by_role('dialog').get_by_role('button',name='确认',exact=True).click()
+        expect(page.locator('.tr-mark')).to_have_text('{{ 法定代表人 }}')
+        page.get_by_role('button',name='全部确认',exact=True).click()
+        page.get_by_role('button',name='保存草稿',exact=True).click()
+        expect(page.locator('.tr-foot span')).to_have_text('已保存')
+        page.reload()
+        expect(page.locator('.tr-mark')).to_have_text('{{ 法定代表人 }}')
+        page.get_by_role('button',name='手动添加',exact=True).click()
+        dialog=page.get_by_role('dialog')
+        dialog.get_by_label('原文位置',exact=True).select_option('b0')
+        dialog.get_by_label('在空栏插入字段（保留原文字）',exact=True).check()
+        dialog.get_by_label('插入位置',exact=True).fill('0')
+        dialog.get_by_role('button',name='保存位置',exact=True).click()
+        expect(page.locator('.tr-mark')).to_have_count(2)
+        page.get_by_role('button',name='保存草稿',exact=True).click()
+        expect(page.locator('.tr-foot span')).to_have_text('已保存')
+        browser.close()
+
+
+@pytest.mark.parametrize('text,label',[
+    ('法定代表人：','法定代表人：'),
+    ('地址:','地址:'),
+    ('协议编号：','协议编号：'),
+    ('甲方（供方）：山东某公司','甲方（供方）：'),
+    ('法定代表人或授权代表：','法定代表人或授权代表：'),
+])
+def test_field_ranges_never_replace_fixed_labels(text,label):
+    blocks=[{'id':'b0','text':text,'section':'正文','kind':'paragraph'}]
+    original=template_review.Region(**region(start=0,end=len(text))).model_dump()
+    fields,repaired=template_review.preserve_form_labels([original],blocks)
+    assert repaired==1
+    assert fields[0]['start']==len(label)
+    assert fields[0]['end']==len(text)
+    assert fields[0]['confirmed'] is False
+    assert fields[0]['id']==original['id']
+    template_review.validate_regions(fields,blocks)
+    assert blocks[0]['text']==text
+
+
+def test_browser_legacy_label_ranges_show_original_words():
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright,expect
+    with TestClient(app) as client:
+        record,base=setup_template(client)
+        source=upload(client,'法定代表人：')
+        client.put(base,json={'name':'模板','group_id':record['group_id'],'source_id':source,'revision':1})
+        document=template_review.document_blocks(source)
+        template_review.repo().update(record['id'],{'review_draft':{'source_id':source,'sha256':document['sha256'],'fields':[template_review.Region(**region(name='甲方法定代表人',start=0,end=6)).model_dump()]}},2)
+        detail=client.get(base+'/review').json()
+        assert detail['repaired']==1
+        assert detail['blocks'][0]['text']=='法定代表人：'
+    with live_server() as address,sync_playwright() as p:
+        browser=p.chromium.launch();page=browser.new_page(viewport={'width':1536,'height':864})
+        page.goto(address+'/templates/'+record['id']+'/review')
+        expect(page.locator('[data-block="b0"]')).to_have_text('法定代表人：{{ 甲方法定代表人 }}')
+        expect(page.locator('.tr-foot span')).to_have_text('尚未保存')
+        page.get_by_role('button',name='保存草稿',exact=True).click()
+        expect(page.locator('.tr-foot span')).to_have_text('已保存')
+        page.reload()
+        expect(page.locator('[data-block="b0"]')).to_have_text('法定代表人：{{ 甲方法定代表人 }}')
+        with TestClient(app) as client:
+            saved=client.get(base+'/review').json()
+            assert saved['fields'][0]['start']==6
+            assert saved['fields'][0]['end']==6
+            assert saved['blocks'][0]['text']=='法定代表人：'
+        browser.close()
+
+
+def test_open_existing_template_supplements_blanks_without_overwriting_draft():
+    with TestClient(app) as client:
+        record,base=setup_template(client)
+        doc=Document()
+        for text in ['甲方：甲公司','法定代表人：','地址:']:
+            doc.add_paragraph(text)
+        data=BytesIO();doc.save(data)
+        source=client.post('/api/contracts/import',files={'file':('blank.docx',data.getvalue())}).json()['source_id']
+        client.put(base,json={'name':'模板','group_id':record['group_id'],'source_id':source,'revision':1})
+        existing=region(name='甲方公司名称',start=3,end=6)
+        client.put(base+'/review',json={'revision':2,'source_id':source,'fields':[existing]})
+        detail=client.get(base+'/review').json()
+        assert detail['supplemented']==2
+        assert len(detail['fields'])==3
+        assert detail['fields'][0]['confirmed'] is True
+        assert [f['name'] for f in detail['fields'][1:]]==['甲方法定代表人','甲方地址']
+        assert all(f['origin']=='rule' and not f['confirmed'] for f in detail['fields'][1:])
+        assert len(template_review.rules_for(template_review.repo().get(record['id'])))==1
+        assert template_review.repo().get(record['id'])['revision']==3
