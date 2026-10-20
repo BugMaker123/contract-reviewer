@@ -21,7 +21,7 @@ export default {
 <template>
   <div
     class="portal-shell h-screen flex flex-col overflow-hidden bg-slate-50 text-slate-800 antialiased"
-    :class="{'portal-review-shell': $route.path.match(/templates\/[^/]+/)}"
+    :class="{'portal-review-shell': $route.name==='template-review'}"
   >
     <header
       class="portal-header h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0"
@@ -35,13 +35,14 @@ export default {
       </RouterLink>
       </div>
       <div class="flex gap-3 items-center">
-        <button @click="showHelp = true" class="portal-help-button"><span aria-hidden="true">?</span>操作手册</button>
-        <button @click="showModel = true" class="button">⚙ 模型配置</button>
+        <button v-if="$route.name!=='template-review'" @click="showHelp = true" class="portal-help-button"><span aria-hidden="true">?</span>操作手册</button>
+        <button v-if="$route.name!=='template-review'" @click="showModel = true" class="button">⚙ 模型配置</button>
+        <RouterLink v-if="$route.name==='template-review'" to="/" class="template-workbench-home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14"/></svg>返回主页</RouterLink>
       </div>
     </header>
 
     <div class="flex flex-1 overflow-hidden">
-      <aside
+      <aside v-if="$route.name!=='template-review'"
         class="portal-sidebar bg-white border-r border-slate-200 p-4 flex flex-col shrink-0"
       >
         <nav class="space-y-1">

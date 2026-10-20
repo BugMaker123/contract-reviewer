@@ -93,7 +93,10 @@ def test_review_browser_manual_mark_persist_publish():
         page.on('pageerror', lambda e: errors.append(str(e)))
         page.goto(address+'/templates/'+record['id']+'/review')
         expect(page.get_by_role('heading', name='模板')).to_be_visible()
-        page.get_by_role('button', name='＋ 手动添加', exact=True).click()
+        expect(page.locator('.portal-sidebar')).to_have_count(0)
+        assert page.locator('.tr-workspace').bounding_box()['y'] <= 150
+        expect(page.get_by_role('link', name='返回主页', exact=True)).to_have_attribute('href', '/')
+        page.get_by_role('button', name='手动添加', exact=True).click()
         dialog = page.get_by_role('dialog')
         dialog.get_by_label('原文位置', exact=True).select_option('b0')
         dialog.get_by_label('开始位置', exact=True).fill('4')
@@ -108,7 +111,7 @@ def test_review_browser_manual_mark_persist_publish():
         expect(page.locator('.tr-field')).to_contain_text('甲方名称')
         page.get_by_role('button', name='发布版本', exact=True).click()
         page.get_by_role('dialog').get_by_role('button', name='确认', exact=True).click()
-        expect(page.locator('.tr-heading h1 span')).to_have_text('已发布')
+        expect(page.locator('.tr-heading .tr-status-badge')).to_have_text('已发布')
         assert not errors
         browser.close()
 
@@ -177,7 +180,7 @@ def test_review_browser_extraction_feedback(monkeypatch):
         browser = p.chromium.launch()
         page = browser.new_page(viewport={'width': 1700, 'height': 1100})
         page.goto(address+'/templates/'+record['id']+'/review')
-        page.get_by_role('button', name='✧ AI 提取', exact=True).click()
+        page.get_by_role('button', name='AI 提取', exact=True).click()
         page.get_by_role('dialog').get_by_role('button', name='确认', exact=True).click()
         expect(page.locator('.tr-extraction-status')).to_contain_text('正在识别合同填写区域')
         expect(page.locator('.tr-field')).to_contain_text('甲方名称')
@@ -189,6 +192,7 @@ def test_review_browser_extraction_feedback(monkeypatch):
         expect(page.locator('.tr-no-matches')).to_have_text('没有匹配的填写区域')
         page.get_by_label('搜索填写区域').fill('')
         expect(page.locator('.tr-field')).to_have_count(1)
+        page.locator('.tr-view-options > summary').click()
         page.get_by_label('显示段落位置').check()
         expect(page.locator('.tr-block-label').first).to_be_visible()
         page.get_by_label('显示段落位置').uncheck()
