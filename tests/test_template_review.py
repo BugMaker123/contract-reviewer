@@ -104,9 +104,16 @@ def test_review_browser_manual_mark_persist_publish():
         dialog.get_by_role('button', name='保存位置').click()
         page.get_by_label('字段名称', exact=True).fill('甲方名称')
         page.get_by_label('免审处理', exact=True).select_option('conditional')
+        expect(page.get_by_role('button', name='试算验证', exact=True)).to_be_disabled()
+        expect(page.locator('.tr-readiness')).to_have_text('待核验 1 项')
+        expect(page.get_by_role('button', name='发布版本', exact=True)).to_have_attribute('title', '还有 1 个区域待核验，请在右侧逐项点击“确认并下一项”')
         page.get_by_role('button', name='确认并下一项').click()
+        expect(page.get_by_role('button', name='试算验证', exact=True)).to_be_enabled()
+        expect(page.locator('.tr-readiness')).to_have_text('全部已确认')
         page.get_by_role('button', name='保存草稿').click()
         expect(page.locator('.tr-foot span')).to_have_text('已保存')
+        expect(page.get_by_role('status')).to_contain_text('草稿已保存，共 1 个填写区域')
+        expect(page.locator('.tr-foot time')).to_contain_text('上次保存')
         page.reload()
         expect(page.locator('.tr-field')).to_contain_text('甲方名称')
         page.get_by_role('button', name='发布版本', exact=True).click()
@@ -198,4 +205,72 @@ def test_review_browser_extraction_feedback(monkeypatch):
         page.get_by_label('显示段落位置').uncheck()
         expect(page.locator('.tr-block-label')).to_have_count(0)
         expect(page.locator('.tr-foot span')).to_have_text('尚未保存')
+        browser.close()
+
+
+def test_review_browser_save_failure_preserves_edits():
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright, expect
+    with TestClient(app) as client:
+        record, base = setup_template(client)
+        client.put(base+'/review', json={'revision': 1, 'source_id': record['source_id'], 'fields': [region()]})
+    with live_server() as address, sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={'width': 1536, 'height': 864})
+        page.goto(address+'/templates/'+record['id']+'/review')
+        page.get_by_label('字段名称', exact=True).fill('修改后字段')
+        def conflict(request_route):
+            if request_route.request.method == 'PUT':
+                request_route.fulfill(status=409, content_type='application/json', body='{"detail":"模板已被修改，请刷新后重试"}')
+            else:
+                request_route.continue_()
+        page.route('**/api/contract-templates/*/review', conflict)
+        page.get_by_role('button', name='保存草稿', exact=True).click()
+        expect(page.get_by_role('alert')).to_contain_text('保存失败：模板已被修改')
+        expect(page.get_by_label('字段名称', exact=True)).to_have_value('修改后字段')
+        expect(page.locator('.tr-foot span')).to_have_text('尚未保存')
+        page.unroute('**/api/contract-templates/*/review', conflict)
+        page.get_by_role('button', name='保存草稿', exact=True).click()
+        expect(page.get_by_role('status')).to_contain_text('草稿已保存')
+        page.reload()
+        expect(page.get_by_label('字段名称', exact=True)).to_have_value('修改后字段')
+        browser.close()
+
+
+def test_browser_bulk_confirm_and_cancel_persist():
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright, expect
+    with TestClient(app) as client:
+        record, base = setup_template(client)
+        fields = [region(confirmed=False), region(id='f2', name='期限', start=11, end=13, confirmed=False)]
+        response = client.put(base+'/review', json={'revision': 1, 'source_id': record['source_id'], 'fields': fields})
+        assert response.status_code == 200
+    with live_server() as address, sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={'width':1536,'height':864})
+        page.goto(address+'/templates/'+record['id']+'/review')
+        expect(page.locator('.tr-fields-panel .tr-bulk-actions')).to_have_count(0)
+        expect(page.locator('.tr-inspector').get_by_role('button', name='全部确认', exact=True)).to_be_visible()
+        expect(page.get_by_role('button', name='取消全部确认', exact=True)).to_be_disabled()
+        page.get_by_label('搜索填写区域').fill('甲方')
+        expect(page.locator('.tr-field')).to_have_count(1)
+        page.get_by_role('button', name='全部确认', exact=True).click()
+        expect(page.locator('.tr-readiness')).to_have_text('全部已确认')
+        expect(page.get_by_role('button', name='试算验证', exact=True)).to_be_enabled()
+        expect(page.get_by_role('button', name='发布版本', exact=True)).to_be_enabled()
+        page.get_by_role('button', name='保存草稿', exact=True).click()
+        expect(page.locator('.tr-foot span')).to_have_text('已保存')
+        page.reload()
+        expect(page.locator('.tr-readiness')).to_have_text('全部已确认')
+        expect(page.get_by_role('button', name='全部确认', exact=True)).to_be_disabled()
+        page.get_by_role('button', name='取消全部确认', exact=True).click()
+        expect(page.locator('.tr-readiness')).to_have_text('待核验 2 项')
+        expect(page.get_by_role('button', name='发布版本', exact=True)).to_be_disabled()
+        page.get_by_role('button', name='保存草稿', exact=True).click()
+        expect(page.locator('.tr-foot span')).to_have_text('已保存')
+        page.reload()
+        expect(page.locator('.tr-readiness')).to_have_text('待核验 2 项')
+        page.get_by_role('button', name='全部确认', exact=True).click()
+        page.get_by_label('字段名称', exact=True).fill('改动后的甲方')
+        expect(page.locator('.tr-readiness')).to_have_text('待核验 1 项')
         browser.close()
