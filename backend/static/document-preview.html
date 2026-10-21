@@ -345,11 +345,11 @@
     .review-document .docx-wrapper { padding: 8px 8px 16px !important; }
     .review-document #pages { min-width: 0; }
     .review-document section.docx { box-shadow: 0 2px 12px #33415514 !important; }
-    .review-document #pages .review-active { background: #f0efff; }
+    .review-document #pages .review-active { background: transparent; }
     .review-document #pages ins { color: #245bdb !important; background: #f0f5ff; }
     .review-document #pages .review-active ins { font-weight: 600; }
     .review-document #pages del { color: #9b5660 !important; background: #fff5f5; }
-    .review-selection-box { position: fixed; pointer-events: none; border: 2px solid #7566ff; border-radius: 4px; z-index: 5; }
+    .review-selection-box { box-sizing: border-box; position: fixed; pointer-events: none; border: 2px solid #6554d9; border-radius: 4px; background: rgba(117, 102, 255, .035); z-index: 5; }
     #review-callout { position: fixed; z-index: 6; border: 1px solid #ef4444; border-radius: 6px; background: white; color: #dc2626; padding: 8px 10px; font: 600 12px system-ui; box-shadow: 0 3px 10px #0f172a12; cursor: pointer; }
     #review-callout::before { content: ''; position: absolute; width: 14px; height: 1px; background: #ef4444; top: 50%; left: -15px; }
     @media print { .review-selection-box, #review-callout { display: none; } .review-document #pages .review-active { background: transparent; } }
@@ -368,13 +368,6 @@
     .review-selection-box.is-rejected { border-color: #94a3b8; border-style: dashed; }
     #review-callout.is-rejected { border-color: #94a3b8; color: #475569; background: #f8fafc; }
     #review-callout.is-rejected::before { background: #94a3b8; }
-    .review-document #pages .review-missing-field,
-    .review-document #pages .review-missing-field.review-active,
-    .review-document #pages .review-missing-field.review-applied,
-    .review-document #pages .review-missing-field.review-rejected { background: #fff4e5; box-shadow: inset 3px 0 #f59e0b; }
-    .review-document #pages .review-missing-field::after { content: '字段缺失 · 待补充'; display: inline-block; margin-left: 12px; padding: 1px 7px; border: 1px solid #fbbf24; border-radius: 4px; background: #fffbeb; color: #b45309; font: 12px/1.6 system-ui; text-indent: 0; vertical-align: middle; }
-    .review-document #pages .review-missing-field.is-critical { box-shadow: inset 3px 0 #ef4444; background: #fff1f2; }
-    @media print { .review-document #pages .review-missing-field::after { display: none; } }
 
   </style>
 </head>
@@ -452,6 +445,7 @@
         const targets = ranges.length ? ranges : (reviewElements.get(selectedReviewId) || []).map(element => ({element}));
         for (const {element, range} of targets) {
           if (!normalize(element.textContent)) continue;
+          // One outline per continuous clause, regardless of individual line widths.
           const page = element.closest('section.docx') || element.closest('article');
           if (!groups.has(page)) groups.set(page, []);
           const rects = range ? [...range.getClientRects()] : [element.getBoundingClientRect()];
@@ -459,17 +453,19 @@
         }
         const bounds = [];
         for (const rects of groups.values()) {
-          // Merge neighboring text lines only; unrelated paragraphs and blank
-          // gaps do not become part of a single large bounding rectangle.
+          // Merge neighboring lines and paragraphs into a calm, single region.
+          // Page boundaries and substantial blank gaps still split the outline.
           const fragments = [];
           for (const r of rects.sort((a,b) => a.top - b.top || a.left - b.left)) {
             const previous = fragments.at(-1);
-            if (previous && r.top <= previous.bottom + r.height * .85) {
-              previous.left = Math.min(previous.left,r.left); previous.right = Math.max(previous.right,r.right); previous.bottom = Math.max(previous.bottom,r.bottom);
+            if (previous && r.top <= previous.bottom + Math.max(24, r.height * 1.5)) {
+              previous.left = Math.min(previous.left,r.left); previous.right = Math.max(previous.right,r.right); previous.top = Math.min(previous.top,r.top); previous.bottom = Math.max(previous.bottom,r.bottom);
             } else fragments.push({left:r.left,right:r.right,top:r.top,bottom:r.bottom});
           }
-          bounds.push(...fragments.map(r=>({left:r.left-5,right:r.right+5,top:Math.max(viewport.top,r.top-1),bottom:Math.min(viewport.bottom,r.bottom+1)})));
+          bounds.push(...fragments.map(r=>({left:Math.max(viewport.left,r.left-4),right:Math.min(viewport.left + document.querySelector('#viewport').clientWidth,r.right+4),top:Math.max(viewport.top,r.top-1),bottom:Math.min(viewport.top + document.querySelector('#viewport').clientHeight,r.bottom+1)})));
         }
+        bounds.splice(0, bounds.length, ...bounds.filter(r => r.right > r.left && r.bottom > r.top));
+        bounds.sort((a,b) => a.top - b.top || a.left - b.left);
         selectionBox.hidden = selectionCallout.hidden = !bounds.length;
         if (!bounds.length) return;
         // Separate page fragments: never draw through page margins or page gaps.
@@ -479,11 +475,12 @@
           const {left, right, top, bottom} = rect;
           Object.assign(box.style, {left:left+'px', top:top+'px', width:(right-left)+'px', height:(bottom-top)+'px'});
         });
-        const {left, right, top, bottom} = bounds[0];
+        const {right, top, bottom} = bounds.find(rect => rect.bottom - rect.top >= 24) || bounds[0];
         const calloutLeft = right + 18;
+        const calloutWidth = selectionCallout.offsetWidth, calloutHeight = selectionCallout.offsetHeight;
         // Keep the one callout outside the text; suppress it when the gutter cannot fit it.
-        selectionCallout.hidden = calloutLeft + 100 > document.documentElement.clientWidth - 10 || bottom-top < 24;
-        Object.assign(selectionCallout.style, {left: calloutLeft+'px', top: Math.max(top, (top+bottom)/2-18)+'px'});
+        selectionCallout.hidden = calloutLeft + calloutWidth > viewport.left + document.querySelector('#viewport').clientWidth - 10 || bottom-top < 24 || viewport.height < calloutHeight;
+        Object.assign(selectionCallout.style, {left: calloutLeft+'px', top: Math.max(viewport.top, Math.min(viewport.bottom-calloutHeight, (top+bottom-calloutHeight)/2))+'px'});
       };
       const scheduleSelection = () => { if (!selectionFrame) selectionFrame = requestAnimationFrame(drawSelection); };
       document.querySelector('#viewport').addEventListener('scroll', scheduleSelection, {passive: true});
@@ -512,7 +509,6 @@
           delete el.dataset.reviewIssue;
           el.removeAttribute('title'); el.removeAttribute('tabindex');
         });
-        pages.querySelectorAll('.review-missing-field').forEach(el => {el.classList.remove('review-missing-field', 'is-critical'); delete el.dataset.missingFields;});
         const elements = [...pages.querySelectorAll('article p')];
         const snapshots = elements.map(element => {
           const old = element.cloneNode(true), current = element.cloneNode(true);
@@ -521,16 +517,10 @@
           return {element, before: normalize(old.textContent), after: normalize(current.textContent)};
         }).filter(item => item.before || item.after);
         for (const issue of info.review_items || []) {
-          let original = issue.redline?.original_text || issue.evidence || '';
-          let suggested = issue.redline?.suggested_text || '';
-          if (issue.redline && original && suggested) {
-            const beforeLines = original.split('\n'), afterLines = suggested.split('\n');
-            while (beforeLines.length && afterLines.length && normalize(beforeLines[0]) === normalize(afterLines[0])) { beforeLines.shift(); afterLines.shift(); }
-            while (beforeLines.length && afterLines.length && normalize(beforeLines.at(-1)) === normalize(afterLines.at(-1))) { beforeLines.pop(); afterLines.pop(); }
-            // Identical suggestions still need an anchor, but unchanged context
-            // around an actual change must never extend the selection.
-            if (beforeLines.length || afterLines.length) { original = beforeLines.join('\n'); suggested = afterLines.join('\n'); }
-          }
+          // The selection represents the complete clause shown in the suggestion
+          // card; tracked ins/del markup separately identifies the actual edits.
+          const original = issue.redline?.original_text || issue.evidence || '';
+          const suggested = issue.redline?.suggested_text || '';
           const old = normalize(original), after = normalize(suggested);
           // Locate both sides independently: a replacement may retain the full
           // original and append paragraphs, which still belong to this issue.
@@ -588,46 +578,26 @@
             element.tabIndex = 0;
           }
         }
-        // Missing information is a finding even when no replacement text exists.
-        // Detect empty labeled fields only when an actual review finding names them;
-        // annotations never become contract text or alter Word contents.
-        const fields = [
-          ['法定代表人', '法定代表人|法定代表人（签字）|法定代表人或授权代表'],
-          ['地址', '地址|住所|联系地址|注册地址'],
-          ['银行账号', '银行账号|银行帐号|账号|帐号|收款账号'],
-          ['开户行', '开户行|开户银行'], ['户名', '户名|账户名称|收款人'],
-          ['金额', '合同金额|合同总价|总金额|价款'],
-          ['税率', '税率|增值税税率'], ['协议编号', '协议编号|合同编号'],
-          ['联系方式', '联系电话|联系方式|联系人|电话'],
-        ];
-        for (const item of snapshots) {
-          const raw = item.element.cloneNode(true);
-          raw.querySelectorAll('ins').forEach(el => el.remove());
-          const missing = fields.filter(([, aliases]) => new RegExp('(?:^|\\n)[ \\t]*(' + aliases + ')[ \\t]*[：:][ \\t_＿—.．·]*(?=\\n|$)').test(raw.textContent));
-          if (!missing.length) continue;
-          const findings = (info.review_items || []).filter(issue => {
-            const description = [issue.issue_title, issue.risk_analysis].filter(Boolean).join(' ');
-            return /空白|未填写|未填|缺失|未提供|未载明/.test(description) && missing.some(([name, aliases]) => new RegExp(aliases).test(description));
-          });
-          if (!findings.length) continue;
-          const issue = findings.find(issue => (reviewElements.get(issue.id) || []).includes(item.element)) || findings[0];
-          const el = item.element;
-          el.classList.add('review-missing-field', 'review-clause');
-          if (findings.some(issue => issue.severity === 'critical')) el.classList.add('is-critical');
-          el.dataset.missingFields = missing.map(([name]) => name).join('、');
-          el.dataset.reviewIssue = issue.id;
-          el.title = el.dataset.missingFields + '未填写；' + issue.issue_title + '。采纳修订不会自动补齐缺失信息。';
-          el.tabIndex = 0;
-          const targets = reviewElements.get(issue.id) || [];
-          if (!targets.includes(el)) reviewElements.set(issue.id, [...targets, el]);
-        }
         if (reviewListenersAttached) return;
         reviewListenersAttached = true;
         const select = (event, edit = false) => {
           const target = event.target.closest('[data-review-issue]');
           if (!target) return;
-          focusReview(target.dataset.reviewIssue, false);
-          parent.postMessage({type: edit ? 'lexis-review-edit' : 'lexis-review-select', run, issue: target.dataset.reviewIssue}, location.origin);
+          // A single Word paragraph can contain several clauses. Use the actual
+          // text hit, rather than whichever issue first claimed the paragraph.
+          const candidates = [];
+          if (event.type !== 'keydown') {
+            for (const [id, ranges] of reviewTextRanges) {
+              const rects = ranges.filter(item => item.element === target).flatMap(item => [...item.range.getClientRects()]);
+              const hit = rects.some(r => event.clientX >= r.left - 2 && event.clientX <= r.right + 2 && event.clientY >= r.top - 2 && event.clientY <= r.bottom + 2);
+              if (hit) candidates.push({id,area:rects.reduce((sum,r)=>sum+r.width*r.height,0)});
+            }
+            candidates.sort((a,b)=>a.area-b.area);
+          }
+          const issueId = candidates[0]?.id || (event.type === 'keydown' ? target.dataset.reviewIssue : null);
+          if (!issueId) return;
+          focusReview(issueId, false);
+          parent.postMessage({type: edit ? 'lexis-review-edit' : 'lexis-review-select', run, issue: issueId}, location.origin);
         };
         let followTimer;
         document.querySelector('#viewport').addEventListener('scroll', () => {
@@ -635,7 +605,7 @@
           followTimer = setTimeout(() => {
             if (Date.now() < followPausedUntil) return;
             const viewport = document.querySelector('#viewport').getBoundingClientRect();
-            const visible = [...reviewElements].map(([id, elements]) => ({id, rect: elements[0]?.getBoundingClientRect()})).filter(item => item.rect && item.rect.bottom > viewport.top && item.rect.top < viewport.bottom);
+            const visible = [...reviewElements].map(([id, elements]) => ({id, rect: reviewTextRanges.get(id)?.[0]?.range.getBoundingClientRect() || elements[0]?.getBoundingClientRect()})).filter(item => item.rect && item.rect.bottom > viewport.top && item.rect.top < viewport.bottom);
             visible.sort((a,b) => Math.abs(a.rect.top - (viewport.top + viewport.height * .35)) - Math.abs(b.rect.top - (viewport.top + viewport.height * .35)));
             if (visible[0]) { focusReview(visible[0].id, false); parent.postMessage({type:'lexis-review-select', run, issue:visible[0].id}, location.origin); }
           }, 160);
