@@ -426,11 +426,11 @@ export function createWorkspaceWorkbench(refs) {
       if (conflicts || missing) {
         showCompletionChecks.value = true;
         await nextTick();
-        const overview = document.querySelector('.wb-functional-overview');
+        const overview = document.querySelector('.requirement-checks');
         overview?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         overview?.querySelector('textarea:not(:disabled)')?.focus({ preventScroll: true });
-        refs.showToast(conflicts ? '要求存在冲突，请在左侧核验区查看并调整审查条件' :
-          '当前稿有未满足或待确认的要求，请在左侧填写人工确认理由后再次完成审核');
+        refs.showToast(conflicts ? '要求存在冲突，请在右侧重点要求核验区查看并调整审查条件' :
+          '当前稿有未满足或待确认的要求，请在右侧填写人工确认理由后再次完成审核');
         return;
       }
       task.value = await api(

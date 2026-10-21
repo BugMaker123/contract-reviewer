@@ -1,10 +1,11 @@
 <script>
 import PriorityReview from "./PriorityReview.vue";
+import RequirementChecks from "./RequirementChecks.vue";
 import ManualIssue from "./ManualIssue.vue";
 import RevisionActions from "./RevisionActions.vue";
 import StaleReviewNotice from "./StaleReviewNotice.vue";
 export default {
-  components: { RevisionActions, ManualIssue, PriorityReview, StaleReviewNotice },
+  components: { RevisionActions, ManualIssue, PriorityReview, RequirementChecks, StaleReviewNotice },
   props: { context: { type: Object, required: true } },
   setup: (props) => props.context,
 };
@@ -28,10 +29,7 @@ export default {
         }}</span></strong
       >
 
-      <div v-if="opinionsOpen && reviewReady && !resultStale && revisionMode !== 'compare'" class="wb-batch-actions">
-        <button class="batch-accept" :disabled="revisionReadOnly || !pendingApplicableCount" @click="acceptAllRevisions">一键全部采纳</button>
-        <button class="batch-cancel" :disabled="revisionReadOnly || !appliedIssueIds.length" @click="cancelAllAcceptedRevisions">一键取消已采纳</button>
-      </div>
+
     </div>
     <div
       v-show="opinionsOpen"
@@ -42,6 +40,10 @@ export default {
       <StaleReviewNotice v-if="resultStale && revisionMode !== 'compare'" :context="context" />
       <p v-if="resultStale && revisionMode === 'compare'" role="status">正文或条件已改变，请重新审查；以下结论属于旧版本。</p>
       <template v-if="!resultStale || revisionMode === 'compare'">
+
+      <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
+        <PriorityReview v-if="reviewResult && !isReviewing" :context="context" :result="reviewResult" />
+        <RequirementChecks v-if="workspace.showCompletionChecks && reviewResult && !isReviewing" :context="context" />
       <section class="wb-opinion-toolbar" aria-label="审查建议筛选">
         <input v-model="issueSearch" placeholder="搜索条款或意见" aria-label="搜索审查意见" class="wb-opinion-search" />
         <div class="wb-opinion-filter-row">
@@ -57,9 +59,11 @@ export default {
           <ManualIssue :context="context" />
           <span v-if="severityFilter !== 'all' || handlingFilter !== 'all' || issueSearch" class="wb-opinion-match-count" role="status">显示 {{ filteredIssues.length }} / {{ reviewIssues.length }} 项</span>
         </div>
+      <div v-if="opinionsOpen && reviewReady && !resultStale && revisionMode !== 'compare'" class="wb-batch-actions">
+        <button class="batch-accept" :disabled="revisionReadOnly || !pendingApplicableCount" @click="acceptAllRevisions">一键全部采纳</button>
+        <button class="batch-cancel" :disabled="revisionReadOnly || !appliedIssueIds.length" @click="cancelAllAcceptedRevisions">一键取消已采纳</button>
+      </div>
       </section>
-      <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
-        <PriorityReview v-if="reviewResult && !isReviewing" :context="context" :result="reviewResult" />
         <h3 v-if="reviewResult && !isReviewing" class="wb-full-analysis-title">全文风险分析 <span>{{ filteredIssues.length }} 项意见</span></h3>
         <div
           v-for="issue in filteredIssues"

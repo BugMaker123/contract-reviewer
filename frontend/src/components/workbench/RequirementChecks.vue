@@ -10,11 +10,8 @@ const groups=computed(()=>[
 </script>
 <template>
   <div class="requirement-checks">
-    <div class="requirement-check-actions">
-      <button :disabled="workspace.historical||workspace.verifying||context.resultStale.value||context.isReviewing.value" @click="workspace.verifyCurrent()">{{workspace.verifying?'正在核验当前稿…':'核验当前稿'}}</button>
-      <span :class="{valid:workspace.run?.current_verification_valid}">{{workspace.run?.current_verification_valid?'当前稿核验有效':'当前稿未核验或已失效'}}</span>
-    </div>
-    <p class="requirement-check-hint">采纳或撤销修改后，在此核验当前稿，再完成审核。</p>
+    <h3 class="completion-check-heading">完成审核前确认</h3>
+    <p class="requirement-check-hint">请核对以下未满足或待确认项，填写处理理由后再次点击“完成审核”。</p>
     <details :open="workspace.showCompletionChecks" @toggle="workspace.showCompletionChecks=$event.target.open">
       <summary>核验结果与人工确认</summary>
       <details v-for="group in groups" :key="group.name" :open="group.current">
