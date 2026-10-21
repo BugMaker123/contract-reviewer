@@ -283,7 +283,7 @@ async def review_events(snapshot, config):
         full_review_mode = mode if mode != 'checklist' else ('deep' if graph.get_llm_client(config) is not None else 'quick')
         state = {
             'contract_title': snapshot['title'], 'contract_type': snapshot['type'], 'party_role': snapshot['role'],
-            'contract_text': snapshot['text'], 'model_config': config, 'review_focus': [
+            'contract_text': snapshot['text'], 'model_config': config, 'prior_resolutions': snapshot.get('prior_resolutions', []), 'review_focus': [
                 f"[{('硬性要求' if item['priority'] == 'required' else '优先偏好')} / {item['source']}] {item['text']}" for item in requirements],
             'review_mode': full_review_mode, 'review_scale': snapshot['scale'], 'background': snapshot['background'],
             'reference_materials': snapshot['references'], 'segments': [], 'compliance_issues': [], 'balance_issues': [],

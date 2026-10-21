@@ -86,6 +86,8 @@ def test_accepted_baseline_creates_new_snapshot_and_freezes_history(client):
     assert new['baseline_kind'] == 'accepted' and new['parent_run_id'] == run['id']
     assert new['number'] == run['number'] + 1 and '15日付款' in new['input']['text']
     assert new['input']['source_id'] != original['input']['source_id']
+    assert len(new['input']['prior_resolutions']) == len(original['applied'])
+    assert any('15日' in item['accepted_text'] for item in new['input']['prior_resolutions'])
     assert client.get('/api/runs/'+run['id']).json() == original
     assert client.put('/api/runs/'+run['id']+'/handling',json={'revision':run['revision'],'applied':[]}).status_code == 409
     assert client.post('/api/runs/'+run['id']+'/followup',json={'issue_id':run['result']['issues'][0]['id'],'question':'说明'}).status_code == 409
@@ -93,6 +95,10 @@ def test_accepted_baseline_creates_new_snapshot_and_freezes_history(client):
     assert diff['kind'] == 'versions' and any('15日' in c['revised'] for c in diff['changes'])
     other = task(client,title='另一任务')
     assert client.get('/api/tasks/'+other['id']+'/comparison',params={'after_run':new['id']}).status_code == 422
+    handled = client.put('/api/runs/'+new['id']+'/handling',json={'revision':new['revision'], 'decisions':{issue['id']:'rejected' for issue in new['result']['issues']}})
+    assert handled.status_code == 200, handled.text
+    latest = client.get('/api/tasks/'+item['id']).json()
+    assert client.post('/api/tasks/'+item['id']+'/complete',json={'revision':latest['revision'], 'archived':False}).status_code == 200
     exported = client.get('/api/runs/'+new['id']+'/export?scope=current')
     doc = Document(BytesIO(exported.content))
     assert any(r.bold and r.font.size.pt == 18 for p in doc.paragraphs for r in p.runs)

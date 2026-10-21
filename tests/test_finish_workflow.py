@@ -16,7 +16,7 @@ def test_finish_keeps_requirement_findings_display_only(client, monkeypatch, sta
                  'explanation': '测试当前稿核验', 'conflict_with': []} for item in requirements]
     monkeypatch.setattr(workspace_api, 'verify_requirements', verify)
     task, run = seed(client, [REQ])
-    result = {**run['result'], 'requirement_findings':[{**REQ, 'status':status, 'explanation':'重点要求核验结论', 'evidence':'', 'conflict_with':[]}]}
+    result = {**run['result'], 'issues':[{'id':'optional', 'severity':'warning', 'clause_title':'一般风险', 'issue_title':'可选完善', 'risk_analysis':'一般建议', 'redline':None}], 'requirement_findings':[{**REQ, 'status':status, 'explanation':'重点要求核验结论', 'evidence':'', 'conflict_with':[]}]}
     run = workspace_api.repo.update(run['id'], {'result':result})
     with live_server() as base, sync_playwright() as p:
         browser = p.chromium.launch()
@@ -32,3 +32,37 @@ def test_finish_keeps_requirement_findings_display_only(client, monkeypatch, sta
         assert workspace_api.repo.get(run['id'])['result']['requirement_findings']==result['requirement_findings']
         assert not errors
         browser.close()
+
+
+@pytest.mark.parametrize('severity,decision,blocked', [
+    ('critical', 'pending', True), ('critical', 'needs_review', True),
+    ('critical', 'rejected', False), ('critical', 'applied', False),
+    ('warning', 'pending', False), ('warning', 'needs_review', False),
+    ('info', 'pending', False), ('favorable', 'pending', False),
+])
+def test_finish_only_requires_serious_risks_handled(client, severity, decision, blocked):
+    task, run = seed(client)
+    issue = {'id':'policy-test', 'severity':severity, 'issue_title':'test'}
+    workspace_api.repo.update(run['id'], {
+        'result':{**run['result'], 'issues':[issue]}, 'decisions':{'policy-test':decision},
+    })
+    response = client.post('/api/tasks/'+task['id']+'/complete', json={'revision':task['revision'], 'archived':False})
+    assert response.status_code == (409 if blocked else 200), response.text
+    saved = workspace_api.repo.get(run['id'])
+    assert saved['decisions']['policy-test'] == decision
+
+
+def test_rereview_model_receives_accepted_history(monkeypatch):
+    from backend import graph
+    messages = []
+    monkeypatch.setattr(graph, 'get_llm_client', lambda config: object())
+    def invoke(client, prompt, config):
+        messages.extend(prompt)
+        return {'tax_settlement':{}, 'issues':[]}
+    monkeypatch.setattr(graph, 'invoke_review_with_retry', invoke)
+    graph.node_balance_review({
+        'review_mode':'deep', 'contract_text':'current accepted document', 'party_role':'neutral',
+        'segments':[], 'prior_resolutions':[{'issue_title':'previous risk', 'accepted_text':'accepted safeguard'}],
+    })
+    assert 'accepted safeguard' in messages[-1].content
+    assert 'previous risk' in messages[-1].content

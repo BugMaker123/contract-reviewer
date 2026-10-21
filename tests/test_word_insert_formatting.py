@@ -49,3 +49,40 @@ def test_inserted_clause_inherits_body_font_spacing_and_indent(isolated_workspac
     assert result.paragraphs[3 if blank_separator else 2].runs[0].font.size.pt == 9
     if tracked:
         assert paragraph._p.find(qn('w:ins')) is not None
+
+
+def test_accepted_rounds_restore_parent_format_and_keep_exact_text(isolated_workspace):
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    doc = Document()
+    heading = doc.add_paragraph('Contract title')
+    heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    heading.runs[0].font.size = Pt(22)
+    doc.add_paragraph('Old clause')
+    doc.add_paragraph('Delete this paragraph')
+    doc.add_paragraph('Delete this too')
+    original = '\n'.join(p.text for p in doc.paragraphs)
+    buffer = BytesIO(); doc.save(buffer)
+    repo = workspace_api.repo
+    source = save_source(repo, word_export.SOURCES, {'extension':'.docx', 'text':original}, buffer.getvalue())
+    final = 'Contract title\nNew clause'
+    parent = repo.create('run', {
+        'input':{'title':'Contract', 'text':original, 'source_id':source['id']},
+        'result':{'issues':[{'id':'edit', 'redline':{'original_text':original.split('\n',1)[1], 'suggested_text':'New clause', 'change_type':'replace'}}]},
+        'applied':['edit'], 'comments':{},
+    })
+    revised, layout = word_export.contract_document(parent, final, repo, workspace_api.word_document)
+    assert layout == 'preserved'
+    assert '\n'.join(word_export.visible_paragraph_text(p._p) for p in revised.paragraphs) == final
+    # Simulate a baseline saved by an older release as an unformatted document.
+    degraded = Document()
+    for line in final.split('\n'): degraded.add_paragraph(line)
+    buffer = BytesIO(); degraded.save(buffer)
+    bad_source = save_source(repo, word_export.SOURCES, {'extension':'.docx', 'text':final}, buffer.getvalue())
+    child = {**parent, 'baseline_kind':'accepted', 'parent_run_id':parent['id'],
+             'input':{'title':'Contract', 'text':final, 'source_id':bad_source['id']},
+             'result':{'issues':[]}, 'applied':[]}
+    restored, layout = word_export.contract_document(child, final, repo, workspace_api.word_document)
+    assert layout == 'preserved'
+    assert restored.paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert restored.paragraphs[0].runs[0].font.size.pt == 22
+    assert '\n'.join(word_export.visible_paragraph_text(p._p) for p in restored.paragraphs) == final

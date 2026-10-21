@@ -83,6 +83,16 @@ def contract_document(run, final_text, repo, default_builder, tracked=False, bas
     source_id = run['input'].get('source_id')
     document = base_document
     layout = base_layout or 'reconstructed'
+    # Rebuild an accepted baseline from its immutable parent, rather than carrying
+    # forward a previously reconstructed source that has already lost formatting.
+    if document is None and run.get('baseline_kind') == 'accepted' and run.get('parent_run_id'):
+        from .revisions import revised_text
+        parent = repo.get(run['parent_run_id'], 'run')
+        if revised_text(parent) == original:
+            inherited, inherited_layout = contract_document(parent, original, repo, default_builder)
+            if inherited_layout == 'preserved':
+                document, layout = inherited, inherited_layout
+
     if document is None and source_id:
         source = repo.get(source_id, 'source')
         if source['extension'] == '.docx' and source['text'] == original:
@@ -105,6 +115,12 @@ def contract_document(run, final_text, repo, default_builder, tracked=False, bas
             if '\n'.join(visible_paragraph_text(p._p) for p in source_paragraphs) != original:
                 source_paragraphs = source_paragraphs[1:]
     before = [visible_paragraph_text(p._p) for p in source_paragraphs]
+    # Older accepted documents retained empty paragraphs removed by a replacement.
+    # Trim only demonstrably extra trailing separators; never discard actual text.
+    while before and '\n'.join(before) != original and before[-1] == '' and '\n'.join(before).startswith(original + '\n'):
+        paragraph = source_paragraphs.pop()
+        paragraph._p.getparent().remove(paragraph._p)
+        before.pop()
     # Soft line breaks remain within paragraphs; applying revisions uses a character-to-paragraph mapping.
     if '\n'.join(before) != original:
         document = default_builder(run['input']['title'], original)
@@ -162,6 +178,9 @@ def contract_document(run, final_text, repo, default_builder, tracked=False, bas
                 # Adjacent revisions belong to their own paragraph/cell. Do not
                 # combine the full replacement block into its first paragraph.
                 if index >= d - c:
+                    if not tracked and p._p.getparent().tag == qn('w:body'):
+                        p._p.getparent().remove(p._p)
+                        continue
                     new = ''
                 elif index == b - a - 1:
                     new = '\n'.join(after[c + index:d])

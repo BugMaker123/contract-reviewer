@@ -413,8 +413,9 @@ export function createWorkspaceWorkbench(refs) {
     try {
       await flush();
       if ((run.value?.result?.issues || []).some(issue =>
+        ['critical', 'high', 'major'].includes(issue.severity) &&
         ['pending', 'needs_review'].includes(decisions.value[issue.id] || 'pending'))) {
-        refs.showToast('还有待处理或待复核条目，请先逐项处理');
+        refs.showToast('还有重大或高风险条目待处理，请采纳或拒绝后再完成审核');
         return;
       }
       task.value = await api(

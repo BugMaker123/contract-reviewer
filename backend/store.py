@@ -302,6 +302,16 @@ class Repository:
             task['status'] = 'running'
             identifier, stamp = uuid4().hex, now()
             snapshot = {key: task.get(key) for key in ('title', 'type', 'text', 'role', 'mode', 'scale', 'background', 'focus', 'references', 'requirements', 'execution', 'reference_text', 'checklist', 'source_id')}
+            if baseline_kind == 'accepted' and parent_run_id:
+                previous_row = db.execute("SELECT data FROM objects WHERE id=? AND kind='run'", (parent_run_id,)).fetchone()
+                previous_data = json.loads(previous_row['data']) if previous_row else {}
+                applied = set(previous_data.get('applied', []))
+                snapshot['prior_resolutions'] = previous_data.get('input', {}).get('prior_resolutions', []) + [
+                    {'issue_title': issue.get('issue_title', ''), 'risk_analysis': issue.get('risk_analysis', ''),
+                     'original_text': (issue.get('redline') or {}).get('original_text', ''),
+                     'accepted_text': (issue.get('redline') or {}).get('suggested_text', '')}
+                    for issue in (previous_data.get('result') or {}).get('issues', []) if issue.get('id') in applied
+                ]
             count = db.execute("SELECT count(*) FROM objects WHERE kind='run' AND parent=?", (task_id,)).fetchone()[0]
             run = {'task_id': task_id, 'number': count + 1, 'input': snapshot, 'status': 'running',
                    'parent_run_id': parent_run_id, 'baseline_kind': baseline_kind,

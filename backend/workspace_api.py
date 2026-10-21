@@ -474,8 +474,8 @@ def complete_task(task_id: str, request: CompleteInput):
         raise HTTPException(409, '请先完成审查并复核结果')
     run = repo.get(task['active_run'], 'run')
     editable_run(repo, run['id'], run['revision'])
-    if any(run['decisions'].get(issue['id'], 'pending') in ('pending', 'needs_review') for issue in run['result']['issues'] if not is_prompt_requirement_issue(issue, run['input'])):
-        raise HTTPException(409, '还有待处理或待复核条目')
+    if any(run['decisions'].get(issue['id'], 'pending') in ('pending', 'needs_review') for issue in run['result']['issues'] if issue.get('severity') in ('critical', 'high', 'major') and not is_prompt_requirement_issue(issue, run['input'])):
+        raise HTTPException(409, '还有重大或高风险条目待处理，请采纳或拒绝后再完成审核')
     if task['revision'] != request.revision:
         raise HTTPException(409, '记录已被修改，请刷新后重试')
     return repo.complete_review(task_id, request.revision, run['id'], run['revision'], request.confirmations)

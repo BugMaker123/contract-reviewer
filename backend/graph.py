@@ -15,6 +15,7 @@ logger = logging.getLogger("contract_reviewer")
 logging.basicConfig(level=logging.INFO)
 
 class ContractReviewState(TypedDict):
+    prior_resolutions: List[Dict[str, Any]]
     contract_title: str
     contract_type: str
     party_role: str
@@ -563,6 +564,9 @@ def node_balance_review(state: ContractReviewState) -> Dict[str, Any]:
 你是站在【{perspective(party_role)}】立场的合同审查助手。请对该【{state.get('contract_type', '商务合同')}】进行专项审查。
 我方谈判尺度：{state.get('review_scale', '中立')}。强势时优先保护我方，弱势时优先给出可接受的必要修改，中立时重视权责对等。
 交易背景：{state.get('background', '')}
+上一轮已采纳修订（仅供核对历史，当前条款列表才是本轮判断依据）：{json.dumps(state.get('prior_resolutions', []), ensure_ascii=False)}
+复审时先核对已采纳修订是否解决原问题，已解决的问题不要重复报告，也不要因措辞偏好不断提高修改要求。若仍需报告同一问题，须引用当前稿原文，明确指出已采纳修订后仍未解决的具体缺口及实际影响；不得沿用已被替换的旧原文。缺失附件、交易事实待补充与条款本身缺陷须区分，不能声称仅修改正文即可补齐缺失材料。重大/高风险（critical）须有具体且重大的法律或商业损失依据；一般完善、措辞优化不得升级为重大风险。不能因为历史采纳而忽略仍真实存在的风险。
+
 重点要求：{json.dumps(state.get('review_focus', []), ensure_ascii=False)}
 自定义要求、清单要求为优先核验重点；交易背景和参考资料用于理解交易事实与提供证据。须同时考虑全部输入，不能因选了清单而忽略背景、资料或其他全文风险；不能把背景资料中的事实当成合同已约定的条款。
 参考资料：{json.dumps(state.get('reference_materials', []), ensure_ascii=False)}
