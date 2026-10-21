@@ -1,4 +1,5 @@
 export const pages = {
+  "/drafting": {key:"drafting",name:"合同起草",icon:"✎",data:[],states:[],features:[]},
   "/": {
     key: "start",
     name: "开始",

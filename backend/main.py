@@ -41,6 +41,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 app.include_router(workspace_router)
+from .drafting_api import router as drafting_router
+app.include_router(drafting_router)
 from .template_api import router as template_router
 app.include_router(template_router)
 from .template_review import router as template_review_router

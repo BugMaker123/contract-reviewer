@@ -11,7 +11,7 @@ export default {
     const shell = usePortalShell();
     const route = useRoute();
     const navigationGroups = computed(() => [
-      {name:'', keys:['start']},
+      {name:'', keys:['start','drafting']},
       {name:'审查管理', keys:['categories','checklists','records']},
       {name:'模板管理', keys:['templates','validations']},
     ].map(group => ({...group, items:group.keys.map(key => {

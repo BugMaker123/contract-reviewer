@@ -3,6 +3,7 @@ import { pages } from "../portal/pages.js";
 import { loadPageModules } from "../portal/modules.js";
 
 const views = {
+  drafting: () => import("../views/ContractDrafting.vue"),
   templates: () => import("../views/ContractTemplates.vue"),
   start: () => import("../views/StartReview.vue"),
   records: () => import("../views/ReviewRecords.vue"),
