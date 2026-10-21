@@ -2221,3 +2221,51 @@
 .workbench-view .overview-trace li:last-child{border-left-color:transparent}
 .workbench-view .wb-functional-overview .overview-notice{padding:10px 12px;background:#fff9ee;border:1px solid #f2e7d1;border-radius:7px;margin:0 0 12px;font-size:11px;line-height:1.85;color:#9a7c45}
 .workbench-view .overview-notice-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+
+/* Opinion cards: one primary decision row, then full-width supporting sections. */
+.workbench-view .is-compact-review .prototype-risk-card > .revision-risk-details,
+.workbench-view .is-compact-review .prototype-risk-card > .compact-extra-tools {width:100%;}
+.workbench-view .is-compact-review .revision-support-tools,
+.workbench-view .is-compact-review .compact-extra-tools {display:block;margin-top:10px;padding:0;border:1px solid #e4eaf2;border-radius:8px;background:#fff;overflow:hidden;}
+.workbench-view .is-compact-review .revision-support-tools > summary,
+.workbench-view .is-compact-review .compact-extra-tools > summary {display:flex;align-items:center;gap:8px;padding:11px 12px;list-style:none;cursor:pointer;color:#475569;font-size:12px;font-weight:550;margin:0;}
+.workbench-view .revision-support-tools > summary::-webkit-details-marker,
+.workbench-view .compact-extra-tools > summary::-webkit-details-marker {display:none;}
+.workbench-view .revision-support-tools > summary::before,
+.workbench-view .compact-extra-tools > summary::before {content:'›';font-size:16px;line-height:1;color:#94a3b8;transform:rotate(0);}
+.workbench-view .revision-support-tools[open] > summary::before,
+.workbench-view .compact-extra-tools[open] > summary::before {transform:rotate(90deg);}
+.workbench-view .revision-support-tools > summary span,
+.workbench-view .compact-extra-tools > summary span {margin-left:auto;font-size:11px;font-weight:400;color:#94a3b8;}
+.workbench-view .revision-support-tools[open] > summary,
+.workbench-view .compact-extra-tools[open] > summary {border-bottom:1px solid #edf2f7;background:#f8fafc;}
+.workbench-view .revision-support-body {padding:12px;}
+.workbench-view .revision-support-body .revision-instruction {display:block;font-size:12px;color:#64748b;}
+.workbench-view .revision-support-body textarea {width:100%;margin-top:7px;min-height:64px;border:1px solid #dce3ed;border-radius:6px;padding:8px;font:12px/1.7 inherit;resize:vertical;}
+.workbench-view .revision-support-generate {display:flex;align-items:center;justify-content:space-between;gap:8px;margin:9px 0 12px;}
+.workbench-view .revision-support-generate small {font-size:11px;color:#94a3b8;}
+.workbench-view .revision-support-generate button {padding:6px 9px;border:1px solid #dbeafe;border-radius:5px;background:#eff6ff;color:#2563eb;font-size:11px;}
+.workbench-view .revision-support-body .revision-secondary-actions {display:flex;flex-wrap:wrap;gap:8px;border-top:1px solid #edf2f7;padding-top:12px;margin:0;}
+.workbench-view .revision-support-body .revision-secondary-actions button,
+.workbench-view .issue-review-actions button {margin:0;padding:6px 10px;border:1px solid #dce3ed;border-radius:5px;background:#fff;color:#475569;font-size:11px;}
+.workbench-view .is-compact-review .compact-extra-tools > .issue-review-actions {display:flex;flex-wrap:wrap;gap:8px;margin:12px;}
+.workbench-view .issue-review-actions button[aria-pressed=true] {color:#b45309;border-color:#fde68a;background:#fffbeb;}
+.workbench-view .issue-note-label {display:block;margin:0 12px 6px;color:#64748b;font-size:12px;}
+.workbench-view .compact-extra-tools > textarea {display:block;margin:0 12px 12px;width:calc(100% - 24px);}
+.workbench-view .compact-extra-tools > div:last-child:not(.issue-review-actions) {margin:12px;}
+.workbench-view .revision-support-tools button:disabled,.workbench-view .issue-review-actions button:disabled {opacity:.45;cursor:not-allowed;}
+
+.workbench-view .is-compact-review .revision-primary-actions > .revision-undo-button {order:0;margin-right:0;margin-left:auto;padding:5px 12px;border:1px solid #dce3ed;background:#fff;color:#64748b;border-radius:5px;}
+.workbench-view .revision-undo-button:disabled {opacity:.4;cursor:not-allowed;}
+
+/* Equal-weight decision buttons with readable action and disabled colors. */
+.workbench-view .is-compact-review .revision-primary-actions {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.workbench-view .is-compact-review .revision-primary-actions > button:nth-child(n) {order:0;margin:0;width:100%;min-width:0;min-height:34px;padding:7px 10px;border:1px solid transparent;border-radius:6px;font-size:12px;font-weight:600;line-height:18px;color:#fff;opacity:1;transition:background-color .15s,border-color .15s;}
+.workbench-view .is-compact-review .revision-primary-actions > button.revision-ai-button {background:#16a34a;border-color:#16a34a;}
+.workbench-view .is-compact-review .revision-primary-actions > button.revision-reject-button {background:#dc2626;border-color:#dc2626;}
+.workbench-view .is-compact-review .revision-primary-actions > button.revision-undo-button {background:#475569;border-color:#475569;}
+.workbench-view .is-compact-review .revision-primary-actions > button.revision-ai-button:hover:not(:disabled) {background:#15803d;border-color:#15803d;}
+.workbench-view .is-compact-review .revision-primary-actions > button.revision-reject-button:hover:not(:disabled) {background:#b91c1c;border-color:#b91c1c;}
+.workbench-view .is-compact-review .revision-primary-actions > button.revision-undo-button:hover:not(:disabled) {background:#334155;border-color:#334155;}
+.workbench-view .is-compact-review .revision-primary-actions > button:disabled {background:#e2e8f0;border-color:#cbd5e1;color:#64748b;opacity:1;cursor:not-allowed;}
+.workbench-view .is-compact-review .revision-primary-actions > button:focus-visible {outline:2px solid #2563eb;outline-offset:2px;}

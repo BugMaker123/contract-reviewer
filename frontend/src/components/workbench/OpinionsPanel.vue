@@ -215,81 +215,14 @@ export default {
             class="compact-extra-tools mt-4 pt-3 border-t border-slate-100 space-y-3"
             @click.stop
           >
-            <summary class="revision-more-tools-label">备注与更多处理</summary>
-            <div class="wb-issue-actions flex gap-2 text-xs">
-              <button
-                @click="workspace.setDecision(issue, 'rejected')"
-                :aria-pressed="workspace.decisionName(issue.id) === '不采纳'"
-                :class="
-                  workspace.decisionName(issue.id) === '不采纳'
-                    ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold'
-                    : ''
-                "
-                :disabled="
-                  workspace.historical ||
-                  workspace.loading ||
-                  isReviewing ||
-                  revisionBusy
-                "
-                class="px-2 py-1 border border-slate-200 rounded text-slate-600"
-              >
-                不采纳</button
-              ><button
-                @click="workspace.setDecision(issue, 'needs_review')"
-                :aria-pressed="workspace.decisionName(issue.id) === '待复核'"
-                :class="
-                  workspace.decisionName(issue.id) === '待复核'
-                    ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold'
-                    : ''
-                "
-                :disabled="
-                  workspace.historical ||
-                  workspace.loading ||
-                  isReviewing ||
-                  revisionBusy
-                "
-                class="px-2 py-1 border border-slate-200 rounded text-amber-700"
-              >
-                待复核</button
-              ><button
-                @click="workspace.setDecision(issue, 'pending')"
-                :aria-pressed="workspace.decisionName(issue.id) === '待处理'"
-                :class="
-                  workspace.decisionName(issue.id) === '待处理'
-                    ? 'bg-blue-50 ring-2 ring-blue-500 font-semibold'
-                    : ''
-                "
-                :disabled="
-                  workspace.historical ||
-                  workspace.loading ||
-                  isReviewing ||
-                  revisionBusy
-                "
-                class="px-2 py-1 text-slate-400"
-              >
-                重置状态</button
-              ><button
-                @click="openClauseEditor(issue)"
-                :disabled="
-                  documentSaving ||
-                  workspace.historical ||
-                  workspace.loading ||
-                  isReviewing
-                "
-                class="px-2 py-1 text-blue-600"
-              >
-                编辑条款</button
-              ><button
-                @click="
-                  workspace.followupIssue =
-                    workspace.followupIssue === issue.id ? null : issue.id
-                "
-                class="ml-auto px-2 py-1 text-blue-600"
-              >
-                追问意见
-              </button>
+            <summary class="revision-more-tools-label">备注与复核<span>记录处理理由或继续追问</span></summary>
+            <div class="wb-issue-actions issue-review-actions">
+              <button @click="setReviewDecision(issue, 'needs_review')" :disabled="revisionReadOnly || workspace.decisions[issue.id] === 'needs_review'" :aria-pressed="workspace.decisions[issue.id] === 'needs_review'">标记待复核</button>
+              <button @click="workspace.followupIssue = workspace.followupIssue === issue.id ? null : issue.id" :aria-expanded="workspace.followupIssue === issue.id" :disabled="workspace.historical || isReviewing">追问意见</button>
             </div>
+            <label class="issue-note-label" :for="'issue-note-'+issue.id">处理备注</label>
             <textarea
+              :id="'issue-note-'+issue.id"
               v-model="workspace.comments[issue.id]"
               :disabled="
                 workspace.historical ||

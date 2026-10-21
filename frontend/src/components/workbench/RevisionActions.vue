@@ -60,7 +60,7 @@ export default {
       >
         采纳
       </button>
-      <button
+      <button class="revision-reject-button"
         @click="setReviewDecision(issue, 'rejected')"
         :disabled="
           revisionReadOnly || workspace.decisions[issue.id] === 'rejected'
@@ -68,8 +68,10 @@ export default {
       >
         拒绝
       </button>
-      <button @click="generateRevision(issue)" :disabled="revisionReadOnly">
-        重新生成
+      <button class="revision-undo-button" @click="setReviewDecision(issue, 'pending')"
+        :disabled="revisionReadOnly || (!appliedIssueIds.includes(issue.id) && (!workspace.decisions[issue.id] || workspace.decisions[issue.id] === 'pending'))"
+        :title="appliedIssueIds.includes(issue.id) ? '撤销采纳，恢复待处理' : workspace.decisions[issue.id] === 'rejected' ? '撤销拒绝，恢复待处理' : '恢复为待处理状态'">
+        撤销操作
       </button>
     </div>
     <p
@@ -79,51 +81,19 @@ export default {
     >
       正在处理这条修订…
     </p>
-    <details
-      class="revision-generation-options"
-      :open="revisionMode === 'compare' || !!revisionInstructions[issue.id]"
-    >
-      <summary>补充生成要求</summary>
-      <label class="revision-instruction"
-        ><span>不满意？补充调整要求后重新生成</span
-        ><textarea
-          v-model="revisionInstructions[issue.id]"
-          :disabled="revisionReadOnly"
-          maxlength="3000"
-          rows="2"
-          placeholder="例如：保留原付款节点，措辞更温和，明确验收期限…"
-          :aria-label="issue.clause_title + 'AI调整要求'"
-        ></textarea>
-      </label>
-    </details>
-    <details class="revision-more-actions">
-      <summary>更多操作</summary>
-
-
-      <div class="revision-secondary-actions">
-        <button
-          v-if="appliedIssueIds.includes(issue.id)"
-          @click="setReviewDecision(issue, 'pending')"
-          :disabled="revisionReadOnly"
-        >
-          撤销采纳
-        </button>
-        <button
-          v-else-if="workspace.decisions[issue.id] === 'rejected'"
-          @click="setReviewDecision(issue, 'pending')"
-          :disabled="revisionReadOnly"
-        >
-          撤销拒绝
-        </button>
-        <button @click="beginRevisionEdit(issue)" :disabled="revisionReadOnly">
-          手动调整修订
-        </button>
-        <button
-          v-if="issue.redline"
-          @click="copyText(issue.redline.suggested_text)"
-        >
-          复制建议
-        </button>
+    <details class="revision-support-tools" :open="!!revisionInstructions[issue.id] || editingRevisionId === issue.id">
+      <summary>调整修订<span>补充要求、手动修改与复制</span></summary>
+      <div class="revision-support-body">
+        <label class="revision-instruction"><span>补充调整要求</span>
+          <textarea v-model="revisionInstructions[issue.id]" :disabled="revisionReadOnly" maxlength="3000" rows="2"
+            placeholder="例如：保留付款节点，措辞更温和…" :aria-label="issue.clause_title + 'AI调整要求'"></textarea>
+        </label>
+        <div class="revision-support-generate"><small>重新生成会保留旧建议版本。</small><button @click="generateRevision(issue)" :disabled="revisionReadOnly">按要求重新生成</button></div>
+        <div class="revision-secondary-actions">
+          <button @click="beginRevisionEdit(issue)" :disabled="revisionReadOnly">手动调整修订</button>
+          <button @click="openClauseEditor(issue)" :disabled="revisionReadOnly || documentSaving">编辑正文</button>
+          <button v-if="issue.redline" @click="copyText(issue.redline.suggested_text)">复制建议</button>
+        </div>
       </div>
     </details>
     <div v-if="editingRevisionId === issue.id" class="revision-manual-editor">
