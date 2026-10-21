@@ -1,5 +1,5 @@
 <script>
-import { computed, watch } from "vue";
+import { computed, watch, nextTick } from "vue";
 import { usePortalPage } from "../composables/usePortalPage.js";
 import PageFrame from "../components/PageFrame.vue";
 import ContractSource from "../components/portal/ContractSource.vue";
@@ -22,6 +22,11 @@ export default {
       if (value && !loading) { Object.assign(context.form, {text:value.text, source_id:value.source_id, title:value.filename.replace(/\.docx$/i,'')}); context.inputMethod.value='file'; }
     }, {immediate:true});
     watch([context.busy, context.importing], ([busy, importing]) => emit('processing', busy || importing), {immediate:true});
+    const focusSource = async (source) => {
+      context.switchSource(source);
+      await nextTick();
+      document.getElementById('source-tab-'+context.inputMethod.value)?.focus();
+    };
     const addFocus = (focus) => {
       const values = context.form.focus.split('；').filter(Boolean);
       context.form.focus = (values.includes(focus) ? values.filter(value => value !== focus) : [...values, focus]).join('；');
@@ -37,7 +42,7 @@ export default {
       if (form.references.some(ref => ref.kind === 'policy' && !ref.confirmed)) return "请先核对并确认公司制度要求";
       return "";
     });
-    return { ...context, context, readiness, addFocus };
+    return { ...context, context, readiness, addFocus, focusSource };
   },
 };
 </script>
@@ -68,19 +73,29 @@ export default {
           <div class="review-contract-panel">
             <div class="review-contract-heading"><span class="label">合同文档</span><span class="pill"
                 :class="form.text.trim() ? 'green' : 'amber'">{{ form.text.trim() ? '已添加' : '待添加' }}</span></div>
-            <label class="block review-contract-name">
-              <!-- <span class="label">合同名称 <em>*</em></span> -->
-              <input
-                v-model="form.title" class="field" placeholder="填写便于识别的合同名称(支持从文件名自动提取)" /></label>
-            <div class="review-source-tabs">
-              <button v-for="source in sources" :key="source.id" @click="switchSource(source.id)" :disabled="importing"
-                class="button" :class="{ soft: inputMethod === source.id }" :aria-pressed="inputMethod === source.id">{{
-                  source.name }}</button>
-              <span>{{ form.text.length.toLocaleString() }} 字</span>
+            <div class="source-method-row">
+              <div class="source-method-tabs" role="tablist" aria-label="合同输入方式">
+                <button v-for="source in sources" :key="source.id" type="button" role="tab"
+                  :aria-label="source.id==='file'?'文件上传':'粘贴正文'" :id="'source-tab-'+source.id" aria-controls="contract-source-panel"
+                  :aria-selected="inputMethod===source.id" :tabindex="inputMethod===source.id?0:-1"
+                  :disabled="importing" @click="switchSource(source.id)"
+                  @keydown.right.prevent="focusSource(source.id==='file'?'paste':'file')"
+                  @keydown.left.prevent="focusSource(source.id==='file'?'paste':'file')"
+                  :class="{active:inputMethod===source.id}">
+                  <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><template v-if="source.id==='file'"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M12 18v-6m-3 3 3-3 3 3"/></template><template v-else><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 3h6v4H9zM9 12h6M9 16h4"/></template></svg>
+                  <span class="source-method-copy"><strong>{{source.id==='file'?'文件上传':'粘贴正文'}}</strong><small>{{source.id==='file'?'导入合同文件':'直接粘贴合同内容'}}</small></span>
+                  <span class="source-method-check" aria-hidden="true">{{inputMethod===source.id?'✓':''}}</span>
+                </button>
+              </div>
+              <span class="source-word-count">{{form.text.length.toLocaleString()}} 字</span>
             </div>
-            <div class="review-document">
+            <div id="contract-source-panel" class="review-document" role="tabpanel" :aria-labelledby="'source-tab-'+inputMethod">
               <ContractSource :context="context" />
             </div>
+            <label class="block review-contract-name">
+              <span class="contract-name-label">合同名称 <span>上传后自动填入，可修改</span></span>
+              <input
+                v-model="form.title" class="field" placeholder="填写便于识别的合同名称(支持从文件名自动提取)" /></label>
           </div>
           <div class="review-requirement-panel">
             <template v-if="form.mode === 'checklist'">
@@ -112,4 +127,5 @@ export default {
 
 <style scoped>
 .ai-intro{color:#64748b;font-size:13px;line-height:1.8;margin:8px 24px 25px}.review-settings{border-radius:18px;box-shadow:0 4px 16px #0f172a06}.ai-focus-pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}.ai-focus-pills button{padding:5px 10px;border-radius:20px;font-size:12px;background:#f1f5f9;color:#64748b}.ai-focus-pills button[aria-pressed=true]{background:#eff6ff;color:#2563eb}
+.source-method-row{display:flex;align-items:center;gap:12px;margin:8px 0 18px}.source-method-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;flex:1;min-width:0}.source-method-tabs button{display:flex;align-items:center;gap:12px;min-height:66px;padding:12px 14px;border:1px solid #dce3ed;border-radius:9px;background:#fff;color:#64748b;text-align:left;cursor:pointer;transition:border-color .15s,background .15s}.source-method-tabs button.active{border-color:#729bfa;background:#eff6ff;color:#2563eb;box-shadow:0 0 0 1px #2563eb0a}.source-method-tabs button:hover:not(:disabled){border-color:#93b4fa;background:#f5f8ff}.source-method-tabs button>svg{flex-shrink:0}.source-method-copy{display:flex;flex-direction:column;gap:4px;min-width:0}.source-method-copy strong{font-size:13px;font-weight:600;line-height:18px}.source-method-copy small{font-size:11px;font-weight:400;color:#8996a9;line-height:16px}.source-method-check{margin-left:auto;flex-shrink:0;width:16px;font-size:14px}.source-method-tabs button:focus-visible{outline:2px solid #93c5fd;outline-offset:3px}.source-method-tabs button:disabled{opacity:.5;cursor:wait}.source-word-count{color:#94a3b8;font-size:11px;white-space:nowrap}.review-contract-panel .review-contract-name{margin:20px 0 0;padding-top:18px;border-top:1px solid #e8edf4}.contract-name-label{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:9px;font-size:13px;font-weight:500;color:#334155}.contract-name-label>span{font-size:11px;font-weight:400;color:#94a3b8}@media(max-width:650px){.source-method-tabs{gap:8px}.source-method-tabs button{padding:10px;gap:8px}.source-word-count{display:none}.source-method-copy small{font-size:10px}}
 </style>

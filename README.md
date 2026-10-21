@@ -77,3 +77,8 @@ Windows 免安装包：先安装 `requirements-build.txt` 中的依赖，执行
 - `frontend/src/views/`、`layouts/` 与 `components/`：Vue 页面、公共布局及业务组件。
 - `frontend/src/composables/`：工作台流程、页面生命周期与持久化适配。
 - `frontend/src/router/`：无刷新路由及页面懒加载。
+
+## 许可证
+
+本项目采用 [GNU Affero General Public License v3.0](LICENSE)（SPDX：`AGPL-3.0-only`）。
+第三方依赖及随附资源仍遵循各自的许可证。

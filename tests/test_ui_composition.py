@@ -66,7 +66,7 @@ def test_navigation_keeps_document_layout_forms_and_history(isolated_workspace):
         page.get_by_role('button', name='AI 智能全面审查').click()
         expect(page.get_by_role('heading', name='新建合同审查', exact=True)).to_be_visible()
         page.evaluate("window.spaMarker = 'same-document'; window.shellHeader = document.querySelector('.portal-header')")
-        page.get_by_role('button', name='✍️ 粘贴正文', exact=True).click()
+        page.get_by_role('tab', name='粘贴正文', exact=True).click()
         page.get_by_label('合同正文', exact=True).fill('第一条 验收后付款。')
         page.get_by_placeholder('填写便于识别的合同名称').fill('保留中的审查表单')
         nav = page.locator('.portal-sidebar nav')

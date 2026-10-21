@@ -54,7 +54,7 @@ def test_category_and_checklist_browser(isolated_workspace):
             expect(page.get_by_role('button', name='进入工作台核对合同')).to_be_disabled()
             page.locator('.checklist-option input').first.check()
             expect(page.get_by_text('已勾选 1 项', exact=True)).to_be_visible()
-            page.get_by_role('button', name='✍️ 粘贴正文', exact=True).click()
+            page.get_by_role('tab', name='粘贴正文', exact=True).click()
             page.get_by_label('合同正文', exact=True).fill('第一条 付款与验收，验收合格后付款。')
             page.locator('.review-contract-name input').fill('技术服务合同')
             expect(page.locator('.review-prompt-field')).to_have_count(0)

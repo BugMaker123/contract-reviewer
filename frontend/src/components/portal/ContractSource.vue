@@ -23,6 +23,11 @@ export default {
     <div
       v-if="inputMethod === 'file' && !form.text"
       class="drop-area"
+      role="button"
+      :tabindex="importing ? -1 : 0"
+      :aria-disabled="importing"
+      @keydown.enter.prevent="!importing && $refs.contractInput.click()"
+      @keydown.space.prevent="!importing && $refs.contractInput.click()"
       :class="{ dragging }"
       @dragover.prevent="dragging = true"
       @dragleave.prevent="dragging = false"
@@ -40,11 +45,11 @@ export default {
       </div>
       <div class="text-sm font-semibold">
         {{
-          importing ? "正在提取合同正文…" : "拖拽合同文件至此处，或点击浏览文件"
+          importing ? "正在提取合同正文…" : "选择合同文件"
         }}
       </div>
       <div class="text-xs text-slate-400 mt-2">
-        DOCX · 文字型 PDF · TXT，最大 10 MB
+        也可将文件拖拽至此 · DOCX / 文字型 PDF / TXT · 最大 10 MB
       </div>
     </div>
     <div v-else-if="inputMethod === 'file'" class="space-y-3">

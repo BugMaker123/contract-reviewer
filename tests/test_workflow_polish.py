@@ -121,16 +121,16 @@ def test_browser_upload_and_rich_paste(isolated_workspace, monkeypatch):
         expect(page.get_by_role('button',name='📑 示例合同',exact=True)).to_have_count(0)
         opened = []
         page.on('filechooser', lambda chooser: opened.append(chooser))
-        page.get_by_role('button',name='✍️ 粘贴正文',exact=True).click()
-        page.get_by_role('button',name='📤 上传合同',exact=True).click()
+        page.get_by_role('tab', name='粘贴正文',exact=True).click()
+        page.get_by_role('tab', name='文件上传',exact=True).click()
         expect(page.locator('.drop-area')).to_be_visible()
-        page.get_by_role('button',name='📤 上传合同',exact=True).click()
+        page.get_by_role('tab', name='文件上传',exact=True).click()
         assert not opened
         with page.expect_file_chooser() as chooser:
             page.locator('.drop-area').click()
         chooser.value.set_files({'name':'上传按钮.txt','mimeType':'text/plain','buffer':TEXT.encode()})
         expect(page.get_by_role('button',name='预览合同',exact=True)).to_be_visible()
-        page.get_by_role('button',name='✍️ 粘贴正文',exact=True).click()
+        page.get_by_role('tab', name='粘贴正文',exact=True).click()
         editor = page.get_by_role('textbox',name='合同正文',exact=True)
         editor.evaluate("(el,html)=>{el.focus();const data=new DataTransfer();data.setData('text/html',html);el.dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true,cancelable:true}));}",HTML)
         expect(editor.locator('strong')).to_contain_text('设备交付')
