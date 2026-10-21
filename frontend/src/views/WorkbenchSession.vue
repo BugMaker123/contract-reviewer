@@ -36,7 +36,7 @@ export default {
 };
 </script>
 <template>
-  <div class="workbench-view flex flex-col h-screen overflow-hidden">
+  <div class="workbench-view flex flex-col h-screen overflow-hidden" :class="{'navigation-collapsed': !summaryOpen}">
     <WorkbenchToast :context="context" />
     <ReviewProgress :context="context" />
     <header class="workbench-global-header">

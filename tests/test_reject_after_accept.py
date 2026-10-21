@@ -1,3 +1,4 @@
+import pytest
 from test_tracked_revisions import revision_client, seed_review
 from test_ui_composition import live_server
 from playwright.sync_api import sync_playwright, expect
@@ -70,7 +71,7 @@ def test_appended_paragraphs_belong_to_same_revision_selection(revision_client):
         page=browser.new_page(viewport={'width':1920,'height':1000})
         page.goto(base+'/workbench?task='+task['id'])
         preview=page.frame_locator('iframe[title="合同修订文档"]')
-        expect(preview.locator('[data-review-issue="payment"]')).to_have_count(3)
+        expect(preview.locator('[data-review-issue="payment"]')).to_have_count(1)
         expect(preview.locator('[data-review-issue="payment"] ins')).to_have_text(addition)
         page.locator('#card-payment .prototype-locate').click()
         expect(preview.locator('.review-active ins')).to_have_text(addition)
@@ -99,4 +100,54 @@ def test_missing_fields_are_risk_annotations_and_survive_acceptance(revision_cli
         expect(preview.locator('.review-applied')).not_to_have_count(0)
         expect(preview.locator('.review-missing-field')).to_have_count(2)
         assert '字段缺失' not in preview.locator('article').first.text_content()
+        browser.close()
+
+
+@pytest.mark.parametrize('soft_breaks', [False, True])
+def test_unchanged_context_is_outside_selection(revision_client, soft_breaks):
+    from io import BytesIO
+    from docx import Document
+    from backend import workspace_api
+    task, run = seed_review(revision_client)
+    original = '1.4 产品为甲方提供的设备。\n二、合作期限\n合同期限为一年。\n三、经营区域\n经营区域为山东省。'
+    suggested = original.replace('甲方提供的设备。', '甲方提供的设备，甲方保证不侵犯第三方知识产权。')
+    document=Document()
+    if soft_breaks: document.add_paragraph(original)
+    else:
+        for line in original.split('\n'): document.add_paragraph(line)
+    output=BytesIO();document.save(output)
+    imported=revision_client.post('/api/contracts/import',files={'file':('context.docx',output.getvalue())}).json()
+    changes={'text':imported['text'],'source_id':imported['source_id']}
+    issue=run['result']['issues'][0]
+    issue['redline'].update({'original_text':original,'suggested_text':suggested})
+    workspace_api.repo.update(task['id'],changes)
+    workspace_api.repo.update(run['id'],{'input':{**run['input'],**changes},'result':{**run['result'],'issues':[issue]}})
+    with live_server() as base, sync_playwright() as p:
+        browser=p.chromium.launch()
+        page=browser.new_page(viewport={'width':1920,'height':1000})
+        page.goto(base+'/workbench?task='+task['id'])
+        preview=page.frame_locator('iframe[title="合同修订文档"]')
+        expect(preview.locator('[data-review-issue="payment"]')).to_have_count(1)
+        page.locator('#card-payment .prototype-locate').click()
+        expect(preview.locator('#review-selection')).to_be_visible()
+        # Check actual DOM text coordinates, including multiple clauses in one Word paragraph.
+        def check():
+            return preview.locator('body').evaluate("""() => {
+              const walker=document.createTreeWalker(document.querySelector('#pages'),NodeFilter.SHOW_TEXT);
+              let node;while(node=walker.nextNode()) {const i=node.data.indexOf('二、合作期限');if(i<0)continue;
+                const range=document.createRange();range.setStart(node,i);range.setEnd(node,i+'二、合作期限'.length);
+                const boundary=range.getBoundingClientRect().top;
+                const bottoms=[...document.querySelectorAll('.review-selection-box')].filter(el=>!el.hidden).map(el=>el.getBoundingClientRect().bottom);
+                return bottoms.every(bottom=>bottom<=boundary+2);
+              } return false;
+            }""")
+        page.wait_for_function('document.querySelector("iframe") !== null')
+        assert check()
+        card=page.locator('#card-payment')
+        card.get_by_role('button',name='采纳',exact=True).click()
+        expect(preview.locator('.review-applied')).not_to_have_count(0)
+        assert check()
+        card.get_by_role('button',name='拒绝',exact=True).click()
+        expect(preview.locator('.review-rejected')).not_to_have_count(0)
+        assert check()
         browser.close()

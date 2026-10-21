@@ -41,6 +41,10 @@ export default {
 
       <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
       <section class="wb-opinion-toolbar" aria-label="审查建议筛选">
+        <div v-if="opinionsOpen && reviewReady && !resultStale && revisionMode !== 'compare'" class="wb-batch-actions" role="group" aria-label="批量处理本轮审查意见">
+          <button class="batch-accept" :disabled="revisionReadOnly || !pendingApplicableCount" @click="acceptAllRevisions" title="采纳本轮全部待处理修订建议"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 12 4 4 9-9M12 16l9-9"/></svg><span>一键全部采纳</span></button>
+          <button class="batch-cancel" :disabled="revisionReadOnly || !undoableRevisionCount" @click="undoAllReviewDecisions" title="撤销本轮全部采纳、拒绝及待复核决定，恢复待处理"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5 4 10l5 5M4 10h9a6 6 0 0 1 0 12" transform="translate(0 -2)"/></svg><span>一键撤销</span></button>
+        </div>
         <input v-model="issueSearch" placeholder="搜索条款或意见" aria-label="搜索审查意见" class="wb-opinion-search" />
         <div class="wb-opinion-filter-row">
           <select v-model="severityFilter" aria-label="筛选风险等级">
@@ -55,10 +59,7 @@ export default {
           <ManualIssue :context="context" />
           <span v-if="severityFilter !== 'all' || handlingFilter !== 'all' || issueSearch" class="wb-opinion-match-count" role="status">显示 {{ filteredIssues.length }} / {{ reviewIssues.length }} 项</span>
         </div>
-      <div v-if="opinionsOpen && reviewReady && !resultStale && revisionMode !== 'compare'" class="wb-batch-actions">
-        <button class="batch-accept" :disabled="revisionReadOnly || !pendingApplicableCount" @click="acceptAllRevisions">一键全部采纳</button>
-        <button class="batch-cancel" :disabled="revisionReadOnly || !appliedIssueIds.length" @click="cancelAllAcceptedRevisions">一键取消已采纳</button>
-      </div>
+
       </section>
         <h3 v-if="reviewResult && !isReviewing" class="wb-full-analysis-title">全文风险分析 <span>{{ filteredIssues.length }} 项意见</span></h3>
         <div

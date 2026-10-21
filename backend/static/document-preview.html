@@ -342,7 +342,8 @@
     body.review-document { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
     .review-document #viewport { flex: 1; min-height: 0; overflow: auto; }
     .review-document > header, .review-document #hint { display: none !important; }
-    .review-document .docx-wrapper { padding: 16px 16px 32px !important; }
+    .review-document .docx-wrapper { padding: 8px 8px 16px !important; }
+    .review-document #pages { min-width: 0; }
     .review-document section.docx { box-shadow: 0 2px 12px #33415514 !important; }
     .review-document #pages .review-active { background: #f0efff; }
     .review-document #pages ins { color: #245bdb !important; background: #f0f5ff; }
@@ -409,9 +410,10 @@
       const resize = () => {
         const sheets = [...pages.querySelectorAll('section.docx')]; if (!sheets.length) return;
         const width = Math.max(...sheets.map(page => Math.max(page.offsetWidth, page.scrollWidth)));
-        const available = document.documentElement.clientWidth;
-        const fit = Math.min(1, Math.max(.1, (available - 32) / (width + 32)));
+        const available = tracking ? document.querySelector('#viewport').clientWidth : document.documentElement.clientWidth;
+        const fit = tracking ? Math.max(.1, available / (width + 16)) : Math.min(1, Math.max(.1, (available - 32) / (width + 32)));
         const scale = zoom.value === 'fit' ? fit : Number(zoom.value);
+        if (tracking) pages.style.width = Math.max(width + 16, available / scale) + 'px';
         pages.style.zoom = scale;
         document.querySelector('#zoom-percent').textContent = zoom.value === 'fit' ? '适应宽度' : Math.round(scale * 100) + '%';
         document.querySelectorAll('[data-zoom]').forEach(button => button.setAttribute('aria-checked', String(button.dataset.zoom === zoom.value)));
@@ -425,7 +427,7 @@
       if (pane === 'revised') { badge.hidden = false; badge.textContent = params.get('edited') === '1' ? '编辑稿' : '全部建议'; badge.title = params.get('edited') === '1' ? '当前人工编辑稿' : '全部修改建议，未自动采纳'; }
       if (tracking) { label.textContent = '合同修订'; badge.hidden = false; badge.textContent = display === 'markup' ? '所有标记' : display === 'current' ? '仅已接受' : '原始稿'; }
       let info, editable = [], anchors = [], documentRendered = false, pendingMarks = null, followPausedUntil = 0;
-      const reviewElements = new Map();
+      const reviewElements = new Map(), reviewTextRanges = new Map();
       let selectedReviewId = null, selectionFrame = 0;
       const selectionBox = document.createElement('div'), selectionCallout = document.createElement('button');
       selectionBox.className = 'review-selection-box';
@@ -446,20 +448,28 @@
         selectionCallout.textContent = applied ? '✓ 已采纳' : rejected ? '已拒绝 · 保留原文' : '⚠ 建议修订';
         const viewport = document.querySelector('#viewport').getBoundingClientRect();
         const groups = new Map();
-        for (const el of reviewElements.get(selectedReviewId) || []) {
-          if (!normalize(el.textContent)) continue;
-          const rect = el.getBoundingClientRect();
-          if (rect.bottom <= viewport.top || rect.top >= viewport.bottom) continue;
-          const page = el.closest('section.docx') || el.closest('article');
+        const ranges = reviewTextRanges.get(selectedReviewId) || [];
+        const targets = ranges.length ? ranges : (reviewElements.get(selectedReviewId) || []).map(element => ({element}));
+        for (const {element, range} of targets) {
+          if (!normalize(element.textContent)) continue;
+          const page = element.closest('section.docx') || element.closest('article');
           if (!groups.has(page)) groups.set(page, []);
-          groups.get(page).push(rect);
+          const rects = range ? [...range.getClientRects()] : [element.getBoundingClientRect()];
+          groups.get(page).push(...rects.filter(r => r.width > 0 && r.height > 0 && r.bottom > viewport.top && r.top < viewport.bottom));
         }
-        const bounds = [...groups.values()].map(rects => ({
-          left: Math.min(...rects.map(r => r.left)) - 6,
-          right: Math.max(...rects.map(r => r.right)) + 6,
-          top: Math.max(viewport.top, Math.min(...rects.map(r => r.top)) - 4),
-          bottom: Math.min(viewport.bottom, Math.max(...rects.map(r => r.bottom)) + 4),
-        }));
+        const bounds = [];
+        for (const rects of groups.values()) {
+          // Merge neighboring text lines only; unrelated paragraphs and blank
+          // gaps do not become part of a single large bounding rectangle.
+          const fragments = [];
+          for (const r of rects.sort((a,b) => a.top - b.top || a.left - b.left)) {
+            const previous = fragments.at(-1);
+            if (previous && r.top <= previous.bottom + r.height * .85) {
+              previous.left = Math.min(previous.left,r.left); previous.right = Math.max(previous.right,r.right); previous.bottom = Math.max(previous.bottom,r.bottom);
+            } else fragments.push({left:r.left,right:r.right,top:r.top,bottom:r.bottom});
+          }
+          bounds.push(...fragments.map(r=>({left:r.left-5,right:r.right+5,top:Math.max(viewport.top,r.top-1),bottom:Math.min(viewport.bottom,r.bottom+1)})));
+        }
         selectionBox.hidden = selectionCallout.hidden = !bounds.length;
         if (!bounds.length) return;
         // Separate page fragments: never draw through page margins or page gaps.
@@ -496,6 +506,7 @@
       }).map(([id]) => id);
       const annotateReview = () => {
         reviewElements.clear();
+        reviewTextRanges.clear();
         pages.querySelectorAll('.review-clause').forEach(el => {
           el.classList.remove('review-clause', 'review-active', 'review-pending', 'review-applied', 'review-rejected');
           delete el.dataset.reviewIssue;
@@ -510,11 +521,20 @@
           return {element, before: normalize(old.textContent), after: normalize(current.textContent)};
         }).filter(item => item.before || item.after);
         for (const issue of info.review_items || []) {
-          const old = normalize(issue.redline?.original_text || issue.evidence || '');
-          const after = normalize(issue.redline?.suggested_text || '');
+          let original = issue.redline?.original_text || issue.evidence || '';
+          let suggested = issue.redline?.suggested_text || '';
+          if (issue.redline && original && suggested) {
+            const beforeLines = original.split('\n'), afterLines = suggested.split('\n');
+            while (beforeLines.length && afterLines.length && normalize(beforeLines[0]) === normalize(afterLines[0])) { beforeLines.shift(); afterLines.shift(); }
+            while (beforeLines.length && afterLines.length && normalize(beforeLines.at(-1)) === normalize(afterLines.at(-1))) { beforeLines.pop(); afterLines.pop(); }
+            // Identical suggestions still need an anchor, but unchanged context
+            // around an actual change must never extend the selection.
+            if (beforeLines.length || afterLines.length) { original = beforeLines.join('\n'); suggested = afterLines.join('\n'); }
+          }
+          const old = normalize(original), after = normalize(suggested);
           // Locate both sides independently: a replacement may retain the full
           // original and append paragraphs, which still belong to this issue.
-          const matched = new Set();
+          const matched = new Set(), textRanges = [];
           for (const [field, target] of [['before', old], ['after', after]]) {
             if (!target) continue;
             const candidates = snapshots.filter(item => item[field]);
@@ -529,7 +549,26 @@
                 }
               }
             }
-            sideHits.forEach(item => matched.add(item));
+            if (!sideHits.length) {
+              const containing = candidates.filter(item => item[field].includes(target));
+              if (containing.length === 1) sideHits = containing;
+            }
+            for (const item of sideHits) {
+              matched.add(item);
+              const chars = [], walker = document.createTreeWalker(item.element, NodeFilter.SHOW_TEXT);
+              while (walker.nextNode()) {
+                const node = walker.currentNode;
+                if (node.parentElement.closest(field === 'before' ? 'ins' : 'del')) continue;
+                for (let offset = 0; offset < node.data.length; offset++) if (!/\s/.test(node.data[offset])) chars.push({node, offset});
+              }
+              const start = sideHits.length === 1 ? item[field].indexOf(target) : 0;
+              const length = sideHits.length === 1 && start >= 0 ? target.length : chars.length;
+              const first = chars[Math.max(0, start)], last = chars[Math.max(0, start) + length - 1];
+              if (first && last) {
+                const range = document.createRange(); range.setStart(first.node, first.offset); range.setEnd(last.node, last.offset + 1);
+                textRanges.push({element:item.element, range});
+              }
+            }
           }
           let hits = snapshots.filter(item => matched.has(item));
           if (!hits.length) {
@@ -538,6 +577,7 @@
             if (containing.length === 1) hits = containing;
           }
           reviewElements.set(issue.id, hits.map(item => item.element));
+          reviewTextRanges.set(issue.id, textRanges);
           for (const {element} of hits) {
             element.classList.add('review-clause');
             if (issue.state === 'applied') element.classList.add('review-applied');

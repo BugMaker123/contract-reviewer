@@ -271,24 +271,29 @@ export function useTrackedReview(context) {
     }
     if (issues.length) message("已采纳 " + issues.length + " 项修订");
   };
-  const cancelAllAcceptedRevisions = async () => {
-    if (!writable() || !appliedIssueIds.value.length) return false;
+  const undoableRevisionIds = computed(() => reviewIssues.value.filter(issue =>
+    appliedIssueIds.value.includes(issue.id) || ['applied', 'rejected', 'needs_review'].includes(workspace.decisions[issue.id])
+  ).map(issue => issue.id));
+  const undoableRevisionCount = computed(() => undoableRevisionIds.value.length);
+  const undoAllReviewDecisions = async () => {
+    if (!writable() || !undoableRevisionCount.value) return false;
+    const identifiers = [...undoableRevisionIds.value];
     revisionBusy.value = true;
     const previousApplied = [...appliedIssueIds.value];
     const previousDecisions = { ...workspace.decisions };
     try {
       const decisions = { ...previousDecisions };
-      for (const id of previousApplied) decisions[id] = "pending";
+      for (const id of identifiers) decisions[id] = "pending";
       appliedIssueIds.value = [];
       workspace.decisions = decisions;
       // Persist the whole batch once, with the run revision checked by the server.
       await workspace.flush();
-      message(`已取消 ${previousApplied.length} 项采纳，恢复为待处理`);
+      message(`已撤销 ${identifiers.length} 项处理决定，恢复为待处理`);
       return true;
     } catch (error) {
       appliedIssueIds.value = previousApplied;
       workspace.decisions = previousDecisions;
-      message("取消采纳失败：" + error.message);
+      message("一键撤销失败：" + error.message);
       return false;
     } finally {
       revisionBusy.value = false;
@@ -485,7 +490,8 @@ export function useTrackedReview(context) {
     setReviewDecision,
     pendingApplicableCount,
     acceptAllRevisions,
-    cancelAllAcceptedRevisions,
+    undoAllReviewDecisions,
+    undoableRevisionCount,
     generateRevision,
     beginRevisionEdit,
     saveRevisionEdit,

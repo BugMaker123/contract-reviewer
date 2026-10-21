@@ -22,7 +22,11 @@ export default {
   <aside id="review-summary-panel" data-testid="review-summary" class="wb-sidebar wb-summary-panel" :class="{ 'is-collapsed': !summaryOpen }">
     <div class="wb-sidebar-heading">
       <strong v-show="summaryOpen">审查导航</strong>
+      <button class="wb-navigation-collapse" @click="toggleSummary" :aria-expanded="summaryOpen" aria-controls="review-summary-content" :aria-label="summaryOpen ? '收起审查导航' : '展开审查导航'" :title="summaryOpen ? '收起导航，扩大文档对照区' : '展开审查导航'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" :class="{'is-collapsed':!summaryOpen}" aria-hidden="true"><path d="m14 6-6 6 6 6M20 4v16"/></svg><span v-if="summaryOpen">收起</span>
+      </button>
     </div>
+    <span v-if="!summaryOpen" class="wb-navigation-rail" aria-hidden="true">审查导航</span>
     <div v-show="summaryOpen" id="review-summary-content" class="wb-summary-content wb-review-navigation">
       <StaleReviewNotice v-if="resultStale" :context="context" />
       <template v-else>

@@ -58,7 +58,7 @@ export default {
           appliedIssueIds.includes(issue.id)
         "
       >
-        采纳
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg><span>采纳</span>
       </button>
       <button class="revision-reject-button"
         @click="setReviewDecision(issue, 'rejected')"
@@ -66,12 +66,12 @@ export default {
           revisionReadOnly || workspace.decisions[issue.id] === 'rejected'
         "
       >
-        拒绝
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg><span>拒绝</span>
       </button>
       <button class="revision-undo-button" @click="setReviewDecision(issue, 'pending')"
         :disabled="revisionReadOnly || (!appliedIssueIds.includes(issue.id) && (!workspace.decisions[issue.id] || workspace.decisions[issue.id] === 'pending'))"
         :title="appliedIssueIds.includes(issue.id) ? '撤销采纳，恢复待处理' : workspace.decisions[issue.id] === 'rejected' ? '撤销拒绝，恢复待处理' : '恢复为待处理状态'">
-        撤销操作
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5 4 10l5 5M4 10h9a6 6 0 0 1 0 12" transform="translate(0 -2)"/></svg><span>撤销操作</span>
       </button>
     </div>
     <p

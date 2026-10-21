@@ -2258,14 +2258,69 @@
 .workbench-view .is-compact-review .revision-primary-actions > .revision-undo-button {order:0;margin-right:0;margin-left:auto;padding:5px 12px;border:1px solid #dce3ed;background:#fff;color:#64748b;border-radius:5px;}
 .workbench-view .revision-undo-button:disabled {opacity:.4;cursor:not-allowed;}
 
-/* Equal-weight decision buttons with readable action and disabled colors. */
-.workbench-view .is-compact-review .revision-primary-actions {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
-.workbench-view .is-compact-review .revision-primary-actions > button:nth-child(n) {order:0;margin:0;width:100%;min-width:0;min-height:34px;padding:7px 10px;border:1px solid transparent;border-radius:6px;font-size:12px;font-weight:600;line-height:18px;color:#fff;opacity:1;transition:background-color .15s,border-color .15s;}
-.workbench-view .is-compact-review .revision-primary-actions > button.revision-ai-button {background:#16a34a;border-color:#16a34a;}
-.workbench-view .is-compact-review .revision-primary-actions > button.revision-reject-button {background:#dc2626;border-color:#dc2626;}
-.workbench-view .is-compact-review .revision-primary-actions > button.revision-undo-button {background:#475569;border-color:#475569;}
-.workbench-view .is-compact-review .revision-primary-actions > button.revision-ai-button:hover:not(:disabled) {background:#15803d;border-color:#15803d;}
-.workbench-view .is-compact-review .revision-primary-actions > button.revision-reject-button:hover:not(:disabled) {background:#b91c1c;border-color:#b91c1c;}
-.workbench-view .is-compact-review .revision-primary-actions > button.revision-undo-button:hover:not(:disabled) {background:#334155;border-color:#334155;}
-.workbench-view .is-compact-review .revision-primary-actions > button:disabled {background:#e2e8f0;border-color:#cbd5e1;color:#64748b;opacity:1;cursor:not-allowed;}
-.workbench-view .is-compact-review .revision-primary-actions > button:focus-visible {outline:2px solid #2563eb;outline-offset:2px;}
+/* Review workspace proportions: navigation / document / suggestions = 2 / 5 / 3. */
+.workbench-view main > aside.wb-summary-panel:not(.is-collapsed) {flex:0 0 20%;width:20% !important;min-width:0;max-width:none;}
+.workbench-view main > section {flex:1 1 50%;width:50%;min-width:0;}
+.workbench-view main > aside.wb-opinion-drawer:not(.is-collapsed) {flex:0 0 30%;width:30% !important;min-width:0;max-width:none;}
+
+.workbench-view .wb-summary-panel .wb-sidebar-heading {justify-content:space-between;}
+.workbench-view .wb-navigation-collapse {display:flex;align-items:center;justify-content:center;gap:5px;padding:6px 8px;border:1px solid #dce3ed;border-radius:6px;background:#fff;color:#475569;font-size:12px;cursor:pointer;}
+.workbench-view .wb-navigation-collapse:hover {background:#eff6ff;border-color:#bfdbfe;color:#2563eb;}
+.workbench-view .wb-navigation-collapse:focus-visible {outline:2px solid #2563eb;outline-offset:2px;}
+.workbench-view .wb-navigation-collapse svg.is-collapsed {transform:rotate(180deg);}
+.workbench-view .wb-summary-panel.is-collapsed {flex:0 0 36px;}
+.workbench-view .wb-summary-panel.is-collapsed .wb-navigation-collapse {padding:5px;border:0;}
+.workbench-view .wb-navigation-rail {align-self:center;margin-top:8px;writing-mode:vertical-rl;letter-spacing:3px;color:#64748b;font-size:12px;}
+
+/* Collapsing navigation expands both comparison panes, in their existing 5:3 ratio. */
+.workbench-view.navigation-collapsed main > aside.wb-opinion-drawer:not(.is-collapsed) {flex:0 0 calc(37.5% - 13.5px);width:calc(37.5% - 13.5px) !important;}
+.workbench-view #opinion-drawer .wb-risk-description,
+.workbench-view #opinion-drawer .prototype-card-analysis {font-size:14px;line-height:1.85;}
+.workbench-view #opinion-drawer .wb-risk-area h4 {font-size:15px;line-height:1.65;}
+.workbench-view #opinion-drawer .revision-clause-preview ins,
+.workbench-view #opinion-drawer .revision-clause-preview del {font-size:14px;line-height:1.85;}
+.workbench-view #opinion-drawer .revision-clause-preview {max-height:240px;}
+.workbench-view #opinion-drawer .revision-explanation,
+.workbench-view #opinion-drawer .compact-decision,
+.workbench-view #opinion-drawer .prototype-clause-label {font-size:12px;line-height:1.75;}
+.workbench-view.navigation-collapsed #opinion-drawer .wb-risk-description,
+.workbench-view.navigation-collapsed #opinion-drawer .prototype-card-analysis,
+.workbench-view.navigation-collapsed #opinion-drawer .revision-clause-preview ins,
+.workbench-view.navigation-collapsed #opinion-drawer .revision-clause-preview del {font-size:15px;line-height:1.9;}
+.workbench-view.navigation-collapsed #opinion-drawer .wb-risk-area h4 {font-size:16px;line-height:1.65;}
+.workbench-view.navigation-collapsed #opinion-drawer .revision-primary-actions > button:nth-child(n) {font-size:14px;min-height:38px;}
+.workbench-view.navigation-collapsed #opinion-drawer .wb-sidebar-heading,
+.workbench-view.navigation-collapsed #opinion-drawer .wb-sidebar-heading strong {font-size:15px;}
+.workbench-view.navigation-collapsed #opinion-drawer .wb-full-analysis-title {font-size:15px;}
+.workbench-view.navigation-collapsed #opinion-drawer .revision-clause-preview {max-height:300px;}
+
+.workbench-view #opinion-drawer .prototype-card-title {font-size:15px;line-height:1.65;}
+.workbench-view.navigation-collapsed #opinion-drawer .prototype-card-title {font-size:16px;line-height:1.7;}
+.workbench-view.navigation-collapsed #opinion-drawer .compact-suggestion-label,
+.workbench-view.navigation-collapsed #opinion-drawer .prototype-card-meta,
+.workbench-view.navigation-collapsed #opinion-drawer .revision-support-tools > summary,
+.workbench-view.navigation-collapsed #opinion-drawer .compact-extra-tools > summary {font-size:13px;}
+
+/* Decision controls: consistent geometry, differentiated visual priority. */
+.workbench-view #opinion-drawer .revision-primary-actions {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;padding-top:12px;margin-top:12px;border-top:1px solid #e6ebf2;}
+.workbench-view #opinion-drawer .revision-primary-actions > button:nth-child(n),
+.workbench-view #opinion-drawer .wb-batch-actions > button {display:inline-flex;align-items:center;justify-content:center;gap:7px;order:0;margin:0;min-width:0;min-height:40px;padding:9px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;font-size:13px;font-weight:600;line-height:20px;white-space:nowrap;opacity:1;box-shadow:0 1px 2px #0f172a05;cursor:pointer;transition:background .15s,border-color .15s,box-shadow .15s;}
+.workbench-view #opinion-drawer .revision-primary-actions > button.revision-ai-button,
+.workbench-view #opinion-drawer .wb-batch-actions > .batch-accept {background:#0d8a60;border-color:#0d8a60;color:#fff;box-shadow:0 2px 4px #04785718;}
+.workbench-view #opinion-drawer .revision-primary-actions > button.revision-reject-button {background:#fff8f8;border-color:#e5b7bc;color:#ac3342;}
+.workbench-view #opinion-drawer .revision-primary-actions > button.revision-undo-button,
+.workbench-view #opinion-drawer .wb-batch-actions > .batch-cancel {background:#fff;border-color:#ccd5e1;color:#475569;}
+.workbench-view #opinion-drawer .revision-primary-actions > button.revision-ai-button:hover:not(:disabled),
+.workbench-view #opinion-drawer .wb-batch-actions > .batch-accept:hover:not(:disabled) {background:#08734f;border-color:#08734f;box-shadow:0 2px 5px #04785728;}
+.workbench-view #opinion-drawer .revision-primary-actions > button.revision-reject-button:hover:not(:disabled) {background:#fff0f1;border-color:#cd7b87;color:#942c3b;}
+.workbench-view #opinion-drawer .revision-primary-actions > button.revision-undo-button:hover:not(:disabled),
+.workbench-view #opinion-drawer .wb-batch-actions > .batch-cancel:hover:not(:disabled) {background:#f1f5f9;border-color:#9eacbf;color:#1e293b;}
+.workbench-view #opinion-drawer .wb-opinion-toolbar .wb-batch-actions {display:flex;justify-content:flex-start;align-items:center;flex-wrap:wrap;gap:10px;margin:0 0 16px;padding:10px;border:1px solid #e4eaf2;border-radius:10px;background:#f8fafc;}
+.workbench-view #opinion-drawer .wb-batch-actions > button {min-height:42px;padding:10px 17px;flex:0 1 auto;width:auto;}
+.workbench-view #opinion-drawer .revision-primary-actions > button:disabled,
+.workbench-view #opinion-drawer .wb-batch-actions > button:disabled {background:#f6f8fb;border-color:#e0e6ee;color:#8b99ad;opacity:1;box-shadow:none;cursor:not-allowed;}
+.workbench-view #opinion-drawer .revision-primary-actions > button:focus-visible,
+.workbench-view #opinion-drawer .wb-batch-actions > button:focus-visible {outline:2px solid #2563eb;outline-offset:3px;}
+.workbench-view #opinion-drawer .revision-primary-actions svg,
+.workbench-view #opinion-drawer .wb-batch-actions svg {flex:none;}
+.workbench-view.navigation-collapsed #opinion-drawer .revision-primary-actions > button:nth-child(n) {font-size:14px;min-height:42px;}
