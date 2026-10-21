@@ -1,11 +1,9 @@
 <script>
-import PriorityReview from "./PriorityReview.vue";
-import RequirementChecks from "./RequirementChecks.vue";
 import ManualIssue from "./ManualIssue.vue";
 import RevisionActions from "./RevisionActions.vue";
 import StaleReviewNotice from "./StaleReviewNotice.vue";
 export default {
-  components: { RevisionActions, ManualIssue, PriorityReview, RequirementChecks, StaleReviewNotice },
+  components: { RevisionActions, ManualIssue, StaleReviewNotice },
   props: { context: { type: Object, required: true } },
   setup: (props) => props.context,
 };
@@ -42,8 +40,6 @@ export default {
       <template v-if="!resultStale || revisionMode === 'compare'">
 
       <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
-        <PriorityReview v-if="reviewResult && !isReviewing" :context="context" :result="reviewResult" />
-        <RequirementChecks v-if="workspace.showCompletionChecks && reviewResult && !isReviewing" :context="context" />
       <section class="wb-opinion-toolbar" aria-label="审查建议筛选">
         <input v-model="issueSearch" placeholder="搜索条款或意见" aria-label="搜索审查意见" class="wb-opinion-search" />
         <div class="wb-opinion-filter-row">

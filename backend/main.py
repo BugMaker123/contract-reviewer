@@ -45,6 +45,8 @@ from .template_api import router as template_router
 app.include_router(template_router)
 from .template_review import router as template_review_router
 app.include_router(template_review_router)
+from .template_validation_api import router as template_validation_router
+app.include_router(template_validation_router)
 from .document_import import ImportBodyLimit
 app.add_middleware(ImportBodyLimit)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost', '[::1]', 'testserver'])

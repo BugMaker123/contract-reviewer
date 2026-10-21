@@ -560,7 +560,7 @@ def test_published_validation_uses_frozen_rules():
         assert response.status_code == 200
         assert response.json()['report']['status'] == 'pass'
         assert response.json()['version'] == 1
-        assert response.json()['eligible_for_skip'] is False
+        assert response.json()['passed'] is True
         # Draft edits make the template unavailable until it is published again.
         client.put(base+'/review', json={'revision': 3, 'source_id': record['source_id'], 'fields': [region(max_length=1)]})
         response = client.post(base+'/validate', json=payload)
@@ -606,28 +606,10 @@ def test_browser_review_entry_published_validation(tmp_path):
         page.locator('#validation-file').set_input_files(str(path))
         expect(page.get_by_role('button', name='开始模板合规核验')).to_be_enabled()
         page.get_by_role('button', name='开始模板合规核验').click()
-        expect(page.get_by_role('heading', name='已检查内容符合模板规则')).to_be_visible()
-        expect(page.get_by_text('某某公司', exact=True)).to_be_visible()
+        expect(page.get_by_role('heading', name='TRUE · 校验通过')).to_be_visible()
+        expect(page.locator('.report-table-wrap tbody tr')).to_have_count(0)
+        expect(page.get_by_text('没有字段未通过项', exact=True)).to_be_visible()
         page.screenshot(path='artifacts/prototypes/review-result-implemented.png', full_page=True)
-        page.get_by_role('button', name='继续 AI 审查').click()
-        expect(page.get_by_role('heading', name='新建合同审查')).to_be_visible()
-        expect(page.locator('input[placeholder^="填写便于识别"]')).to_have_value('entry-contract')
-        expect(page.get_by_role('button', name='进入工作台核对合同')).to_be_enabled()
-        page.get_by_role('button', name='重新选择审查方式').click()
-        page.get_by_role('button', name='AI 智能全面审查').click()
-        expect(page.locator('input[placeholder^="填写便于识别"]')).to_have_value('entry-contract')
-        page.set_viewport_size({'width':390,'height':844})
-        page.get_by_role('button', name='重新选择审查方式').click()
-        expect(page.get_by_role('heading', name='选择本次审查方式')).to_be_visible()
-        assert page.locator('.review-entry').evaluate('(el)=>el.scrollWidth <= el.clientWidth')
-        page.get_by_role('button', name='AI 智能全面审查').click()
-        page.set_viewport_size({'width':1440,'height':1000})
-        page.screenshot(path='artifacts/prototypes/review-ai-implemented.png', full_page=True)
-        page.get_by_role('button', name='进入工作台核对合同').click()
-        page.wait_for_url('**/workbench?task=*')
-        task = template_review.repo().get(page.url.split('task=')[1], 'task')
-        assert task['text'] == '甲方：某某公司；期限：30日。'
-        assert task['source_id'] and task['source_id'] != record['source_id']
         assert len(imports) == 1
         assert not errors
         browser.close()

@@ -648,3 +648,8 @@ select:not([multiple]) { appearance:none; background-image:url("data:image/svg+x
 .portal-review-shell .portal-main{min-width:0;padding:0;overflow:hidden;background:#eef1f5}
 @media(max-width:900px){.portal-review-shell .portal-main{overflow-y:auto}}
 @media(max-width:650px){.portal-review-shell .portal-header{padding:0 12px}.portal-review-shell .portal-help-button{display:none}.portal-review-shell .portal-header>.flex{gap:8px}.portal-review-shell .template-workbench-home{font-size:11px;margin-left:0}}
+
+.portal-navigation{display:flex;flex-direction:column;gap:16px}
+.portal-nav-group{display:flex;flex-direction:column;gap:4px;min-width:0}
+.portal-nav-group+.portal-nav-group{padding-top:14px;border-top:1px solid #edf1f6}
+.portal-nav-label{padding:0 16px 8px;margin:0;font-size:14px;line-height:22px;font-weight:650;color:#475569;letter-spacing:0}

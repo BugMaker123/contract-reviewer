@@ -10,11 +10,19 @@ export default {
   setup() {
     const shell = usePortalShell();
     const route = useRoute();
+    const navigationGroups = computed(() => [
+      {name:'', keys:['start']},
+      {name:'审查管理', keys:['categories','checklists','records']},
+      {name:'模板管理', keys:['templates','validations']},
+    ].map(group => ({...group, items:group.keys.map(key => {
+      const item = shell.navigation.find(item => item.key === key);
+      return {...item, name:({checklists:'审查清单维护',validations:'合同模板核验记录'})[key] || item.name};
+    })})));
     const recentError = ref('');
     const refreshRecent = async () => { try { await shell.loadRecords(); recentError.value = ''; } catch { recentError.value = '最近工作读取失败'; } };
     watch(() => route.path, refreshRecent, {immediate:true});
     const recentAction = status => ({completed:'查看审核结果',pending_review:'继续复核',running:'查看审查进度',draft:'继续审查',failed:'重新处理',interrupted:'恢复处理'})[status] || '打开任务';
-    return { ...shell, shell, recentAction, recentError, refreshRecent, page: computed(() => route.meta.page) };
+    return { ...shell, shell, navigationGroups, recentAction, recentError, refreshRecent, page: computed(() => route.meta.page) };
   },
 };
 </script>
@@ -45,17 +53,13 @@ export default {
       <aside v-if="$route.name!=='template-review'"
         class="portal-sidebar bg-white border-r border-slate-200 p-4 flex flex-col shrink-0"
       >
-        <nav class="space-y-1">
-          <RouterLink
-            v-for="item in navigation"
-            :to="item.href"
-            class="nav-link"
-            :class="{ active: page === item.key }"
-            ><span aria-hidden="true" class="w-5 text-center">{{
-              item.icon
-            }}</span
-            >{{ item.name }}</RouterLink
-          >
+        <nav class="portal-navigation" aria-label="功能导航">
+          <section v-for="group in navigationGroups" :key="group.name" class="portal-nav-group" :aria-label="group.name || '主入口'">
+            <h2 v-if="group.name" class="portal-nav-label">{{group.name}}</h2>
+            <RouterLink v-for="item in group.items" :key="item.key" :to="item.href" class="nav-link" :class="{active:page===item.key}">
+              <span aria-hidden="true" class="w-5 text-center">{{item.icon}}</span>{{item.name}}
+            </RouterLink>
+          </section>
         </nav>
         <section v-if="false" class="recent-work" aria-labelledby="recent-work-title">
           <div class="recent-work-heading"><h2 id="recent-work-title">最近工作</h2><RouterLink to="/records">全部记录</RouterLink></div>

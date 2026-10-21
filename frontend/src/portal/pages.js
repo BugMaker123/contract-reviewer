@@ -15,6 +15,10 @@ export const pages = {
     states: ["records"],
     features: ["records"],
   },
+  "/validation-records": {
+    key: "validations", name: "核验记录", icon: "☑",
+    data: [], states: [], features: [],
+  },
   "/categories": {
     key: "categories",
     name: "业务分类维护",

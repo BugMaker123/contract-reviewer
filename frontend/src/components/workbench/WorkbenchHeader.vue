@@ -207,7 +207,7 @@ export default {
         {{ workspace.saving ? "保存中…" : "保存" }}
       </button>
 
-      <button @click="workspace.finish" :disabled="workspace.historical || resultStale || workspace.saving || workspace.verifying || workspace.finishing || workspace.task?.status !== 'pending_review'" :title="resultStale ? '请先重新审查当前正文' : ''" class="wb-finish-action">{{ workspace.task?.status === 'completed' ? '已完成审核' : workspace.finishing || workspace.verifying ? '正在核验…' : '完成审核' }}</button>
+      <button @click="workspace.finish" :disabled="workspace.historical || resultStale || workspace.saving || workspace.verifying || workspace.finishing || workspace.task?.status !== 'pending_review'" :title="resultStale ? '请先重新审查当前正文' : ''" class="wb-finish-action">{{ workspace.task?.status === 'completed' ? '已完成审核' : workspace.finishing || workspace.verifying ? '正在保存…' : '完成审核' }}</button>
       <div class="wb-export-menu wb-menu">
         <button class="wb-delivery-button"
           :title="workspace.canExport ? '导出修订稿' : '请先完成审核'" :aria-expanded="exportOpen"

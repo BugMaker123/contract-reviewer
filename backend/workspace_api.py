@@ -476,19 +476,6 @@ def complete_task(task_id: str, request: CompleteInput):
     editable_run(repo, run['id'], run['revision'])
     if any(run['decisions'].get(issue['id'], 'pending') in ('pending', 'needs_review') for issue in run['result']['issues'] if not is_prompt_requirement_issue(issue, run['input'])):
         raise HTTPException(409, '还有待处理或待复核条目')
-    requirements = requirements_for(run['input'])
-    verification = run.get('current_verification') or {}
-    if requirements:
-        if verification.get('digest') != current_digest(run):
-            raise HTTPException(409, '请先核验当前采纳稿；原文及全部建议稿核验不能替代当前稿核验')
-        findings = verification.get('findings', [])
-        if len(findings) != len(requirements) or {f['id'] for f in findings} != {r['id'] for r in requirements}:
-            raise HTTPException(409, '当前稿要求核验不完整，请重新核验')
-        if any(f.get('conflict_with') for f in findings):
-            raise HTTPException(409, '要求存在冲突，请修改审查条件并重新审查')
-        pending = [f for f in findings if f['status'] not in ('pass', 'not_applicable')]
-        if any(not 5 <= len(request.confirmations.get(f['id'], '').strip()) <= 3000 for f in pending):
-            raise HTTPException(409, '未满足或待确认的要求必须逐项填写人工确认理由（5至3000字）')
     if task['revision'] != request.revision:
         raise HTTPException(409, '记录已被修改，请刷新后重试')
     return repo.complete_review(task_id, request.revision, run['id'], run['revision'], request.confirmations)

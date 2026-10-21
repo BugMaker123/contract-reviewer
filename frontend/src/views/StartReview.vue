@@ -2,6 +2,7 @@
 import {ref, computed, watch} from 'vue';
 import {useRoute, onBeforeRouteLeave} from 'vue-router';
 import AiReview from './AiReview.vue';
+import TemplateCheckReport from '../components/portal/TemplateCheckReport.vue';
 import {usePortalShell} from '../stores/portal.js';
 import {readDocument} from '../portal/services/documents.js';
 const route = useRoute();
@@ -11,14 +12,6 @@ const aiBusy = ref(false), templates = ref([]), selected = ref('');
 const loading = ref(false), busy = ref(false), error = ref('');
 const contract = ref(null), result = ref(null), importedContract = ref(null);
 const template = computed(() => templates.value.find(t => t.id === selected.value));
-const report = computed(() => result.value?.report);
-const titles = {
-  pass: '已检查内容符合模板规则',
-  needs_changes: '发现差异，需要人工确认',
-  needs_review: '填写内容需要人工审核',
-  incomplete: '检查未完成，部分内容需人工核对',
-};
-const labels = {pass: '符合规则', manual: '转人工', issue: '需修改', not_checked: '未能检查'};
 watch(() => route.query.checklist, value => { if (value) stage.value = 'ai'; });
 onBeforeRouteLeave(() => {
   if (busy.value) {
@@ -85,10 +78,6 @@ async function verify() {
   }
 }
 
-function continueAi() {
-  importedContract.value = contract.value;
-  stage.value = 'ai';
-}
 </script>
 <template><div class="review-entry"><div v-if="stage==='ai'||stage==='template'" class="review-page-heading">
   <div><h1>{{stage==='ai'?'新建合同审查':'已有标准模板核验'}}</h1>
@@ -97,6 +86,7 @@ function continueAi() {
     <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg>
     重新选择审查方式
   </button>
+  <RouterLink v-if="stage==='template'" to="/validation-records" class="review-mode-switch">核验记录</RouterLink>
 </div><KeepAlive><AiReview v-if="stage==='ai'" :imported-contract="importedContract" @processing="aiBusy=$event"/></KeepAlive><template v-if="stage!=='ai'"><div v-if="error" role="alert" class="entry-error">{{error}} <button v-if="stage==='template'" class="btn btn-secondary" :disabled="loading||busy" @click="openTemplate">刷新模板列表</button></div><section v-if="stage==='choose'">
 
 
@@ -171,7 +161,7 @@ function continueAi() {
 
         <div class="notice-bar">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--slate-400); flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
-          <span>提示：标准模板审核依据发布模板的既定风控规则；若核验完成后需进一步推敲非标争议，可在报告中一键无缝发起 AI 深度审查。</span>
+          <span>模板校验依据已发布版本的字段规则和固定内容计算结果，并自动保存统计与差异报告。</span>
         </div>
       </section>
 <section v-if="stage==='template'">
@@ -179,7 +169,7 @@ function continueAi() {
 <div class="panel"><p v-if="loading" role="status">正在读取已发布模板…</p><div v-else-if="!templates.length" class="notice-bar">暂无已发布模板。请先在 <RouterLink to="/templates">合同模板</RouterLink> 中配置字段规则并发布。<button class="btn btn-secondary" @click="openTemplate">重新加载</button></div>
 <template v-else><div class="form-group"><label class="form-label" for="baseline">选择基准合同模板 <span class="sub">仅展示已发布模板</span></label><select id="baseline" v-model="selected" :disabled="busy" class="form-control" @change="result=null"><option v-for="t in templates" :key="t.id" :value="t.id">{{t.name}}</option></select><div v-if="template" class="template-detail-box"><div class="template-detail-header"><span class="status-tag">正式发布</span>{{template.name}}</div><p class="template-detail-desc">{{template.description||'核验固定文字，以及已配置字段的必填、长度、类型和取值规则。'}}</p></div></div>
 <div class="form-group"><label class="form-label" for="validation-file">上传待核验合同文件</label><div class="dropzone" @dragover.prevent @drop.prevent="upload($event.dataTransfer.files[0])"><input id="validation-file" type="file" accept=".docx" :disabled="busy" @change="upload($event.target.files[0]); $event.target.value=''"/><div class="dropzone-icon">↥</div><strong>{{contract?.filename||'拖拽合同文件至此处，或点击浏览上传'}}</strong><p>{{busy?'正在处理，请稍候…':'支持 Microsoft Word (.docx) 格式，文件不超过 10 MB'}}</p></div></div><div class="notice-bar">固定文字发生变更、字段不符合规则或无法完整核验的内容，将提示人工处理。验证结果不作为自动免审依据。</div><div class="panel-footer"><RouterLink to="/templates" class="btn btn-secondary">管理合同模板</RouterLink><button class="btn btn-primary" :disabled="busy||!contract||!template" @click="verify">{{busy?'正在处理…':'开始模板合规核验'}} →</button></div></template></div></section>
-<section v-if="stage==='result' && report"><button class="back-btn" @click="stage='template'"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m14 7-5 5 5 5"/></svg><span>返回修改核验信息</span></button><div class="page-header"><div class="page-title"><h1>模板核验报告</h1><p>{{contract.filename}} · {{result.template_name}} V{{result.version}}</p></div></div><div class="panel"><div class="result-banner" :class="{'result-pass':report.status==='pass'}"><div class="result-banner-icon">{{report.status==='pass'?'✓':'!'}}</div><div class="result-banner-text"><h2>{{titles[report.status]}}</h2><p>{{report.status==='pass'?'已检查的文字和填写规则符合所选模板发布版本。':'核实填写问题、固定条款变化和未能完整检查的内容。'}}</p></div></div><div class="stats-row"><div class="stat-card"><div class="stat-icon green">✓</div><div class="stat-data"><h3>{{report.counts.pass}}</h3><p>字段符合规则</p></div></div><div class="stat-card"><div class="stat-icon orange">!</div><div class="stat-data"><h3>{{report.counts.issue+report.counts.manual+report.counts.not_checked}}</h3><p>字段需处理</p></div></div><div class="stat-card"><div class="stat-icon purple">≠</div><div class="stat-data"><h3>{{report.counts.differences}}</h3><p>固定内容差异</p></div></div></div><div class="table-container"><table><thead><tr><th>验证字段</th><th>合同中的内容</th><th>结果</th><th>处理说明</th></tr></thead><tbody><tr v-for="f in report.fields" :key="f.id"><td>{{f.name}}</td><td>{{f.value===null?'未能定位':f.value||'（空白）'}}</td><td><span class="tag-status" :class="f.status==='pass'?'pass':f.status==='issue'?'danger':'warning'">{{labels[f.status]}}</span></td><td>{{f.reason||'符合已发布版本字段规则'}}</td></tr></tbody></table></div><article v-for="(d,i) in report.differences" :key="i" class="difference"><h3>变化 {{i+1}} · {{d.reason}}</h3><div><p><b>模板原文</b>{{d.original}}</p><p><b>上传合同</b>{{d.current}}</p></div></article><div class="notice-bar scope"><strong>检查范围与限制</strong><p v-for="(w,i) in report.limitations" :key="i">{{w}}</p><p>仅检查文字、段落结构和配置的字段规则。格式、合并单元格、图片及复杂对象需另行人工核对。本结果不代表合同整体法律风险结论。</p></div><div class="panel-footer"><button class="btn btn-secondary" @click="stage='template'">重新验证</button><button class="btn btn-primary" @click="continueAi">继续 AI 审查 →</button></div></div></section>
+<TemplateCheckReport v-if="stage==='result' && result" :record="result" @close="stage='template'"/>
 </template></div></template><style scoped>
     .review-entry {
       --primary: #2563eb;

@@ -38,18 +38,12 @@ def complete(client, task_id, confirmations=None):
     return client.post('/api/tasks/'+task_id+'/complete',json={'archived':False,'revision':task['revision'],'confirmations':confirmations or {}})
 
 
-def test_current_verification_required_and_manual_confirmation_persists(client):
+def test_requirement_findings_do_not_add_a_completion_confirmation_step(client):
     task, run = seed(client,[REQ])
-    assert complete(client,task['id']).status_code == 409
-    response = verify(client,run)
-    assert response.status_code == 200, response.text
-    run = response.json()
-    assert run['current_verification_valid']
-    assert run['current_verification']['findings'][0]['status'] == 'needs_review'
-    assert complete(client,task['id']).status_code == 409
-    assert complete(client,task['id'],{'r1':'已经人工核对付款期限并确认符合要求'}).status_code == 200
+    assert complete(client,task['id']).status_code == 200
     saved = client.get('/api/runs/'+run['id']).json()
-    assert saved['completion_confirmations']['r1'].startswith('已经人工')
+    assert saved.get('completion_confirmations') == {}
+    assert not saved.get('current_verification')
 
 
 def test_manual_issue_and_accepted_change_invalidate_current_verification(client):
@@ -63,10 +57,7 @@ def test_manual_issue_and_accepted_change_invalidate_current_verification(client
     response = client.put('/api/runs/'+run['id']+'/handling',json={'revision':run['revision'],'applied':[issue['id']], 'decisions':{issue['id']:'applied'}})
     assert response.status_code == 200
     assert not response.json()['current_verification_valid']
-    assert complete(client,task['id'],{'r1':'人工核对确认付款期限符合要求'}).status_code == 409
-    run = verify(client,response.json()).json()
-    assert run['current_verification_valid']
-    assert complete(client,task['id'],{'r1':'人工核对确认付款期限符合要求'}).status_code == 200
+    assert complete(client,task['id']).status_code == 200
 
 
 def test_verification_rejects_stale_revision_and_changed_conditions(client):
@@ -80,14 +71,15 @@ def test_verification_rejects_stale_revision_and_changed_conditions(client):
     assert complete(client,task['id']).status_code == 409
 
 
-def test_conflicts_cannot_be_confirmed_away(client):
+def test_requirement_conflicts_remain_visible_without_confirmation_gate(client):
     task, run = seed(client,[REQ])
     run = verify(client,run).json()
     verification = run['current_verification']
     verification['findings'][0]['conflict_with'] = ['r2']
     workspace_api.repo.update(run['id'],{'current_verification':verification})
     response = complete(client,task['id'],{'r1':'人工确认接受这一要求冲突'})
-    assert response.status_code == 409 and '冲突' in response.text
+    assert response.status_code == 200
+    assert workspace_api.repo.get(run['id'])['current_verification']['findings'][0]['conflict_with'] == ['r2']
 
 
 def test_report_preview_and_word_share_content_and_export_options(client):
@@ -114,8 +106,12 @@ def test_report_preview_and_word_share_content_and_export_options(client):
     assert any('当前采纳稿要求核验' in p['text'] for p in content)
     assert any('税率评价：核对交易适用税率' == p['text'] for p in content)
     assert any('付款条件需确认' == p['text'] for p in content)
-    for scope in ('current','tracked','all','applied_report'):
-        assert client.get('/api/runs/'+run['id']+'/export?scope='+scope).status_code == 200
+    for scope in ('current','tracked','all'):
+        assert client.get('/api/runs/'+run['id']+'/export?scope='+scope).status_code == 409
+    assert client.get('/api/runs/'+run['id']+'/export?scope=applied_report').status_code == 200
+    assert client.get('/api/runs/'+run['id']+'/audit').status_code == 409
+    client.put('/api/runs/'+run['id']+'/handling',json={'revision':run['revision'],'applied':[],'decisions':{issue['id']:'rejected' for issue in run['result']['issues']}})
+    assert complete(client,task['id']).status_code == 200
     assert client.get('/api/runs/'+run['id']+'/audit').json()['id'] == run['id']
 
 
@@ -178,14 +174,12 @@ def test_functional_workbench_in_browser(isolated_workspace, monkeypatch):
         task = page.request.post(base+'/api/tasks',data={'title':'完整功能浏览器验收','text':TEXT,'mode':'quick','requirements':[REQ]}).json()
         page.request.post(base+'/api/tasks/'+task['id']+'/review/stream',data={})
         page.goto(base+'/workbench?task='+task['id'])
-        expect(page.locator('.wb-priority-review')).to_be_visible()
-        expect(page.locator('.wb-priority-review')).to_contain_text(REQ['text'])
-        assert page.locator('.wb-priority-review').bounding_box()['y'] < page.locator('.wb-full-analysis-title').bounding_box()['y']
         page.locator('.wb-functional-overview > summary').click()
-        expect(page.get_by_role('button',name='核验当前稿',exact=True)).to_be_enabled()
-        page.get_by_role('button',name='核验当前稿',exact=True).click()
-        expect(page.get_by_text('当前稿核验有效',exact=True)).to_be_visible()
-        page.get_by_placeholder('说明处理方式、确认依据或接受风险的理由').fill('已人工核对付款期限符合要求')
+        priority=page.locator('.wb-functional-overview .wb-priority-review')
+        expect(priority).to_be_visible()
+        expect(priority).to_contain_text(REQ['text'])
+        assert priority.evaluate('(el)=>el.previousElementSibling.textContent.includes("准入结论") && el.nextElementSibling.textContent.includes("审查总评")')
+        expect(page.locator('#opinion-drawer .wb-priority-review')).to_have_count(0)
         page.get_by_role('button',name='＋ 添加人工意见',exact=True).click()
         page.get_by_label('意见标题',exact=True).fill('人工确认付款条件')
         page.get_by_label('风险说明',exact=True).fill('明确付款时间可减少争议')
@@ -208,20 +202,14 @@ def test_functional_workbench_in_browser(isolated_workspace, monkeypatch):
         manual = next(issue for issue in saved['result']['issues'] if issue.get('source') == 'manual')
         page.locator('#card-'+manual['id']).get_by_role('button',name='采纳',exact=True).click()
         page.locator('.wb-functional-overview > summary').click()
-        expect(page.get_by_text('当前稿未核验或核验已失效',exact=True)).to_be_visible()
         for issue in saved['result']['issues']:
             if issue['id'] != manual['id']:
                 page.locator('#card-'+issue['id']).get_by_role('button',name='拒绝',exact=True).click()
-        page.get_by_role('button',name='核验当前稿',exact=True).click()
-        expect(page.get_by_text('当前稿核验有效',exact=True)).to_be_visible()
-        page.get_by_placeholder('说明处理方式、确认依据或接受风险的理由').fill('已人工核对当前采纳稿付款期限符合要求')
         page.get_by_role('button',name='完成审核',exact=True).click()
-        expect(page.get_by_role('heading',name='新建合同审查',exact=True)).to_be_visible()
         page.goto(base+'/workbench?task='+task['id'])
         expect(page.get_by_role('button',name='已完成审核',exact=True)).to_be_visible()
         page.reload()
         page.locator('.wb-functional-overview > summary').click()
-        expect(page.get_by_placeholder('说明处理方式、确认依据或接受风险的理由')).to_have_value('已人工核对当前采纳稿付款期限符合要求')
         expect(page.frame_locator('iframe[title="合同修订文档"]').locator('article')).to_contain_text('验收后15日付款。')
         page.screenshot(path='artifacts/functional-workbench.png')
         page.get_by_text('审查设置',exact=True).click()

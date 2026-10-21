@@ -17,7 +17,7 @@ const label = (status) => ({pass:'符合',fail:'未满足',needs_review:'待确�
 <template>
   <section v-if="hasRequirements || findings.length || background || references.length" class="wb-priority-review" aria-label="重点要求核验">
     <header><h3>重点要求核验 <span>{{ findings.length }} 项</span></h3><small>本轮原文</small></header>
-    <p class="wb-priority-scope">先核对审查重点，再查看下方全文风险分析。</p>
+    <p class="wb-priority-scope">本轮审查重点的逐项核对结果。</p>
     <p v-if="context.resultStale.value" class="wb-priority-stale">正文或条件已修改，以下为旧版本结论。</p>
     <div v-if="findings.length" class="wb-priority-counts"><span class="is-fail">未满足 {{ counts.fail }}</span><span class="is-pending">待确认 {{ counts.pending }}</span><span class="is-pass">符合 {{ counts.pass }}</span></div>
     <template v-for="(item,index) in findings.slice(0,3)" :key="item.id">

@@ -6,6 +6,7 @@ const views = {
   templates: () => import("../views/ContractTemplates.vue"),
   start: () => import("../views/StartReview.vue"),
   records: () => import("../views/ReviewRecords.vue"),
+  validations: () => import("../views/ValidationRecords.vue"),
   categories: () => import("../views/BusinessCategories.vue"),
   checklists: () => import("../views/Checklists.vue"),
 };
@@ -41,6 +42,13 @@ export const router = createRouter({
       meta: { title: "页面不存在" },
     },
   ],
+});
+
+router.beforeEach((to) => {
+  if (to.path === '/records' && to.query.tab === 'templates') {
+    const {tab, ...query} = to.query;
+    return {path:'/validation-records',query,replace:true};
+  }
 });
 
 router.afterEach((to, _from, failure) => {

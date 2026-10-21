@@ -30,7 +30,7 @@ export function createWorkspaceWorkbench(refs) {
     followupIssue = ref(null),
     followupBusy = ref(false);
   const verifying = ref(false), manualBusy = ref(false), confirmations = ref({});
-  const finishing = ref(false), showCompletionChecks = ref(false);
+  const finishing = ref(false);
   const showConditions = ref(false),
     exportScope = ref("current"),
     versions = ref([]),
@@ -417,26 +417,10 @@ export function createWorkspaceWorkbench(refs) {
         refs.showToast('还有待处理或待复核条目，请先逐项处理');
         return;
       }
-      if (!run.value?.current_verification_valid && !await verifyCurrent()) return;
-      const findings = run.value?.current_verification?.findings || [];
-      const conflicts = findings.some(item => item.conflict_with?.length);
-      const missing = findings.some(item => !['pass', 'not_applicable'].includes(item.status) &&
-        !(item.conflict_with?.length) &&
-        (confirmations.value[item.id]?.trim().length || 0) < 5);
-      if (conflicts || missing) {
-        showCompletionChecks.value = true;
-        await nextTick();
-        const overview = document.querySelector('.requirement-checks');
-        overview?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        overview?.querySelector('textarea:not(:disabled)')?.focus({ preventScroll: true });
-        refs.showToast(conflicts ? '要求存在冲突，请在右侧重点要求核验区查看并调整审查条件' :
-          '当前稿有未满足或待确认的要求，请在右侧填写人工确认理由后再次完成审核');
-        return;
-      }
       task.value = await api(
         "/api/tasks/" + taskId.value + "/complete",
         "POST",
-        { archived: false, revision: task.value.revision, confirmations: confirmations.value },
+        { archived: false, revision: task.value.revision },
       );
       await refresh();
       refs.showToast("已完成审核，现在可以导出文件");
@@ -513,7 +497,7 @@ export function createWorkspaceWorkbench(refs) {
   return {
     canExport, canExportReport, requireExport, checkExport,
     getModel: refs.getModel,
-    verifying, finishing, showCompletionChecks, manualBusy, confirmations, verifyCurrent, addManualIssue, selectVersion, downloadAudit,
+    verifying, finishing, manualBusy, confirmations, verifyCurrent, addManualIssue, selectVersion, downloadAudit,
     taskId,
     task,
     run,

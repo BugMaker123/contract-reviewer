@@ -2186,5 +2186,38 @@
 /* Risk controls follow the read-only priority findings and belong to the full-text analysis. */
 .workbench-view .wb-opinion-content > .flex-1 .wb-opinion-toolbar { padding:12px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; }
 .workbench-view .wb-opinion-toolbar .wb-batch-actions { justify-content:flex-end; margin:10px 0 0; padding-top:10px; border-top:1px solid #edf1f7; }
-.workbench-view .requirement-checks { padding:14px; margin-top:0; border:1px solid #e2e8f0; border-radius:8px; background:#fff; }
-.workbench-view .completion-check-heading { color:#334155; font-size:13px; font-weight:600; }
+
+.workbench-view .wb-functional-overview .wb-priority-review{margin:12px 0;padding:12px;border-top-width:2px;background:#f8faff}
+.workbench-view .wb-functional-overview .wb-priority-review h3{font-size:12px}
+.workbench-view .wb-functional-overview .wb-priority-review .wb-priority-item{margin:0;padding:8px 0;border:0;border-top:1px solid #e5edf8;background:transparent}
+
+/* Consistent reading hierarchy for the review overview. */
+.workbench-view .wb-functional-overview>.overview-body{padding-top:10px}
+.workbench-view .overview-version{padding:12px;background:#f6f8fc;border:1px solid #e7edf5;border-radius:8px;margin-bottom:12px}
+.workbench-view .wb-functional-overview .overview-version label{margin:0 0 7px;color:#7b879a;font-size:11px;font-weight:500}
+.workbench-view .wb-functional-overview .overview-version select{padding:8px 10px;border:1px solid #dce4ef;border-radius:6px;font-size:12px;color:#334155}
+.workbench-view .overview-baseline{display:flex;flex-direction:column;gap:4px;margin-top:11px;padding-top:10px;border-top:1px solid #e5ebf3}
+.workbench-view .overview-baseline>span{font-size:10px;color:#94a3b8}
+.workbench-view .overview-baseline>strong{font-size:11px;color:#5e6f86;font-weight:500;line-height:1.7}
+.workbench-view .wb-functional-overview .overview-section,.workbench-view .wb-functional-overview .wb-priority-review{padding:12px;margin:0 0 12px;border:1px solid #e3e9f2;border-radius:8px;background:#fff}
+.workbench-view .overview-section header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.workbench-view .overview-section h3,.workbench-view .wb-functional-overview .wb-priority-review h3{font-size:13px;line-height:20px;font-weight:600;color:#334155;margin:0}
+.workbench-view .wb-functional-overview .overview-section>p{font-size:12px;line-height:1.9;color:#64748b;margin:0;overflow-wrap:anywhere}
+.workbench-view .overview-status{font-size:10px;padding:2px 7px;border-radius:4px;line-height:18px;background:#f1f5f9;color:#64748b}
+.workbench-view .overview-status.pass{background:#edf8f1;color:#388361}
+.workbench-view .overview-status.rejected,.workbench-view .overview-status.needs_review{background:#fff5e6;color:#a37532}
+.workbench-view .wb-functional-overview .overview-scope{background:#f8fafc}
+.workbench-view .wb-functional-overview .wb-priority-review header{margin-bottom:10px}
+.workbench-view .wb-functional-overview .wb-priority-review .wb-priority-scope{display:none}
+.workbench-view .wb-functional-overview .wb-priority-counts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:0;margin:0 0 10px}
+.workbench-view .wb-functional-overview .wb-priority-counts>span{text-align:center;padding:5px 3px;border-radius:5px;background:#f5f7fb;font-size:10px}
+.workbench-view .wb-functional-overview .wb-priority-review .wb-priority-item{padding:9px 0;border-top:1px solid #edf1f6}
+.workbench-view .wb-functional-overview .overview-trace{padding:0 12px;border:1px solid #e3e9f2;border-radius:8px;background:#f8fafc;margin-bottom:12px}
+.workbench-view .wb-functional-overview .overview-trace>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 0;color:#475569;font-size:12px;font-weight:500}
+.workbench-view .overview-trace>summary>small{font-size:10px;color:#94a3b8;font-weight:400;white-space:nowrap}
+.workbench-view .overview-trace ol{margin:0;padding:0 0 6px 10px;list-style:none}
+.workbench-view .overview-trace li{position:relative;margin:0;padding:0 0 14px 14px;border-left:1px solid #e0e7f1;font-size:11px;line-height:1.85;color:#7b879a;overflow-wrap:anywhere}
+.workbench-view .overview-trace li:before{content:'';position:absolute;left:-3px;top:6px;width:5px;height:5px;border-radius:50%;background:#b5c5dc}
+.workbench-view .overview-trace li:last-child{border-left-color:transparent}
+.workbench-view .wb-functional-overview .overview-notice{padding:10px 12px;background:#fff9ee;border:1px solid #f2e7d1;border-radius:7px;margin:0 0 12px;font-size:11px;line-height:1.85;color:#9a7c45}
+.workbench-view .overview-notice-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}

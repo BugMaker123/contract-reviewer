@@ -527,6 +527,11 @@ def validate_published(identifier: str, body: PublishedValidationInput):
         result.update(result='UNDETERMINED', reason='；'.join(warnings))
     report = validation_report(result, release['fields'], release, warnings)
     report['same_source'] = body.source_id == release['source_id']
-    return {**result, 'report': report, 'release_id': body.release_id,
-            'version': release['version'], 'template_name': record['name'],
-            'eligible_for_skip': False}
+    source = repo().get(body.source_id, 'source')
+    return repo().create('template_validation', {
+        **result, 'report': report, 'release_id': body.release_id,
+        'template_id': identifier, 'template_name': record['name'], 'version': release['version'],
+        'source_id': body.source_id, 'filename': source['name'],
+        'source_sha256': candidate['sha256'], 'template_sha256': release['sha256'],
+        'status': 'completed', 'passed': report['status'] == 'pass',
+    }, parent=identifier)
