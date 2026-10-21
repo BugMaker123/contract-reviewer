@@ -176,12 +176,17 @@ class FollowupInput(RunRequest):
     question: str = Field(min_length=1, max_length=3000)
 
 
-class RevisionGenerate(RunRequest):
+class RevisionTarget(BaseModel):
+    original_text: str | None = Field(default=None, max_length=20000)
+    change_type: Literal['replace', 'insert'] | None = None
+
+
+class RevisionGenerate(RunRequest, RevisionTarget):
     revision: int = Field(ge=1)
     instruction: str = Field(default='', max_length=3000)
 
 
-class RevisionEdit(BaseModel):
+class RevisionEdit(RevisionTarget):
     revision: int = Field(ge=1)
     suggested_text: str = Field(min_length=1, max_length=20000)
 

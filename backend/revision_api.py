@@ -13,7 +13,7 @@ from .export_policy import exportable_run
 from .word_export import paragraphs, visible_paragraph_text
 from .workspace_models import RevisionGenerate, RevisionEdit, RevisionRestore
 from .revisions import editable_run, revision_anchor, save_candidate, review_document, revision_plan
-from .review_policy import requirements_for, verify_requirements
+from .review_policy import requirements_for, verify_requirements, is_prompt_requirement_issue
 
 
 def create_revision_router(repository, builder):
@@ -38,9 +38,9 @@ def create_revision_router(repository, builder):
         issue = issue_for(run, issue_id)
         if any(item.get('conflict_with') for item in run['result'].get('requirement_findings', [])):
             raise HTTPException(409, '审查要求存在冲突，请明确要求并重新审查后再生成修订。')
-        original, kind = revision_anchor(run, issue)
+        original, kind = revision_anchor(run, issue, request)
         prompt = f'''{STANCE_INSTRUCTIONS}{REWRITE_INSTRUCTIONS}
-为合同中选定的一处条款重新生成可直接替换的完整修订文本。
+为合同中选定的一处条款生成完整修订文本。处理方式：{'新增缺失条款到合同文末' if kind == 'insert' else '替换所选原文条款'}。只处理本次指定的一处条款，不把跨条款风险汇总写成一段合同正文。
 仅返回 JSON {{"suggested_text":"完整替代条款","explanation":"本次调整说明"}}。
 保留原有条款编号和未涉及的内容；不得编造金额、日期、主体、税率等交易事实，不新增待确认占位符。
 所选条款：{original or '需补充的缺失条款'}
@@ -74,7 +74,7 @@ def create_revision_router(repository, builder):
     def edit_revision(run_id: str, issue_id: str, request: RevisionEdit):
         repo = repository()
         run = editable_run(repo, run_id, request.revision)
-        original, kind = revision_anchor(run, issue_for(run, issue_id))
+        original, kind = revision_anchor(run, issue_for(run, issue_id), request)
         if not request.suggested_text.strip() or request.suggested_text.strip() == original.strip():
             raise HTTPException(422, '修订内容不能为空或与原文相同')
         return save_candidate(repo, run, issue_id, {'original_text': original, 'suggested_text': request.suggested_text, 'change_type': kind},
@@ -97,7 +97,7 @@ def create_revision_router(repository, builder):
         content = [visible_paragraph_text(p._p) for p in paragraphs(document)]
         ids, _ = revision_plan(run)
         items = [{**issue, 'state': 'applied' if issue['id'] in run['applied'] else run.get('decisions', {}).get(issue['id'], 'pending'),
-                  'in_document': issue['id'] in ids} for issue in run['result']['issues']]
+                  'in_document': issue['id'] in ids} for issue in run['result']['issues'] if not is_prompt_requirement_issue(issue, run['input'])]
         suffix = '-修订稿' if display == 'markup' else '-当前稿' if display == 'current' else '-原始稿'
         return {'id': run['input'].get('source_id'), 'name': run['input']['title'] + suffix + '.docx', 'extension': '.docx',
                 'text': '\n'.join(content), 'paragraphs': content, 'layout': layout, 'review_items': items,

@@ -28,8 +28,8 @@ export default {
       document.getElementById('source-tab-'+context.inputMethod.value)?.focus();
     };
     const addFocus = (focus) => {
-      const values = context.form.focus.split('；').filter(Boolean);
-      context.form.focus = (values.includes(focus) ? values.filter(value => value !== focus) : [...values, focus]).join('；');
+      const values = context.form.focus.split(/[；\n]/).filter(Boolean);
+      context.form.focus = (values.includes(focus) ? values.filter(value => value !== focus) : [...values, focus]).join('\n');
     };
     const readiness = computed(() => {
       const { form, selectedList, importing, busy } = context;
@@ -102,7 +102,7 @@ export default {
               <ChecklistConfig :context="context" />
               <ChecklistSelection :context="context" />
             </template>
-            <div v-else class="review-prompt-field"><div class="ai-focus-pills"><button v-for="focus in ['付款与验收','违约责任','知识产权','合同解除','争议解决']" :key="focus" type="button" :aria-pressed="form.focus.split('；').includes(focus)" @click="addFocus(focus)">{{focus}}</button></div>
+            <div v-else class="review-prompt-field"><div class="ai-focus-pills"><button v-for="focus in ['付款与验收','违约责任','知识产权','合同解除','争议解决']" :key="focus" type="button" :aria-pressed="form.focus.split(/[；\n]/).includes(focus)" @click="addFocus(focus)">{{focus}}</button></div>
               <label class="block"><span class="label">自定义审查要求（Prompt）</span><textarea v-model="form.focus"
                   class="field" rows="5"
                   placeholder="例如：重点审查付款与验收条款；指出单方解除权及责任不对等的风险；修改建议应保留合理的协商空间。"></textarea></label>

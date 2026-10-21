@@ -382,12 +382,13 @@ async def review_events(snapshot, config):
     }
     requirement_issues = []
     for finding in findings:
-        if finding.get('origin') != 'checklist' and finding['status'] in ('fail', 'needs_review'):
+        if finding.get('origin') == 'reference' and finding['status'] in ('fail', 'needs_review'):
             requirement_issues.append({'id': 'req-' + finding['id'], 'segment_id': None,
-                'clause_title': '自定义要求', 'severity': 'warning' if finding['status'] == 'fail' and finding['priority'] == 'required' else 'info',
+                'clause_title': '制度要求', 'severity': 'warning' if finding['status'] == 'fail' and finding['priority'] == 'required' else 'info',
                 'category': '要求核验', 'issue_title': finding['text'][:100], 'legal_basis': finding['source'],
                 'risk_analysis': finding['explanation'], 'negotiation_strategy': '请核对要求与原文；冲突要求须由用户明确后重新审查。',
                 'redline': None, 'evidence': finding['evidence'], 'requirement_id': finding['id']})
+    result['issues'].extend(requirement_issues)
     conflicts = any(item.get('conflict_with') for item in findings)
     if conflicts:
         for issue in result['issues']:
@@ -396,7 +397,6 @@ async def review_events(snapshot, config):
         result['warning'] = '审查要求存在冲突，本次保留风险意见，暂停生成自动修订。'
     elif mode in ('quick', 'deep', 'checklist'):
         await consolidate_revisions(result, snapshot, config)
-    result['issues'].extend(requirement_issues)
     if requirements and any(i.get('redline') for i in result['issues']):
         from .revisions import revised_text
         from fastapi import HTTPException

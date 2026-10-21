@@ -26,8 +26,22 @@ export default {
       ><ins>{{ issue.redline.suggested_text || "（删除此条款）" }}</ins>
     </div>
     <p v-else class="revision-empty">
-      此条意见尚无可替换文本，可先让 AI 生成修订建议。
+      此项尚未生成条款修订。请先确认处理位置，再生成建议或手动填写修订。
     </p>
+    <div v-if="needsRevisionTarget(issue)" class="revision-target-editor">
+      <strong>指定这条意见的处理位置</strong>
+      <p>该意见没有唯一对应的原文。每次处理一处条款；涉及多个问题时，可分别添加人工意见。</p>
+      <label>处理方式<select v-model="revisionTarget(issue).change_type" :disabled="revisionReadOnly" @change="revisionTarget(issue).original_text=''">
+        <option value="replace">修改现有条款</option><option value="insert">新增缺失条款到文末</option>
+      </select></label>
+      <template v-if="revisionTarget(issue).change_type==='replace'">
+        <label>从合同条款中选择<select v-model="revisionTarget(issue).original_text" :disabled="revisionReadOnly">
+          <option value="">请选择待修改的条款</option><option v-for="segment in workspace.run?.result?.segments||[]" :key="segment.id" :value="segment.content">{{segment.title||segment.clause_title||segment.id}} · {{segment.content?.slice(0,80)}}</option>
+        </select></label>
+        <label>待修改的完整原文<textarea v-model="revisionTarget(issue).original_text" :disabled="revisionReadOnly" rows="4" maxlength="20000" placeholder="也可从正文复制一处完整且唯一的条款到这里；不能填写风险说明或条款编号摘要。"/></label>
+      </template>
+      <p v-else>生成并采纳后，会在合同文末新增条款。请确认合同确实缺少该约定。</p>
+    </div>
     <p v-if="issue.revision_explanation" class="revision-explanation">
       {{ issue.revision_explanation }}
     </p>
@@ -180,3 +194,7 @@ export default {
     </details>
   </section>
 </template>
+
+<style scoped>
+.revision-target-editor{margin:12px 0;padding:12px;border:1px solid #dbe5f4;background:#f8faff;border-radius:8px}.revision-target-editor>strong{font-size:12px;color:#334155}.revision-target-editor p{font-size:11px;line-height:1.8;color:#64748b;margin:7px 0}.revision-target-editor label{display:block;font-size:11px;color:#475569;margin-top:10px}.revision-target-editor select,.revision-target-editor textarea{display:block;box-sizing:border-box;width:100%;min-width:0;margin-top:5px;border:1px solid #dce3ed;border-radius:5px;padding:8px;background:#fff;font:inherit;color:#334155}.revision-target-editor textarea{resize:vertical;line-height:1.7}
+</style>

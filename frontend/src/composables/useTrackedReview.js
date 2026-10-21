@@ -36,6 +36,17 @@ export function useTrackedReview(context) {
   const revisionErrors = reactive({});
   const revisionWarnings = reactive({});
   const revisionEdits = reactive({});
+  const revisionTargets = reactive({});
+  const needsRevisionTarget = issue => {
+    if (issue.redline) return false;
+    const text = workspace.run?.input?.text || '';
+    const segment = workspace.run?.result?.segments?.find(s => s.id === issue.segment_id);
+    const original = issue.evidence || segment?.content;
+    return !original || text.split(original).length !== 2;
+  };
+  const revisionTarget = issue => revisionTargets[issue.id] ||= {change_type:'replace', original_text:''};
+  const targetPayload = issue => needsRevisionTarget(issue) ? {...revisionTarget(issue)} : {};
+
   const editingRevisionId = ref(null);
   const reviewReady = computed(
     () =>
@@ -316,6 +327,7 @@ export function useTrackedReview(context) {
   };
   const generateRevision = (issue) =>
     updateProposal(issue, "regenerate", "POST", {
+      ...targetPayload(issue),
       instruction: revisionInstructions[issue.id] || "",
       model_config_data: modelConfig(),
     });
@@ -329,6 +341,7 @@ export function useTrackedReview(context) {
   const saveRevisionEdit = async (issue) => {
     if (
       await updateProposal(issue, "revision", "PUT", {
+        ...targetPayload(issue),
         suggested_text: revisionEdits[issue.id],
       })
     )
@@ -457,6 +470,7 @@ export function useTrackedReview(context) {
     revisionInstructions,
     revisionErrors,
     revisionWarnings,
+    revisionTargets, revisionTarget, needsRevisionTarget,
     revisionEdits,
     editingRevisionId,
     activeRevision,

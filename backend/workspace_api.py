@@ -22,7 +22,7 @@ from .workspace_models import (TaskInput, ChecklistInput, CategoryInput, RunRequ
 from .workspace_review import review_events, model_json
 from . import review_jobs
 from .word_export import contract_document
-from .review_policy import AdmissionError, snapshot_digest, requirements_for, verify_requirements
+from .review_policy import AdmissionError, snapshot_digest, requirements_for, verify_requirements, is_prompt_requirement_issue
 from .workspace_models import ReferenceMaterial, ReviewRequirement
 from .models import ModelConfig
 
@@ -65,6 +65,8 @@ def revision_preview(run, scope):
     ids = list(run['applied']) if scope == 'current' else []
     if scope == 'all':
         for issue in run['result']['issues']:
+            if is_prompt_requirement_issue(issue, run['input']):
+                continue
             if issue.get('rewrite_warning'):
                 warnings.append(issue['issue_title'] + '：' + issue['rewrite_warning'])
             if not issue.get('redline'):
@@ -413,6 +415,14 @@ def save_handling(run_id: str, request: HandlingInput):
 def run_view(run):
     if run.get('current_verification'):
         run['current_verification_valid'] = run['current_verification'].get('digest') == current_digest(run)
+    if run.get('result'):
+        from copy import deepcopy
+        run = deepcopy(run)
+        result = run['result']
+        result['issues'] = [issue for issue in result.get('issues', [])
+                            if not is_prompt_requirement_issue(issue, run['input'])]
+        for severity in ('critical', 'warning', 'info'):
+            result.setdefault('summary', {})[severity + '_count'] = sum(i.get('severity') == severity for i in result['issues'])
     return run
 
 
@@ -464,7 +474,7 @@ def complete_task(task_id: str, request: CompleteInput):
         raise HTTPException(409, '请先完成审查并复核结果')
     run = repo.get(task['active_run'], 'run')
     editable_run(repo, run['id'], run['revision'])
-    if any(run['decisions'].get(issue['id'], 'pending') in ('pending', 'needs_review') for issue in run['result']['issues']):
+    if any(run['decisions'].get(issue['id'], 'pending') in ('pending', 'needs_review') for issue in run['result']['issues'] if not is_prompt_requirement_issue(issue, run['input'])):
         raise HTTPException(409, '还有待处理或待复核条目')
     requirements = requirements_for(run['input'])
     verification = run.get('current_verification') or {}

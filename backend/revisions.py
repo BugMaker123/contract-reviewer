@@ -24,7 +24,10 @@ def revised_text(run, ids=None):
 
 def revision_plan(run):
     ids, warnings = list(run['applied']), []
+    from .review_policy import is_prompt_requirement_issue
     for issue in run['result']['issues']:
+        if is_prompt_requirement_issue(issue, run['input']):
+            continue
         if issue['id'] in ids or run.get('decisions', {}).get(issue['id']) == 'rejected':
             continue
         if not issue.get('redline'):
@@ -71,7 +74,17 @@ def editable_run(repo, run_id, revision):
     return run
 
 
-def revision_anchor(run, issue):
+def revision_anchor(run, issue, target=None):
+    if target and (target.change_type is not None or target.original_text is not None):
+        if target.change_type == 'insert':
+            if target.original_text:
+                raise HTTPException(422, '新增条款不应指定替换原文')
+            return '', 'insert'
+        original = target.original_text
+        if not original or run['input']['text'].count(original) != 1:
+            raise HTTPException(422, '请选择一处完整且唯一的合同原文；缺失条款请选择新增到文末')
+        return original, 'replace'
+
     redline = issue.get('redline')
     if redline and redline.get('change_type') == 'insert':
         return '', 'insert'
