@@ -58,6 +58,15 @@ npx --yes tailwindcss@3.4.17 -i ./backend/static/styles.input.css -o ./backend/s
 
 Vue 和路由通过 Vite 打包后由本机服务提供，运行时无需外部 CDN。前端开发和扩展见 [前端架构说明](FRONTEND.md)。后端热重载仅监控 `backend/`，避免测试和临时转换工具触发服务重启。
 
+## Windows 免安装包
+
+Windows 免安装包：先安装 `requirements-build.txt` 中的依赖，执行
+`powershell -ExecutionPolicy Bypass -File scripts/build-windows.ps1`。
+输出为 `artifacts/LexisGraph-Windows-x64.zip`；完整解压后双击 `LexisGraph.exe`。
+包内不带开发数据库、上传文件或密钥，运行数据默认保存在 `%LOCALAPPDATA%\LexisGraph`。
+启动窗口关闭时会停止本机服务。实际 EXE 冒烟检查可运行
+`.venv/Scripts/python.exe scripts/smoke-windows.py`，使用独立临时数据目录。
+
 ## 主要文件
 
 - `backend/main.py`：服务入口、文件提取与兼容审查接口。

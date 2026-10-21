@@ -1,5 +1,6 @@
 """Contract template catalogue; source originals remain immutable."""
 from pathlib import Path
+from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 from fastapi.responses import FileResponse
@@ -54,11 +55,25 @@ def delete_group(identifier: str, revision: int = Query(ge=1)):
 
 @router.get('/api/contract-templates')
 def templates(q: str = Query('', max_length=200), group_id: str = '',
-              page: int = Query(1, ge=1), page_size: int = Query(10, ge=1, le=100)):
+              page: int = Query(1, ge=1), page_size: int = Query(10, ge=1, le=100),
+              status: Literal['all','unconfigured','reviewing','ready','published'] = 'all'):
     rows = workspace_api.repo.list('contract_template')
     rows = [r for r in rows if (not group_id or r['group_id'] == group_id)
             and q.strip().casefold() in (r['name'] + ' ' + r['description'] + ' ' + r['filename']).casefold()]
-    return {'items': rows[(page-1)*page_size:page*page_size], 'total': len(rows)}
+    summaries = []
+    for row in rows:
+        draft = row.get('review_draft') or {}
+        fields = draft.get('fields', []) if draft.get('source_id') == row['source_id'] else []
+        confirmed = sum(bool(f.get('confirmed')) for f in fields)
+        state = ('published' if row.get('review_status') == 'published' else
+                 'ready' if fields and confirmed == len(fields) else
+                 'reviewing' if fields else 'unconfigured')
+        if status != 'all' and state != status:
+            continue
+        summaries.append({**{k:v for k,v in row.items() if k != 'review_draft'},
+                          'field_count': len(fields), 'confirmed_count': confirmed,
+                          'configuration_status': state})
+    return {'items': summaries[(page-1)*page_size:page*page_size], 'total': len(summaries)}
 
 
 def template_data(body):

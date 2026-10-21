@@ -14,6 +14,7 @@ with sync_playwright() as p:
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto(base)
+    page.get_by_role('button', name='AI 智能全面审查').click()
     expect(page.get_by_role('heading', name='新建合同审查')).to_be_visible()
     expect(page.get_by_role('button', name='进入工作台核对合同')).to_be_disabled()
     page.get_by_role('button', name='快速审查 基础规则与关键风险').click()

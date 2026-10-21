@@ -15,7 +15,9 @@ def parse_document(content, extension):
         raise HTTPException(503, '文件解析繁忙，请稍后重试')
     try:
         try:
-            result = subprocess.run([sys.executable, '-m', 'backend.document_parse', extension], input=content,
+            command = ([sys.executable, '--parse-document', extension] if getattr(sys, 'frozen', False)
+                       else [sys.executable, '-m', 'backend.document_parse', extension])
+            result = subprocess.run(command, input=content,
                                     capture_output=True, timeout=45, cwd=Path(__file__).parent.parent, env={**os.environ, 'PYTHONIOENCODING': 'utf-8'},
                                     creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
             data = json.loads(result.stdout.decode('utf-8'))

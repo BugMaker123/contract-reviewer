@@ -87,6 +87,7 @@ def test_preview_follows_edit_and_handling(isolated_workspace, monkeypatch):
             page.on('pageerror', lambda error: errors.append(str(error)))
             base = f'http://127.0.0.1:{port}'
             page.goto(base)
+            page.get_by_role('button', name='AI 智能全面审查').click()
             text = SAMPLE_CONTRACTS['business_cooperation_contract']['text']
             imported = page.request.post(base+'/api/contracts/import', multipart={'file': {'name':'test.txt', 'mimeType':'text/plain', 'buffer':text.encode('utf-8')}}).json()
             source = {'id': imported['source_id']}

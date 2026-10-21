@@ -547,3 +547,101 @@ def test_open_existing_template_supplements_blanks_without_overwriting_draft():
         assert all(f['origin']=='rule' and not f['confirmed'] for f in detail['fields'][1:])
         assert len(template_review.rules_for(template_review.repo().get(record['id'])))==1
         assert template_review.repo().get(record['id'])['revision']==3
+
+
+def test_published_validation_uses_frozen_rules():
+    with TestClient(app) as client:
+        record, base = setup_template(client)
+        client.put(base+'/review', json={'revision': 1, 'source_id': record['source_id'], 'fields': [region()]})
+        published = client.post(base+'/publish', json={'revision': 2}).json()
+        source = upload(client, '甲方：某某公司；期限：30日。')
+        payload = {'source_id': source, 'release_id': published['release_id']}
+        response = client.post(base+'/validate', json=payload)
+        assert response.status_code == 200
+        assert response.json()['report']['status'] == 'pass'
+        assert response.json()['version'] == 1
+        assert response.json()['eligible_for_skip'] is False
+        # Draft edits make the template unavailable until it is published again.
+        client.put(base+'/review', json={'revision': 3, 'source_id': record['source_id'], 'fields': [region(max_length=1)]})
+        response = client.post(base+'/validate', json=payload)
+        assert response.status_code == 409
+        release = template_review.repo().get(published['release_id'], 'template_release')
+        assert release['fields'][0]['max_length'] == 200
+        updated = client.post(base+'/publish', json={'revision': 4}).json()
+        assert client.post(base+'/validate', json=payload).status_code == 409
+        payload['release_id'] = updated['release_id']
+        assert client.post(base+'/validate', json=payload).json()['report']['status'] == 'needs_changes'
+
+
+def test_published_validation_rejects_unpublished_and_wrong_release():
+    with TestClient(app) as client:
+        record, base = setup_template(client)
+        assert client.post(base+'/validate', json={'source_id':record['source_id'], 'release_id':'missing'}).status_code == 409
+
+
+def test_browser_review_entry_published_validation(tmp_path):
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright, expect
+    with TestClient(app) as client:
+        record, base = setup_template(client)
+        client.put(base+'/review', json={'revision':1, 'source_id':record['source_id'], 'fields':[region()]})
+        client.post(base+'/publish', json={'revision':2})
+    path = tmp_path / 'entry-contract.docx'
+    doc = Document()
+    doc.add_paragraph('甲方：某某公司；期限：30日。')
+    doc.save(path)
+    with live_server() as address, sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={'width':1440, 'height':1000})
+        errors=[]
+        imports=[]
+        page.on('request', lambda r: imports.append(r.url) if r.url.endswith('/api/contracts/import') else None)
+        page.on('pageerror', lambda e: errors.append(str(e)))
+        page.goto(address)
+        expect(page.get_by_role('heading', name='选择本次审查方式')).to_be_visible()
+        page.locator('.review-entry').evaluate('(el)=>el.getAnimations({subtree:true}).forEach(a=>a.finish())')
+        page.screenshot(path='artifacts/prototypes/review-entry-implemented.png', full_page=True)
+        page.get_by_role('button', name='已有标准模板核验').click()
+        expect(page.locator('#baseline')).to_have_value(record['id'])
+        page.locator('#validation-file').set_input_files(str(path))
+        expect(page.get_by_role('button', name='开始模板合规核验')).to_be_enabled()
+        page.get_by_role('button', name='开始模板合规核验').click()
+        expect(page.get_by_role('heading', name='已检查内容符合模板规则')).to_be_visible()
+        expect(page.get_by_text('某某公司', exact=True)).to_be_visible()
+        page.screenshot(path='artifacts/prototypes/review-result-implemented.png', full_page=True)
+        page.get_by_role('button', name='继续 AI 审查').click()
+        expect(page.get_by_role('heading', name='新建合同审查')).to_be_visible()
+        expect(page.locator('input[placeholder^="填写便于识别"]')).to_have_value('entry-contract')
+        expect(page.get_by_role('button', name='进入工作台核对合同')).to_be_enabled()
+        page.get_by_role('button', name='重新选择审查方式').click()
+        page.get_by_role('button', name='AI 智能全面审查').click()
+        expect(page.locator('input[placeholder^="填写便于识别"]')).to_have_value('entry-contract')
+        page.set_viewport_size({'width':390,'height':844})
+        page.get_by_role('button', name='重新选择审查方式').click()
+        expect(page.get_by_role('heading', name='选择本次审查方式')).to_be_visible()
+        assert page.locator('.review-entry').evaluate('(el)=>el.scrollWidth <= el.clientWidth')
+        page.get_by_role('button', name='AI 智能全面审查').click()
+        page.set_viewport_size({'width':1440,'height':1000})
+        page.screenshot(path='artifacts/prototypes/review-ai-implemented.png', full_page=True)
+        page.get_by_role('button', name='进入工作台核对合同').click()
+        page.wait_for_url('**/workbench?task=*')
+        task = template_review.repo().get(page.url.split('task=')[1], 'task')
+        assert task['text'] == '甲方：某某公司；期限：30日。'
+        assert task['source_id'] and task['source_id'] != record['source_id']
+        assert len(imports) == 1
+        assert not errors
+        browser.close()
+
+
+def test_browser_review_entry_empty_templates():
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright, expect
+    with live_server() as address, sync_playwright() as p:
+        browser=p.chromium.launch()
+        page=browser.new_page()
+        page.goto(address)
+        page.get_by_role('button', name='已有标准模板核验').click()
+        expect(page.get_by_text('暂无已发布模板。', exact=False)).to_be_visible()
+        expect(page.get_by_role('button', name='开始模板合规核验')).to_have_count(0)
+        expect(page.get_by_role('link', name='合同模板', exact=True).last).to_have_attribute('href','/templates')
+        browser.close()

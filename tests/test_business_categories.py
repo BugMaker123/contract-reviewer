@@ -99,6 +99,7 @@ def test_uploaded_contract_opens_workbench(isolated_workspace):
             page.on('pageerror', lambda error: errors.append(str(error)))
             base = f'http://127.0.0.1:{sock.getsockname()[1]}'
             page.goto(base + '/')
+            page.get_by_role('button', name='AI 智能全面审查').click()
             page.locator('input[type="file"]').first.set_input_files({
                 'name': '采购协议.txt', 'mimeType': 'text/plain',
                 'buffer': '第一条 采购价款为100元，验收后付款。'.encode('utf-8'),
@@ -115,6 +116,7 @@ def test_uploaded_contract_opens_workbench(isolated_workspace):
                 sessionStorage.setItem('LEXIS_HOME_DRAFT', JSON.stringify(draft));
             }''')
             page.reload()
+            page.get_by_role('button', name='AI 智能全面审查').click()
             expect(page.get_by_role('button', name='预览合同')).to_be_visible()
             page.get_by_role('button', name='进入工作台核对合同').click()
             page.wait_for_url('**/workbench?task=*')

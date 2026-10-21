@@ -106,6 +106,7 @@ def test_home_checklist_summary_restored_draft_and_selection(isolated_workspace)
                  'checklist_id': lists[0]['id'], 'checklist_item_ids': ['payment']}
         page.add_init_script('sessionStorage.setItem("LEXIS_HOME_DRAFT", ' + json.dumps(json.dumps(draft)) + ')')
         page.goto(base)
+        page.get_by_role('button', name='AI 智能全面审查').click()
         expect(page.get_by_role('heading', name='新建合同审查', exact=True)).to_be_visible()
         expect(page.get_by_text('首页清单1 · 1 条要求', exact=True)).to_have_count(1)
         expect(page.get_by_role('button', name='进入工作台核对合同', exact=True)).to_be_enabled()

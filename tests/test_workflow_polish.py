@@ -117,6 +117,7 @@ def test_browser_upload_and_rich_paste(isolated_workspace, monkeypatch):
         browser = p.chromium.launch(); page = browser.new_page(viewport={'width':1600,'height':1000})
         errors = []; page.on('pageerror',lambda err:errors.append(str(err)))
         page.goto(base)
+        page.get_by_role('button', name='AI 智能全面审查').click()
         expect(page.get_by_role('button',name='📑 示例合同',exact=True)).to_have_count(0)
         opened = []
         page.on('filechooser', lambda chooser: opened.append(chooser))

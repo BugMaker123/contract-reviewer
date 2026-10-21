@@ -63,6 +63,7 @@ def test_navigation_keeps_document_layout_forms_and_history(isolated_workspace):
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.on('request', lambda request: documents.append(request.url) if request.is_navigation_request() and request.frame == page.main_frame else None)
         page.goto(base)
+        page.get_by_role('button', name='AI 智能全面审查').click()
         expect(page.get_by_role('heading', name='新建合同审查', exact=True)).to_be_visible()
         page.evaluate("window.spaMarker = 'same-document'; window.shellHeader = document.querySelector('.portal-header')")
         page.get_by_role('button', name='✍️ 粘贴正文', exact=True).click()

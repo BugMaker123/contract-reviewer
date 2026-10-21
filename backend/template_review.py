@@ -503,3 +503,30 @@ def trial(identifier: str, body: TrialInput):
     result['report'] = report
     result.update(eligible_for_skip=False, coverage='文字和段落结构试算，尚未接入 BPM；格式、合并单元格与复杂对象不作为自动免审依据')
     return result
+
+
+class PublishedValidationInput(BaseModel):
+    source_id: str
+    release_id: str
+
+
+@router.post('/{identifier}/validate')
+def validate_published(identifier: str, body: PublishedValidationInput):
+    record = current(identifier)
+    if record.get('review_status') != 'published' or record.get('release_id') != body.release_id:
+        raise HTTPException(409, '模板发布版本已变化，请重新选择模板')
+    release = repo().get(body.release_id, 'template_release')
+    if not any(item['id'] == body.release_id for item in repo().list('template_release', identifier)):
+        raise HTTPException(409, '模板版本不匹配，请重新选择模板')
+    candidate = document_blocks(body.source_id)
+    result = compare_blocks(release['blocks'], candidate['blocks'], release['fields'])
+    warnings = list(dict.fromkeys(release.get('warnings', []) + candidate['warnings']))
+    if result['result'] == 'UNDETERMINED':
+        warnings.append(result['reason'])
+    if warnings:
+        result.update(result='UNDETERMINED', reason='；'.join(warnings))
+    report = validation_report(result, release['fields'], release, warnings)
+    report['same_source'] = body.source_id == release['source_id']
+    return {**result, 'report': report, 'release_id': body.release_id,
+            'version': release['version'], 'template_name': record['name'],
+            'eligible_for_skip': False}

@@ -366,7 +366,8 @@ a:focus-visible {
   }
 }
 /* New review: document and standards beside the decision context. */
-.portal-main:has(.review-start) { padding: 0; }
+.portal-main:has(.review-entry) { padding: 24px; }
+@media(max-width:650px) { .portal-main:has(.review-entry) { padding:16px; } }
 .review-start { display: flex; flex-direction: column; min-height: 100%; width: 100%; }
 .review-conditions-first { flex: 1; margin-bottom: 0; }
 .review-conditions-first .review-condition-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }

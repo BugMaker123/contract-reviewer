@@ -122,6 +122,7 @@ def test_policy_upload_confirmation_and_snapshot_in_browser(monkeypatch):
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(base)
+        page.get_by_role('button', name='AI 智能全面审查').click()
         page.get_by_role('button', name='✍️ 粘贴正文', exact=True).click()
         page.get_by_label('合同正文', exact=True).fill(TEXT)
         page.get_by_placeholder('填写便于识别的合同名称').fill('公司制度浏览器核验')
