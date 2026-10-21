@@ -2324,3 +2324,5 @@
 .workbench-view #opinion-drawer .revision-primary-actions svg,
 .workbench-view #opinion-drawer .wb-batch-actions svg {flex:none;width:14px;height:14px;}
 .workbench-view.navigation-collapsed #opinion-drawer .revision-primary-actions > button:nth-child(n) {font-size:12px;min-height:30px;}
+
+.workbench-view .workbench-global-header { justify-content: flex-start; gap: 24px; }

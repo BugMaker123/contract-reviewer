@@ -41,11 +41,11 @@ export default {
           >⚖</span
         ><strong class="text-base text-slate-900">LexisGraph</strong>
       </RouterLink>
+        <RouterLink v-if="['template-review', 'templates'].includes($route.name)" to="/" class="app-home-link"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14"/></svg>返回主页</RouterLink>
       </div>
       <div class="flex gap-3 items-center">
         <button v-if="$route.name!=='template-review'" @click="showHelp = true" class="portal-help-button"><span aria-hidden="true">?</span>操作手册</button>
         <button v-if="$route.name!=='template-review'" @click="showModel = true" class="button">⚙ 模型配置</button>
-        <RouterLink v-if="$route.name==='template-review'" to="/" class="template-workbench-home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14"/></svg>返回主页</RouterLink>
       </div>
     </header>
 

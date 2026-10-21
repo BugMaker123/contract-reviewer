@@ -653,3 +653,32 @@ select:not([multiple]) { appearance:none; background-image:url("data:image/svg+x
 .portal-nav-group{display:flex;flex-direction:column;gap:4px;min-width:0}
 .portal-nav-group+.portal-nav-group{padding-top:14px;border-top:1px solid #edf1f6}
 .portal-nav-label{padding:0 16px 8px;margin:0;font-size:14px;line-height:22px;font-weight:650;color:#475569;letter-spacing:0}
+
+/* Shared home navigation for the review and template workspaces. */
+.app-home-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex-shrink: 0;
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.app-home-link:hover { background: #dbeafe; border-color: #93bafa; color: #1e40af; }
+.app-home-link:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+.portal-header-leading:has(.app-home-link) { gap: 24px; }
+.portal-header-leading:has(.app-home-link) .portal-brand { width: auto; }
+@media (max-width: 650px) {
+  .portal-header-leading:has(.app-home-link) { gap: 12px; }
+  .app-home-link { padding: 4px 9px; gap: 5px; }
+}
