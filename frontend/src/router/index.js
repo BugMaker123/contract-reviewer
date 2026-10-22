@@ -3,7 +3,7 @@ import { pages } from "../portal/pages.js";
 import { loadPageModules } from "../portal/modules.js";
 
 const views = {
-  drafting: () => import("../views/ContractDrafting.vue"),
+  drafting: () => import("../views/ContractDraftList.vue"),
   templates: () => import("../views/ContractTemplates.vue"),
   start: () => import("../views/StartReview.vue"),
   records: () => import("../views/ReviewRecords.vue"),
@@ -29,7 +29,7 @@ export const router = createRouter({
           ]);
           return view;
         },
-      })), {path: '/templates/:id/review', name: 'template-review', meta: {page: 'templates', title: '模板核验'}, component: () => import('../views/TemplateReview.vue')}],
+      })), {path:'/drafting/new',name:'drafting-new',meta:{page:'drafting',title:'新建合同起草'},component:()=>import('../views/ContractDrafting.vue')}, {path:'/drafting/:id/edit',name:'drafting-edit',meta:{page:'drafting',title:'编辑合同草稿'},component:()=>import('../views/ContractDrafting.vue')}, {path: '/templates/:id/review', name: 'template-review', meta: {page: 'templates', title: '模板核验'}, component: () => import('../views/TemplateReview.vue')}],
     },
     {
       path: "/workbench",

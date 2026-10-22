@@ -181,7 +181,7 @@ def test_browser_records_paging_comparison_and_completion(isolated_workspace, mo
         with page.expect_download() as download: row.get_by_role('link',name='导出审核结果',exact=True).click()
         assert download.value.suggested_filename.endswith('.docx')
         row.get_by_role('button',name='前后对比',exact=True).click()
-        expect(page.get_by_role('dialog',name='审核前后对比')).to_contain_text('验收后15日付款')
+        expect(page.frame_locator('iframe[title="修改后合同原格式文档"]').locator('article')).to_contain_text('验收后15日付款')
         page.get_by_role('button',name='关闭对比',exact=True).click()
         row.get_by_role('link',name='打开',exact=True).click()
         page.get_by_role('button',name='完成审核',exact=True).click()

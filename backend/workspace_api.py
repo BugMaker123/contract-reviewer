@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 from fastapi.responses import Response
 
 from .store import repository as repo, now
-from .revisions import revised_text, editable_run
+from .revisions import revised_text, editable_run, revision_plan
 from .export_policy import exportable_run, exportable_report
 from .stance_policy import changes_identity, stance_as_fact, model_input
 from .rewrite_policy import adds_signing_reminder, REWRITE_WARNING
@@ -347,26 +347,61 @@ def get_run(run_id: str):
     return run_view(repo.get(run_id, 'run'))
 
 
-@router.get('/api/tasks/{task_id}/comparison')
-def compare_task_versions(task_id: str, before_run: str | None = None, after_run: str | None = None):
+def comparison_versions(task_id, before_run=None, after_run=None, scope='current'):
     task = repo.get(task_id, 'task')
     identifier = after_run or task.get('active_run')
     if not identifier:
         raise HTTPException(409, '此任务尚无审查结果')
+    if scope not in ('current', 'all'):
+        raise HTTPException(422, '无效对比范围')
     after = repo.get(identifier, 'run')
-    before = repo.get(before_run, 'run') if before_run else after
+    if before_run == 'initial':
+        runs = [run for run in repo.list('run', task_id) if run['status'] == 'completed']
+        if not runs:
+            raise HTTPException(409, '此任务尚无已完成的审查版本')
+        before = min(runs, key=lambda run: run['number'])
+    else:
+        before = repo.get(before_run, 'run') if before_run else after
     if any(run['task_id'] != task_id for run in (before, after)):
         raise HTTPException(422, '只能对比同一任务的历史版本')
     if before['status'] != 'completed' or after['status'] != 'completed':
         raise HTTPException(409, '请选择已完成的审查版本')
+    snapshots = bool(before_run and before_run != 'initial')
+    ids, warnings = revision_plan(after)
     original = before['input']['text']
-    revised = after['input']['text'] if before_run else revised_text(after)
+    revised = after['input']['text'] if snapshots else revised_text(after, ids if scope == 'all' else None)
+    return task, before, after, original, revised, snapshots, ids, warnings
+
+
+@router.get('/api/tasks/{task_id}/comparison')
+def compare_task_versions(task_id: str, before_run: str | None = None, after_run: str | None = None, scope: str = 'current'):
+    task, before, after, original, revised, snapshots, ids, warnings = comparison_versions(task_id, before_run, after_run, scope)
     diff = compare_documents(DocumentComparison(original=original, revised=revised))
-    return {'title': task['title'], 'before_run': before['id'], 'after_run': after['id'],
+    return {**diff, 'title': task['title'], 'before_run': before['id'], 'after_run': after['id'],
             'before_number': before['number'], 'after_number': after['number'],
-            'kind': 'versions' if before_run else 'accepted', 'original': original, 'revised': revised,
+            'kind': 'versions' if snapshots else 'accepted', 'scope': scope,
+            'applied_count': len(after['applied']), 'pending_count': len(set(ids) - set(after['applied'])),
+            'warnings': warnings, 'original': original, 'revised': revised,
             'changes': [{**change, 'original': '\n'.join(original.split('\n')[change['original_start']:change['original_end']]),
                          'revised': '\n'.join(revised.split('\n')[change['revised_start']:change['revised_end']])} for change in diff['changes']]}
+
+
+@router.get('/api/tasks/{task_id}/comparison/document/{side}')
+def comparison_document(task_id: str, side: str, before_run: str | None = None,
+                        after_run: str | None = None, scope: str = 'current', info: bool = False):
+    if side not in ('original', 'revised'):
+        raise HTTPException(422, '无效对比方向')
+    _, before, after, original, revised, _, _, _ = comparison_versions(task_id, before_run, after_run, scope)
+    run, text = (before, original) if side == 'original' else (after, revised)
+    document, layout = contract_document(run, text, repo, word_document)
+    if info:
+        from .word_export import paragraphs, visible_paragraph_text
+        content = [visible_paragraph_text(p._p) for p in paragraphs(document)]
+        if '\n'.join(content) != text and '\n'.join(content[1:]) == text:
+            content = content[1:]
+        return {'name': run['input']['title'] + '.docx', 'extension': '.docx',
+                'text': text, 'paragraphs': content, 'layout': layout}
+    return download_docx(document, run['input']['title'], layout, inline=True)
 
 
 @router.get('/api/runs/{run_id}/audit')

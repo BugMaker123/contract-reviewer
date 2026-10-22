@@ -1,4 +1,5 @@
 from io import BytesIO
+import re
 import pytest
 from fastapi.testclient import TestClient
 from docx import Document
@@ -62,24 +63,60 @@ def test_drafting_browser_flow(client):
         page.on('pageerror',lambda e:errors.append(str(e)))
         page.goto(base+'/drafting')
         expect(page.get_by_role('heading',name='合同起草',exact=True)).to_be_visible()
+        expect(page.get_by_label('搜索起草记录')).to_be_visible()
+        expect(page.locator('.drafting-layout')).to_have_count(0)
+        page.get_by_role('link',name='新建起草',exact=False).first.click()
+        page.wait_for_url('**/drafting/new')
+        expect(page.get_by_role('heading',name='新建合同起草',exact=True)).to_be_visible()
+        expect(page.get_by_label('搜索起草记录')).to_have_count(0)
+        expect(page.get_by_role('button',name='生成合同草稿',exact=True)).to_be_disabled()
+        page.get_by_role('button',name='填入示例',exact=True).click()
+        expect(page.get_by_label('交易内容与履行安排',exact=False)).to_have_value(re.compile('甲方向乙方采购'))
+        expect(page.get_by_role('button',name='填入示例',exact=True)).to_be_disabled()
+        focus=page.get_by_role('button',name='＋ 明确知识产权归属',exact=True)
+        focus.click()
+        expect(focus).to_have_attribute('aria-pressed','true')
+        focus.click()
+        expect(focus).to_have_attribute('aria-pressed','false')
         page.get_by_label('合同名称',exact=False).first.fill(BRIEF['title'])
         page.get_by_label('交易内容与履行安排',exact=False).fill(BRIEF['transaction'])
         page.get_by_label('甲方名称',exact=True).fill(BRIEF['party_a'])
         page.get_by_role('button',name='生成合同草稿',exact=True).click()
+        page.wait_for_url('**/drafting/*/edit')
+        edit_url=page.url
+        expect(page.get_by_role('heading',name='编辑合同草稿',exact=True)).to_be_visible()
+        expect(page.get_by_label('合同草稿正文')).to_have_value(TEXT)
+        page.reload()
         expect(page.get_by_label('合同草稿正文')).to_have_value(TEXT)
         page.get_by_label('合同草稿正文').fill(TEXT+'\n补充条款：银行转账支付。')
+        page.get_by_role('button',name='预览',exact=True).click()
+        expect(page.get_by_label('合同草稿预览')).to_contain_text('银行转账支付')
+        expect(page.get_by_text('有未保存修改',exact=True)).to_be_visible()
+        page.get_by_role('button',name='编辑',exact=True).click()
+        expect(page.get_by_label('合同草稿正文')).to_have_value(TEXT+'\n补充条款：银行转账支付。')
         with page.expect_download() as download:
             page.get_by_role('button',name='导出 Word').click()
         assert '银行转账' in '\n'.join(p.text for p in Document(download.value.path()).paragraphs)
-        page.get_by_role('button',name='新建起草',exact=False).click()
-        page.get_by_role('button',name='打开草稿',exact=True).click()
-        expect(page.get_by_label('合同草稿正文')).to_have_value(TEXT+'\n补充条款：银行转账支付。')
+        page.get_by_label('合同草稿正文').fill(TEXT+'\n补充条款：银行转账支付。\n签署后生效。')
+        page.get_by_role('link',name='返回列表',exact=True).click()
+        page.wait_for_url('**/drafting')
+        expect(page.get_by_label('搜索起草记录')).to_be_visible()
+        page.screenshot(path='artifacts/prototypes/contract-drafting-list.png')
+        page.get_by_role('link',name='编辑草稿',exact=True).click()
+        expect(page).to_have_url(edit_url)
+        expect(page.get_by_label('合同草稿正文')).to_have_value(TEXT+'\n补充条款：银行转账支付。\n签署后生效。')
         page.locator('.portal-main').evaluate('(el)=>{el.scrollTop=0}')
         page.screenshot(path='artifacts/prototypes/contract-drafting.png')
+        page.set_viewport_size({'width':1000,'height':900})
+        brief_box=page.locator('.drafting-brief').bounding_box()
+        output_box=page.locator('.drafting-output').bounding_box()
+        assert output_box['y'] >= brief_box['y']+brief_box['height']
+        assert page.locator('.drafting-page').evaluate('(el)=>el.scrollWidth<=el.clientWidth')
+        page.set_viewport_size({'width':1600,'height':1000})
         page.get_by_role('button',name='进入合同审查',exact=False).click()
         page.wait_for_url('**/workbench?task=*')
         task_id=page.url.split('task=')[1]
         task=workspace_api.repo.get(task_id,'task')
-        assert task['text'].endswith('银行转账支付。') and task['status']=='draft'
+        assert task['text'].endswith('签署后生效。') and task['status']=='draft'
         assert not errors,errors
         browser.close()

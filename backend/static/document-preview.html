@@ -369,6 +369,15 @@
     #review-callout.is-rejected { border-color: #94a3b8; color: #475569; background: #f8fafc; }
     #review-callout.is-rejected::before { background: #94a3b8; }
 
+    .record-comparison-document .pane-identity{display:none}
+    .record-comparison-document mark.lexis-diff-token[data-side="original"]{background:#fecdd3!important;text-decoration:line-through;text-decoration-color:#be123c;box-shadow:none}
+    .record-comparison-document mark.lexis-diff-token[data-side="revised"]{background:#a7f3d0!important;text-decoration:underline;text-decoration-color:#047857;box-shadow:none}
+    .record-comparison-document .lexis-diff-original{box-shadow:inset 3px 0 #e11d48;background:#fff1f250}
+    .record-comparison-document .lexis-diff-revised{box-shadow:inset 3px 0 #059669;background:#ecfdf550}
+    .record-comparison-document .comparison-current-change{outline:2px solid #2563eb!important;outline-offset:4px}
+    .comparison-changes-only section.docx{min-height:0!important;height:auto!important;padding-top:24pt!important;padding-bottom:24pt!important;margin-bottom:12px!important}
+    .comparison-changes-only article{min-height:0!important;height:auto!important}
+    .record-comparison-document .docx-wrapper{padding:12px!important}
   </style>
 </head>
 
@@ -400,6 +409,10 @@
   <script>
     (async () => {
       const params = new URLSearchParams(location.search), tracking = params.get('review') === '1', display = params.get('display') || 'markup', id = params.get('source'), run = params.get('run'), scope = params.get('scope') || 'current', readOnly = params.get('readonly') === '1'; const status = document.querySelector('#status'), pages = document.querySelector('#pages'), zoom = { value: 'fit' }, zoomControls = document.querySelector('#zoom-controls');
+      const comparison = params.get('comparison');
+      const comparisonQuery = new URLSearchParams({before_run: params.get('before_run') || '', after_run: run || '', scope});
+      const comparisonUrl = '/api/tasks/' + comparison + '/comparison/document/' + (params.get('side') === 'revised' ? 'revised' : 'original') + '?' + comparisonQuery;
+      if (comparison) document.body.classList.add('record-comparison-document');
       const resize = () => {
         const sheets = [...pages.querySelectorAll('section.docx')]; if (!sheets.length) return;
         const width = Math.max(...sheets.map(page => Math.max(page.offsetWidth, page.scrollWidth)));
@@ -762,6 +775,29 @@
           }
           matches.forEach(item => item.element.classList.add('lexis-review-risk'));
         }
+        if (comparison) {
+          document.body.classList.toggle('comparison-changes-only', Boolean(data.onlyChanges));
+          const active = data.changes?.[data.selectedChange];
+          const start = active?.[data.side + '_start'], end = active?.[data.side + '_end'];
+          const matched = anchors.filter(item => start < end && item.index < end && item.end > start);
+          const nearest = anchors.find(item => item.end > start) || anchors.at(-1);
+          const focused = matched.length ? matched : nearest ? [nearest] : [];
+          for (const item of anchors) {
+            const changed = (data.changes || []).some(change => {
+              const a = change[data.side + '_start'], b = change[data.side + '_end'];
+              return a < b ? item.index < b && item.end > a : item === (anchors.find(anchor => anchor.end > a) || anchors.at(-1));
+            });
+            item.element.hidden = Boolean(data.onlyChanges && data.changes?.length && !changed);
+            item.element.classList.toggle('comparison-current-change', focused.includes(item));
+          }
+          pages.querySelectorAll('tr').forEach(row => { const ps = [...row.querySelectorAll('p')]; row.hidden = Boolean(data.onlyChanges && ps.length && ps.every(p => p.hidden)); });
+          pages.querySelectorAll('section.docx').forEach(page => { const items = anchors.filter(item => page.contains(item.element)); page.hidden = Boolean(data.onlyChanges && items.length && items.every(item => item.element.hidden)); });
+          resize();
+          if (data.focus && active) {
+            scrollLockUntil = performance.now() + 250;
+            focused[0]?.element.scrollIntoView({behavior:'instant',block:'center'});
+          }
+        }
         if (data.focusFirst) {
           const first = pages.querySelector('.lexis-review-risk');
           if (first) { first.scrollIntoView({ behavior: 'instant', block: 'center' }); hint.textContent = '已定位到首个审查重点'; }
@@ -837,12 +873,12 @@
       document.addEventListener('click', event => { if (!zoomControls.contains(event.target)) closeZoom(); });
       document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeZoom(); zoomButton.focus(); } });
       try {
-        if (tracking ? !/^[a-f0-9]{32}$/.test(run || '') : !/^[a-f0-9]{32}$/.test(id || '')) throw Error('文档标识无效');
-        const metadata = tracking ? '/api/runs/' + run + '/review-document/info?display=' + encodeURIComponent(display) : '/api/sources/' + id + '?include_text=true' + (run ? '&run=' + encodeURIComponent(run) + '&scope=' + encodeURIComponent(scope) : '');
+        if (!/^[a-f0-9]{32}$/.test(comparison || (tracking ? run : id) || '')) throw Error('文档标识无效');
+        const metadata = comparison ? comparisonUrl + '&info=true' : tracking ? '/api/runs/' + run + '/review-document/info?display=' + encodeURIComponent(display) : '/api/sources/' + id + '?include_text=true' + (run ? '&run=' + encodeURIComponent(run) + '&scope=' + encodeURIComponent(scope) : '');
         const response = await fetch(metadata);
         if (!response.ok) { const data = await response.json(); throw Error(data.detail || '文档记录不存在'); }
         info = await response.json(); document.querySelector('#name').textContent = info.name; label.title = info.name;
-        const url = tracking ? '/api/runs/' + run + '/review-document/preview?display=' + encodeURIComponent(display) : run ? '/api/runs/' + encodeURIComponent(run) + '/preview-file/inline?scope=' + encodeURIComponent(scope) : '/api/sources/' + id + '/file';
+        const url = comparison ? comparisonUrl : tracking ? '/api/runs/' + run + '/review-document/preview?display=' + encodeURIComponent(display) : run ? '/api/runs/' + encodeURIComponent(run) + '/preview-file/inline?scope=' + encodeURIComponent(scope) : '/api/sources/' + id + '/file';
         const link = document.querySelector('#download'); link.href = url; link.download = info.name;
         const file = await fetch(url); if (!file.ok) throw Error('原件文件缺失，请重新上传'); const blob = await file.blob();
         if (info.extension === '.docx') {
@@ -881,7 +917,7 @@
         documentRendered = true;
         if (pendingMarks) { applyDifferenceMarks(pendingMarks); pendingMarks = null; }
         requestAnimationFrame(() => requestAnimationFrame(() => parent.postMessage({ type: tracking ? 'lexis-review-ready' : 'lexis-document-ready', source: id, run, text: info.text, warnings: info.revision_warnings || [], token: params.get('v'), revision: info.revision, order: tracking ? reviewOrder() : [] }, location.origin)));
-      } catch (error) { status.textContent = '预览失败：' + error.message + '。可切换至审查文本继续核对。'; }
+      } catch (error) { if (comparison) parent.postMessage({type:'lexis-document-error', message:error.message}, location.origin); status.textContent = '预览失败：' + error.message + '。可切换至审查文本继续核对。'; }
     })();</script>
 </body>
 

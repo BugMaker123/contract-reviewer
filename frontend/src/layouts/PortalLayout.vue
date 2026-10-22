@@ -11,9 +11,10 @@ export default {
     const shell = usePortalShell();
     const route = useRoute();
     const navigationGroups = computed(() => [
-      {name:'', keys:['start','drafting']},
+      {name:'', keys:['start']},
       {name:'审查管理', keys:['categories','checklists','records']},
       {name:'模板管理', keys:['templates','validations']},
+      {name:'', keys:['drafting']},
     ].map(group => ({...group, items:group.keys.map(key => {
       const item = shell.navigation.find(item => item.key === key);
       return {...item, name:({checklists:'审查清单维护',validations:'合同模板核验记录'})[key] || item.name};
