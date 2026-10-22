@@ -53,5 +53,12 @@ export default {
       <p v-else-if="reviewResult" class="wb-nav-empty">本次审查没有需要处理的问题。</p>
       </template>
     </div>
+    <div
+      v-if="summaryOpen"
+      class="wb-edge-resize wb-edge-right"
+      title="拖拽调整导航大纲宽度，双击恢复默认"
+      @mousedown="context.startLeftResize"
+      @dblclick="context.resetLeftWidth"
+    />
   </aside>
 </template>

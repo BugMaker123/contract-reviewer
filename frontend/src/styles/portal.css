@@ -134,8 +134,20 @@ a:focus-visible {
   color: #475569;
 }
 
+.nav-icon {
+  width: 18px;
+  height: 18px;
+  color: #64748b;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
 .nav-link:hover {
   background: #f8fafc;
+}
+
+.nav-link:hover .nav-icon {
+  color: #2563eb;
 }
 
 .nav-link.active {
@@ -143,6 +155,10 @@ a:focus-visible {
   border-color: #bfdbfe;
   color: #1d4ed8;
   font-weight: 600;
+}
+
+.nav-link.active .nav-icon {
+  color: #1d4ed8;
 }
 
 .mode-button {
@@ -499,6 +515,13 @@ a:focus-visible {
 .records-date-range { display: flex; align-items: center; gap: 7px; color: #94a3b8; font-size: 12px; }
 .records-date-range .field { width: calc((100% - 26px) / 2); }
 .records-archive { display: flex; align-items: center; gap: 6px; color: #64748b; font-size: 12px; white-space: nowrap; }
+.records-search-box { position: relative; width: 100%; min-width: 0; }
+.records-search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; line-height: 16px; border-radius: 50%; background: #e2e8f0; color: #64748b; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; border: none; cursor: pointer; transition: background 0.15s; }
+.records-search-clear:hover { background: #cbd5e1; color: #1e293b; }
+.records-filter-actions { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.records-reset-btn { font-size: 12px; color: #2563eb; background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background-color 0.15s; }
+.records-reset-btn:hover { background-color: #eff6ff; text-decoration: underline; }
+.records-empty-reset { font-size: 12px; padding: 6px 14px; margin-top: 10px; }
 .records-table-scroll { overflow-x: auto; }
 .records-table { min-width: 940px; table-layout: fixed; }
 .records-table th, .records-table td { padding: 12px; vertical-align: middle; }

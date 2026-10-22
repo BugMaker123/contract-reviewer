@@ -271,6 +271,39 @@ export function useTrackedReview(context) {
     }
     if (issues.length) message("已采纳 " + issues.length + " 项修订");
   };
+  const pendingCriticalCount = computed(
+    () =>
+      reviewIssues.value.filter(
+        (issue) =>
+          issue.redline &&
+          issue.severity === "critical" &&
+          !appliedIssueIds.value.includes(issue.id) &&
+          !["applied", "rejected"].includes(workspace.decisions[issue.id]),
+      ).length,
+  );
+  const pendingLowRiskCount = computed(
+    () =>
+      reviewIssues.value.filter(
+        (issue) =>
+          issue.redline &&
+          issue.severity !== "critical" &&
+          !appliedIssueIds.value.includes(issue.id) &&
+          !["applied", "rejected"].includes(workspace.decisions[issue.id]),
+      ).length,
+  );
+  const acceptLowRiskRevisions = async () => {
+    const issues = reviewIssues.value.filter(
+      (issue) =>
+        issue.redline &&
+        issue.severity !== "critical" &&
+        !appliedIssueIds.value.includes(issue.id) &&
+        !["applied", "rejected"].includes(workspace.decisions[issue.id]),
+    );
+    for (const issue of issues) {
+      if (!(await setReviewDecision(issue, "applied"))) return;
+    }
+    if (issues.length) message("已采纳 " + issues.length + " 项一般与优化建议（已保留重大风险供人工复核）");
+  };
   const undoableRevisionIds = computed(() => reviewIssues.value.filter(issue =>
     appliedIssueIds.value.includes(issue.id) || ['applied', 'rejected', 'needs_review'].includes(workspace.decisions[issue.id])
   ).map(issue => issue.id));
@@ -294,6 +327,29 @@ export function useTrackedReview(context) {
       appliedIssueIds.value = previousApplied;
       workspace.decisions = previousDecisions;
       message("一键撤销失败：" + error.message);
+      return false;
+    } finally {
+      revisionBusy.value = false;
+    }
+  };
+  const cancelAllAcceptedRevisions = async () => {
+    if (!writable() || !appliedIssueIds.value.length) return false;
+    const identifiers = [...appliedIssueIds.value];
+    revisionBusy.value = true;
+    const previousApplied = [...appliedIssueIds.value];
+    const previousDecisions = { ...workspace.decisions };
+    try {
+      const decisions = { ...previousDecisions };
+      for (const id of identifiers) decisions[id] = "pending";
+      appliedIssueIds.value = [];
+      workspace.decisions = decisions;
+      await workspace.flush();
+      message(`已取消 ${identifiers.length} 项采纳，恢复为待处理`);
+      return true;
+    } catch (error) {
+      appliedIssueIds.value = previousApplied;
+      workspace.decisions = previousDecisions;
+      message("取消采纳失败：" + error.message);
       return false;
     } finally {
       revisionBusy.value = false;
@@ -490,7 +546,11 @@ export function useTrackedReview(context) {
     setReviewDecision,
     pendingApplicableCount,
     acceptAllRevisions,
+    pendingCriticalCount,
+    pendingLowRiskCount,
+    acceptLowRiskRevisions,
     undoAllReviewDecisions,
+    cancelAllAcceptedRevisions,
     undoableRevisionCount,
     generateRevision,
     beginRevisionEdit,

@@ -1,4 +1,5 @@
 <script>
+import { ref } from "vue";
 import { useTrackedReview } from "../composables/useTrackedReview.js";
 import { useWorkbench } from "../composables/useWorkbench.js";
 import WorkbenchHeader from "../components/workbench/WorkbenchHeader.vue";
@@ -12,6 +13,7 @@ import ReviewConditions from "../components/workbench/ReviewConditions.vue";
 import DocumentEditor from "../components/workbench/DocumentEditor.vue";
 import WorkbenchModelSettings from "../components/workbench/WorkbenchModelSettings.vue";
 import ReportPreview from "../components/workbench/ReportPreview.vue";
+
 export default {
   components: {
     WorkbenchHeader,
@@ -31,7 +33,75 @@ export default {
     const context = useWorkbench();
     Object.assign(context, useTrackedReview(context));
     emit("ready", context);
-    return { ...context, context };
+
+    const leftWidth = ref("");
+    const rightWidth = ref("");
+
+    const startLeftResize = (e) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const panel = document.getElementById("review-summary-panel");
+      if (!panel) return;
+      const initialWidth = panel.getBoundingClientRect().width;
+      const onMouseMove = (moveEvent) => {
+        const delta = moveEvent.clientX - startX;
+        const newWidth = Math.max(220, Math.min(560, initialWidth + delta));
+        leftWidth.value = `${newWidth}px`;
+      };
+      const onMouseUp = () => {
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+      };
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+    };
+
+    const startRightResize = (e) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const panel = document.getElementById("opinion-drawer");
+      if (!panel) return;
+      const initialWidth = panel.getBoundingClientRect().width;
+      const onMouseMove = (moveEvent) => {
+        const delta = startX - moveEvent.clientX;
+        const newWidth = Math.max(320, Math.min(760, initialWidth + delta));
+        rightWidth.value = `${newWidth}px`;
+      };
+      const onMouseUp = () => {
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+      };
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+    };
+
+    const resetLeftWidth = () => {
+      leftWidth.value = "";
+    };
+
+    const resetRightWidth = () => {
+      rightWidth.value = "";
+    };
+
+    Object.assign(context, {
+      leftWidth,
+      rightWidth,
+      startLeftResize,
+      startRightResize,
+      resetLeftWidth,
+      resetRightWidth,
+    });
+
+    return {
+      ...context,
+      context,
+      leftWidth,
+      rightWidth,
+      startLeftResize,
+      startRightResize,
+      resetLeftWidth,
+      resetRightWidth,
+    };
   },
 };
 </script>
@@ -50,9 +120,9 @@ export default {
     </header>
     <WorkbenchHeader :context="context" />
     <main class="flex-1 flex overflow-hidden">
-      <SummaryPanel :context="context" />
+      <SummaryPanel :context="context" :style="leftWidth ? { width: leftWidth, flex: '0 0 auto' } : {}" />
       <DocumentPanel :context="context" />
-      <OpinionsPanel :context="context" />
+      <OpinionsPanel :context="context" :style="rightWidth ? { width: rightWidth, flex: '0 0 auto' } : {}" />
     </main>
     <ClauseEditor :context="context" />
     <ReviewConditions :context="context" />

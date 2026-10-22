@@ -4,12 +4,23 @@ import { useRoute } from "vue-router";
 import { usePortalShell } from "../stores/portal.js";
 import ModelSettings from "../components/portal/ModelSettings.vue";
 import Help from "../components/portal/Help.vue";
+import ReviewIcon from "../components/portal/ReviewIcon.vue";
+
 export default {
   name: "PortalLayout",
-  components: { ModelSettings, Help },
+  components: { ModelSettings, Help, ReviewIcon },
   setup() {
     const shell = usePortalShell();
     const route = useRoute();
+    const iconMap = {
+      start: 'home',
+      drafting: 'drafting',
+      records: 'records',
+      validations: 'validations',
+      categories: 'categories',
+      checklists: 'checklists',
+      templates: 'templates',
+    };
     const navigationGroups = computed(() => [
       {name:'', keys:['start']},
       {name:'审查管理', keys:['categories','checklists','records']},
@@ -23,7 +34,7 @@ export default {
     const refreshRecent = async () => { try { await shell.loadRecords(); recentError.value = ''; } catch { recentError.value = '最近工作读取失败'; } };
     watch(() => route.path, refreshRecent, {immediate:true});
     const recentAction = status => ({completed:'查看审核结果',pending_review:'继续复核',running:'查看审查进度',draft:'继续审查',failed:'重新处理',interrupted:'恢复处理'})[status] || '打开任务';
-    return { ...shell, shell, navigationGroups, recentAction, recentError, refreshRecent, page: computed(() => route.meta.page) };
+    return { ...shell, shell, navigationGroups, iconMap, recentAction, recentError, refreshRecent, page: computed(() => route.meta.page) };
   },
 };
 </script>
@@ -39,7 +50,7 @@ export default {
       <RouterLink to="/" class="portal-brand flex items-center gap-3"
         ><span
           class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold"
-          >⚖</span
+          ><ReviewIcon name="scale" class="w-5 h-5 text-white" aria-hidden="true" /></span
         ><strong class="text-base text-slate-900">LexisGraph</strong>
       </RouterLink>
         <RouterLink v-if="['template-review', 'templates'].includes($route.name)" to="/" class="app-home-link"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14"/></svg>返回主页</RouterLink>
@@ -58,7 +69,7 @@ export default {
           <section v-for="group in navigationGroups" :key="group.name" class="portal-nav-group" :aria-label="group.name || '主入口'">
             <h2 v-if="group.name" class="portal-nav-label">{{group.name}}</h2>
             <RouterLink v-for="item in group.items" :key="item.key" :to="item.href" class="nav-link" :class="{active:page===item.key}">
-              <span aria-hidden="true" class="w-5 text-center">{{item.icon}}</span>{{item.name}}
+              <ReviewIcon :name="iconMap[item.key] || 'document'" class="nav-icon" aria-hidden="true" />{{item.name}}
             </RouterLink>
           </section>
         </nav>

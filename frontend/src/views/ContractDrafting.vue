@@ -1,37 +1,234 @@
 <script setup>
-import {ref,reactive,computed,onActivated,onDeactivated} from 'vue';
-import {useRouter,useRoute,onBeforeRouteLeave} from 'vue-router';
+import { ref, reactive, computed, onActivated, onDeactivated } from 'vue';
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router';
 import ReviewIcon from '../components/portal/ReviewIcon.vue';
-import {usePortalShell} from '../stores/portal.js';
-const shell=usePortalShell(),router=useRouter(),route=useRoute();
-const empty=()=>({title:'',contract_type:'采购合同',party_a:'',party_b:'',perspective:'中立审慎',transaction:'',payment:'',requirements:''});
-const brief=reactive(empty()),draft=ref(null),title=ref(''),text=ref(''),busy=ref(false),error=ref('');
-const operation=ref(''),mode=ref('edit');
-const contractTypes=['采购合同','销售合同','服务合同','技术开发合同','租赁合同','保密协议','合作协议','其他合同'];
-const focusOptions=['明确验收标准与异议期限','约定逾期付款与违约责任','明确知识产权归属','约定保密义务与期限'];
-const readiness=computed(()=>!brief.title.trim()?'请填写合同名称':brief.transaction.trim().length<10?'请补充至少 10 字的交易安排':'需求已就绪，可以生成合同草稿');
-const canGenerate=computed(()=>Boolean(brief.title.trim())&&brief.transaction.trim().length>=10);
-const briefChanged=computed(()=>draft.value&&JSON.stringify(brief)!==JSON.stringify({...empty(),...draft.value.brief}));
-const missing=computed(()=>draft.value?.missing_information||[]);
-const dirty=computed(()=>draft.value&&(title.value!==draft.value.title||text.value!==draft.value.text));
-function show(saved){draft.value=saved;title.value=saved.title;text.value=saved.text;Object.assign(brief,empty(),saved.brief);mode.value='edit';}
-async function persist(){if(!dirty.value)return draft.value;if(!title.value.trim()||!text.value.trim())throw Error('合同名称和正文不能为空，请补充后保存');const saved=await shell.api('/api/contract-drafts/'+draft.value.id,'PUT',{title:title.value,text:text.value,revision:draft.value.revision});draft.value=saved;return saved;}
-async function action(fn,name='load'){if(busy.value)return;busy.value=true;operation.value=name;error.value='';try{await fn();}catch(e){error.value=e.message;}finally{busy.value=false;operation.value='';}}
-function generate(){if(!canGenerate.value||busy.value)return;action(async()=>{await persist();const saved=await shell.api('/api/contract-drafts/generate','POST',{brief:{...brief},model_config_data:shell.model});shell.notify('合同草稿已生成并保存');busy.value=false;await router.replace('/drafting/'+saved.id+'/edit');Object.assign(brief,empty());},'generate');}
-function save(){action(async()=>{await persist();shell.notify('草稿已保存');},'save');}
-function download(){action(async()=>{const saved=await persist();const response=await fetch('/api/contract-drafts/'+saved.id+'/word');if(!response.ok)throw Error('Word 导出失败，请重试');const url=URL.createObjectURL(await response.blob());const a=document.createElement('a');a.href=url;a.download=saved.title+'.docx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);},'download');}
-function review(){action(async()=>{const saved=await persist();const roles={'甲方立场':'甲方(买方/采购方/委托方)','乙方立场':'乙方(卖方/开发方/服务方)','中立审慎':'中立审慎'};const task=await shell.api('/api/tasks','POST',{title:saved.title,text:saved.text,type:saved.brief.contract_type,role:roles[saved.brief.perspective]||'中立审慎',mode:'deep',background:saved.brief.transaction,focus:saved.brief.requirements});busy.value=false;await router.push('/workbench?task='+task.id);},'review');}
-function addFocus(value){const items=brief.requirements.split('；').filter(Boolean);const next=(items.includes(value)?items.filter(item=>item!==value):[...items,value]).join('；');if(next.length>10000){shell.notify('起草要求最多 10,000 字，请精简后添加');return;}brief.requirements=next;}
-function example(){if(!isEmpty.value)return;Object.assign(brief,{title:'办公设备采购合同',contract_type:'采购合同',perspective:'甲方立场',transaction:'甲方向乙方采购 20 台办公电脑，合同签订后 15 个工作日内送至甲方指定地点。到货后 5 个工作日内完成数量、配置及运行情况验收，质量保修期为验收合格后 12 个月。',payment:'合同总价人民币 100,000 元（含税）。签约后支付 30%，验收合格并收到合规发票后支付 70%。',requirements:'明确验收标准与异议期限；约定逾期交付与质量不合格的违约责任'});}
-const isEmpty=computed(()=>!brief.title&&!brief.party_a&&!brief.party_b&&!brief.transaction&&!brief.payment&&!brief.requirements);
-function beforeUnload(event){if(dirty.value||busy.value){event.preventDefault();event.returnValue='';}}
-onBeforeRouteLeave(async()=>{if(busy.value){shell.notify('正在处理，请稍后再切换页面');return false;}if(dirty.value){try{await persist();}catch(e){error.value=e.message;shell.notify('修改未能保存，请保存后再离开');return false;}}});
-async function loadDraft(){
-  if(!route.params.id)return;
-  await action(async()=>{show(await shell.api('/api/contract-drafts/'+route.params.id));});
+import { usePortalShell } from '../stores/portal.js';
+
+const shell = usePortalShell();
+const router = useRouter();
+const route = useRoute();
+
+/** 初始化起草需求表单数据 */
+const empty = () => ({
+  title: '',
+  contract_type: '采购合同',
+  party_a: '',
+  party_b: '',
+  perspective: '中立审慎',
+  transaction: '',
+  payment: '',
+  requirements: '',
+});
+
+const brief = reactive(empty());
+const draft = ref(null);
+const title = ref('');
+const text = ref('');
+const busy = ref(false);
+const error = ref('');
+const operation = ref('');
+const mode = ref('edit');
+
+const contractTypes = [
+  '采购合同',
+  '销售合同',
+  '服务合同',
+  '技术开发合同',
+  '租赁合同',
+  '保密协议',
+  '合作协议',
+  '其他合同',
+];
+
+const focusOptions = [
+  '明确验收标准与异议期限',
+  '约定逾期付款与违约责任',
+  '明确知识产权归属',
+  '约定保密义务与期限',
+];
+
+const readiness = computed(() => {
+  if (!brief.title.trim()) return '请填写合同名称';
+  if (brief.transaction.trim().length < 10) return '请补充至少 10 字的交易安排';
+  return '需求已就绪，可以生成合同草稿';
+});
+
+const canGenerate = computed(() => Boolean(brief.title.trim()) && brief.transaction.trim().length >= 10);
+
+const briefChanged = computed(() => (
+  draft.value && JSON.stringify(brief) !== JSON.stringify({ ...empty(), ...draft.value.brief })
+));
+
+const missing = computed(() => draft.value?.missing_information || []);
+
+const dirty = computed(() => (
+  draft.value && (title.value !== draft.value.title || text.value !== draft.value.text)
+));
+
+const isEmpty = computed(() => (
+  !brief.title &&
+  !brief.party_a &&
+  !brief.party_b &&
+  !brief.transaction &&
+  !brief.payment &&
+  !brief.requirements
+));
+
+function show(saved) {
+  draft.value = saved;
+  title.value = saved.title;
+  text.value = saved.text;
+  Object.assign(brief, empty(), saved.brief);
+  mode.value = 'edit';
 }
-onActivated(()=>{loadDraft();window.addEventListener('beforeunload',beforeUnload);});
-onDeactivated(()=>window.removeEventListener('beforeunload',beforeUnload));
+
+async function persist() {
+  if (!dirty.value) return draft.value;
+  if (!title.value.trim() || !text.value.trim()) {
+    throw new Error('合同名称和正文不能为空，请补充后保存');
+  }
+  const saved = await shell.api('/api/contract-drafts/' + draft.value.id, 'PUT', {
+    title: title.value,
+    text: text.value,
+    revision: draft.value.revision,
+  });
+  draft.value = saved;
+  return saved;
+}
+
+async function action(fn, name = 'load') {
+  if (busy.value) return;
+  busy.value = true;
+  operation.value = name;
+  error.value = '';
+  try {
+    await fn();
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    busy.value = false;
+    operation.value = '';
+  }
+}
+
+function generate() {
+  if (!canGenerate.value || busy.value) return;
+  action(async () => {
+    await persist();
+    const saved = await shell.api('/api/contract-drafts/generate', 'POST', {
+      brief: { ...brief },
+      model_config_data: shell.model,
+    });
+    shell.notify('合同草稿已生成并保存');
+    busy.value = false;
+    await router.replace('/drafting/' + saved.id + '/edit');
+    Object.assign(brief, empty());
+  }, 'generate');
+}
+
+function save() {
+  action(async () => {
+    await persist();
+    shell.notify('草稿已保存');
+  }, 'save');
+}
+
+function download() {
+  action(async () => {
+    const saved = await persist();
+    const response = await fetch('/api/contract-drafts/' + saved.id + '/word');
+    if (!response.ok) throw new Error('Word 导出失败，请重试');
+    const url = URL.createObjectURL(await response.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = saved.title + '.docx';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, 'download');
+}
+
+function review() {
+  action(async () => {
+    const saved = await persist();
+    const roles = {
+      '甲方立场': '甲方(买方/采购方/委托方)',
+      '乙方立场': '乙方(卖方/开发方/服务方)',
+      '中立审慎': '中立审慎',
+    };
+    const task = await shell.api('/api/tasks', 'POST', {
+      title: saved.title,
+      text: saved.text,
+      type: saved.brief.contract_type,
+      role: roles[saved.brief.perspective] || '中立审慎',
+      mode: 'deep',
+      background: saved.brief.transaction,
+      focus: saved.brief.requirements,
+    });
+    busy.value = false;
+    await router.push('/workbench?task=' + task.id);
+  }, 'review');
+}
+
+function addFocus(value) {
+  const items = brief.requirements.split('；').filter(Boolean);
+  const next = (items.includes(value) ? items.filter(item => item !== value) : [...items, value]).join('；');
+  if (next.length > 10000) {
+    shell.notify('起草要求最多 10,000 字，请精简后添加');
+    return;
+  }
+  brief.requirements = next;
+}
+
+function example() {
+  if (!isEmpty.value) return;
+  Object.assign(brief, {
+    title: '办公设备采购合同',
+    contract_type: '采购合同',
+    perspective: '甲方立场',
+    transaction: '甲方向乙方采购 20 台办公电脑，合同签订后 15 个工作日内送至甲方指定地点。到货后 5 个工作日内完成数量、配置及运行情况验收，质量保修期为验收合格后 12 个月。',
+    payment: '合同总价人民币 100,000 元（含税）。签约后支付 30%，验收合格并收到合规发票后支付 70%。',
+    requirements: '明确验收标准与异议期限；约定逾期交付与质量不合格的违约责任',
+  });
+}
+
+function beforeUnload(event) {
+  if (dirty.value || busy.value) {
+    event.preventDefault();
+    event.returnValue = '';
+  }
+}
+
+onBeforeRouteLeave(async () => {
+  if (busy.value) {
+    shell.notify('正在处理，请稍后再切换页面');
+    return false;
+  }
+  if (dirty.value) {
+    try {
+      await persist();
+    } catch (e) {
+      error.value = e.message;
+      shell.notify('修改未能保存，请保存后再离开');
+      return false;
+    }
+  }
+});
+
+async function loadDraft() {
+  if (!route.params.id) return;
+  await action(async () => {
+    show(await shell.api('/api/contract-drafts/' + route.params.id));
+  });
+}
+
+onActivated(() => {
+  loadDraft();
+  window.addEventListener('beforeunload', beforeUnload);
+});
+
+onDeactivated(() => {
+  window.removeEventListener('beforeunload', beforeUnload);
+});
 </script>
 <template>
   <div class="drafting-page">

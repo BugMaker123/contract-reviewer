@@ -2303,8 +2303,8 @@
 
 /* Secondary decision controls keep the page-level actions visually primary. */
 .workbench-view #opinion-drawer .revision-primary-actions {display:flex;flex-wrap:wrap;gap:8px;padding-top:10px;margin-top:10px;border-top:1px solid #e6ebf2;}
-.workbench-view #opinion-drawer .revision-primary-actions > button:nth-child(n),
-.workbench-view #opinion-drawer .wb-batch-actions > button {display:inline-flex;align-items:center;justify-content:center;gap:5px;order:0;margin:0;flex:0 0 auto;min-width:0;min-height:30px;padding:4px 10px;border:1px solid #dce3eb;border-radius:5px;background:#fff;color:#526176;font-size:12px;font-weight:400;line-height:20px;white-space:nowrap;opacity:1;box-shadow:none;cursor:pointer;transition:background .15s,border-color .15s,color .15s;}
+.workbench-view #opinion-drawer .wb-batch-actions > button {display:inline-flex;align-items:center;justify-content:center;gap:6px;order:0;margin:0;flex:0 0 auto;min-width:0;min-height:42px;padding:8px 16px;border:1px solid #dce3eb;border-radius:6px;background:#fff;color:#526176;font-size:13px;font-weight:500;line-height:22px;white-space:nowrap;opacity:1;box-shadow:none;cursor:pointer;transition:background .15s,border-color .15s,color .15s;}
+.workbench-view #opinion-drawer .revision-primary-actions > button:nth-child(n) {display:inline-flex;align-items:center;justify-content:center;gap:5px;order:0;margin:0;flex:0 0 auto;min-width:0;min-height:30px;padding:4px 10px;border:1px solid #dce3eb;border-radius:5px;background:#fff;color:#526176;font-size:12px;font-weight:400;line-height:20px;white-space:nowrap;opacity:1;box-shadow:none;cursor:pointer;transition:background .15s,border-color .15s,color .15s;}
 .workbench-view #opinion-drawer .revision-primary-actions > button.revision-ai-button,
 .workbench-view #opinion-drawer .wb-batch-actions > .batch-accept {background:#edf8f2;border-color:#bfdfcd;color:#287653;box-shadow:none;}
 .workbench-view #opinion-drawer .revision-primary-actions > button.revision-reject-button {background:#fff2f2;border-color:#efcdcf;color:#b34b55;}
@@ -2315,8 +2315,10 @@
 .workbench-view #opinion-drawer .revision-primary-actions > button.revision-reject-button:hover:not(:disabled) {background:#fff5f5;border-color:#e4c6ca;color:#a34450;}
 .workbench-view #opinion-drawer .revision-primary-actions > button.revision-undo-button:hover:not(:disabled),
 .workbench-view #opinion-drawer .wb-batch-actions > .batch-cancel:hover:not(:disabled) {background:#f1f5f9;border-color:#9eacbf;color:#1e293b;}
+.workbench-view #opinion-drawer .wb-batch-actions > .batch-safe-accept {background:#f0fdf4;border-color:#bbf7d0;color:#15803d;}
+.workbench-view #opinion-drawer .wb-batch-actions > .batch-safe-accept:hover:not(:disabled) {background:#dcfce7;border-color:#86efac;color:#166534;}
 .workbench-view #opinion-drawer .wb-opinion-toolbar .wb-batch-actions {display:flex;justify-content:flex-start;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 12px;padding:0 0 12px;border:0;border-bottom:1px solid #edf1f7;border-radius:0;background:transparent;}
-.workbench-view #opinion-drawer .wb-batch-actions > button {min-height:30px;padding:4px 10px;flex:0 0 auto;width:auto;}
+.workbench-view #opinion-drawer .wb-batch-actions > button {min-height:42px;padding:8px 16px;flex:0 0 auto;width:auto;}
 .workbench-view #opinion-drawer .revision-primary-actions > button:disabled,
 .workbench-view #opinion-drawer .wb-batch-actions > button:disabled {background:#fafbfc;border-color:#e8edf2;color:#a0aab8;opacity:1;box-shadow:none;cursor:not-allowed;}
 .workbench-view #opinion-drawer .revision-primary-actions > button:focus-visible,
@@ -2326,3 +2328,26 @@
 .workbench-view.navigation-collapsed #opinion-drawer .revision-primary-actions > button:nth-child(n) {font-size:12px;min-height:30px;}
 
 .workbench-view .workbench-global-header { justify-content: flex-start; gap: 24px; }
+
+.workbench-view .wb-edge-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 40;
+  background: transparent;
+  transition: background-color 0.15s ease;
+  user-select: none;
+}
+.workbench-view .wb-edge-right {
+  right: 0;
+}
+.workbench-view .wb-edge-left {
+  left: 0;
+}
+.workbench-view .wb-edge-resize:hover,
+.workbench-view .wb-edge-resize:active {
+  background: #3b82f6;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.4);
+}

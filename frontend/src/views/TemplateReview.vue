@@ -1,137 +1,819 @@
 <script setup>
-import {ref, computed, onMounted, watch} from 'vue';
-import {useRoute, onBeforeRouteLeave} from 'vue-router';
-import {usePortalShell} from '../stores/portal.js';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, onBeforeRouteLeave } from 'vue-router';
+import { usePortalShell } from '../stores/portal.js';
 import TemplateValidationReport from '../components/portal/TemplateValidationReport.vue';
 import ReviewIcon from '../components/portal/ReviewIcon.vue';
-import {readDocument} from '../portal/services/documents.js';
-const route=useRoute(), shell=usePortalShell();
-const record=ref(null), blocks=ref([]), fields=ref([]), releases=ref([]), warnings=ref([]);
-const validationFilename=ref('');
-const extracting=ref(false), extractionReport=ref(null), saving=ref(false), savedAt=ref('');
-const fieldSearch=ref(''), fieldFilter=ref('all'), showLocations=ref(false);
-const visibleFields=computed(()=>fields.value.map((item,index)=>({...item,number:index+1})).filter(f=>(fieldFilter.value!=='pending'||!f.confirmed)&&f.name.toLowerCase().includes(fieldSearch.value.trim().toLowerCase())));
-const ready=computed(()=>fields.value.length>0&&confirmed.value===fields.value.length);
-const readinessReason=computed(()=>!fields.value.length?'请先提取或手动添加填写区域':!ready.value?`还有 ${fields.value.length-confirmed.value} 个区域待核验，请在右侧逐项点击“确认并下一项”`:'全部区域已确认，可以验证合同或发布');
-const selected=ref(''), busy=ref(false), error=ref(''), dirty=ref(false), mode=ref('structure');
-const picker=ref(false), adjusting=ref(false), selection=ref(null), paper=ref(null), trialFile=ref(null), result=ref(null), confirmModal=ref('');
-const field=computed(()=>fields.value.find(f=>f.id===selected.value));
-const confirmed=computed(()=>fields.value.filter(f=>f.confirmed).length);
-const base=()=>'/api/contract-templates/'+route.params.id;
-const points=s=>Array.from(s);
-const placeholder=name=>`{{ ${name} }}`;
-const fixedLabel=/^(\s*)(?:(?:甲|乙|丙)方(?:[（(][^（）()]{1,8}[）)])?|(?:(?:甲|乙|丙)方)?(?:法定代表人(?:或授权代表)?|法定代表人或委托代理人|授权代表|委托代理人|通讯地址|联系地址|注册地址|地址|联系电话|联系人|电话|电子邮箱|邮箱|开户银行|开户行|银行账号|账号|统一社会信用代码|税号|签订日期|签署日期|日期|合同编号|协议编号|交货地点|签订地点))\s*[：:]/u;
-function fieldBounds(f,text){
- const label=text.slice(f.start,f.end).join('').match(fixedLabel);
- return {start:label?f.start+points(label[0]).length:f.start,end:f.end};
+import { readDocument } from '../portal/services/documents.js';
+
+const route = useRoute();
+const shell = usePortalShell();
+
+const record = ref(null);
+const blocks = ref([]);
+const fields = ref([]);
+const releases = ref([]);
+const warnings = ref([]);
+const validationFilename = ref('');
+const extracting = ref(false);
+const extractionReport = ref(null);
+const saving = ref(false);
+const savedAt = ref('');
+
+const fieldSearch = ref('');
+const fieldFilter = ref('all');
+const showLocations = ref(false);
+
+const selected = ref('');
+const busy = ref(false);
+const error = ref('');
+const dirty = ref(false);
+const mode = ref('structure');
+
+const picker = ref(false);
+const adjusting = ref(false);
+const selection = ref(null);
+const paper = ref(null);
+const trialFile = ref(null);
+const result = ref(null);
+const confirmModal = ref('');
+
+const pickBlock = ref('');
+const pickStart = ref(0);
+const pickEnd = ref(1);
+const insertBlank = ref(false);
+
+const visibleFields = computed(() => (
+  fields.value
+    .map((item, index) => ({ ...item, number: index + 1 }))
+    .filter((f) => (
+      (fieldFilter.value !== 'pending' || !f.confirmed) &&
+      f.name.toLowerCase().includes(fieldSearch.value.trim().toLowerCase())
+    ))
+));
+
+const confirmed = computed(() => fields.value.filter((f) => f.confirmed).length);
+const ready = computed(() => fields.value.length > 0 && confirmed.value === fields.value.length);
+const field = computed(() => fields.value.find((f) => f.id === selected.value));
+const chosenBlock = computed(() => blocks.value.find((b) => b.id === pickBlock.value));
+
+const readinessReason = computed(() => {
+  if (!fields.value.length) return '请先提取或手动添加填写区域';
+  if (!ready.value) {
+    return `还有 ${fields.value.length - confirmed.value} 个区域待核验，请在右侧逐项点击“确认并下一项”`;
+  }
+  return '全部区域已确认，可以验证合同或发布';
+});
+
+const base = () => '/api/contract-templates/' + route.params.id;
+const points = (s) => Array.from(s);
+const placeholder = (name) => `{{ ${name} }}`;
+
+const fixedLabel = /^(\s*)(?:(?:甲|乙|丙)方(?:[（(][^（）()]{1,8}[）)])?|(?:(?:甲|乙|丙)方)?(?:法定代表人(?:或授权代表)?|法定代表人或委托代理人|授权代表|委托代理人|通讯地址|联系地址|注册地址|地址|联系电话|联系人|电话|电子邮箱|邮箱|开户银行|开户行|银行账号|账号|统一社会信用代码|税号|签订日期|签署日期|日期|合同编号|协议编号|交货地点|签订地点))\s*[：:]/u;
+
+function fieldBounds(f, text) {
+  const label = text.slice(f.start, f.end).join('').match(fixedLabel);
+  return {
+    start: label ? f.start + points(label[0]).length : f.start,
+    end: f.end,
+  };
 }
-async function load(){try{const data=await shell.api(base()+'/review');record.value=data.template;blocks.value=data.blocks;fields.value=data.fields;releases.value=data.releases;warnings.value=data.warnings;selected.value=fields.value[0]?.id||'';dirty.value=!!(data.repaired||data.supplemented);if(data.supplemented)extractionReport.value={count:data.fields.length,skipped:[],supplemented:data.supplemented,preserved:data.fields.length-data.supplemented};savedAt.value=record.value.review_draft?record.value.updated_at:'';error.value='';}catch(e){error.value=e.message;record.value=null;blocks.value=[];fields.value=[];warnings.value=[];}}
+
+async function load() {
+  try {
+    const data = await shell.api(base() + '/review');
+    record.value = data.template;
+    blocks.value = data.blocks;
+    fields.value = data.fields;
+    releases.value = data.releases;
+    warnings.value = data.warnings;
+    selected.value = fields.value[0]?.id || '';
+    dirty.value = Boolean(data.repaired || data.supplemented);
+    if (data.supplemented) {
+      extractionReport.value = {
+        count: data.fields.length,
+        skipped: [],
+        supplemented: data.supplemented,
+        preserved: data.fields.length - data.supplemented,
+      };
+    }
+    savedAt.value = record.value.review_draft ? record.value.updated_at : '';
+    error.value = '';
+  } catch (e) {
+    error.value = e.message;
+    record.value = null;
+    blocks.value = [];
+    fields.value = [];
+    warnings.value = [];
+  }
+}
+
 onMounted(load);
-watch(()=>route.params.id,load);
-function openModel(){shell.showModel.value=true;}
-function openHelp(){shell.showHelp.value=true;}
-function change(){if(field.value)field.value.confirmed=false;dirty.value=true;}
-function select(id){selected.value=id;requestAnimationFrame(()=>document.getElementById('region-'+id)?.scrollIntoView({block:'nearest',behavior:'smooth'}));}
-function pieces(block){
- const text=points(block.text),rows=fields.value.filter(f=>f.block_id===block.id).map(f=>({field:f,...fieldBounds(f,text)})).sort((a,b)=>a.start-b.start);
- let cursor=0,out=[];
- for(const row of rows){
-  if(row.start>cursor)out.push({text:text.slice(cursor,row.start).join(''),start:cursor});
-  out.push({text:text.slice(row.start,row.end).join(''),start:row.start,field:row.field});
-  cursor=row.end;
- }
- if(cursor<text.length)out.push({text:text.slice(cursor).join(''),start:cursor});
- return out;
+watch(() => route.params.id, load);
+
+watch(pickBlock, () => {
+  pickStart.value = 0;
+  pickEnd.value = chosenBlock.value?.kind === 'cell'
+    ? points(chosenBlock.value.text).length
+    : Math.min(1, points(chosenBlock.value?.text || '').length);
+});
+
+function openModel() {
+  shell.showModel.value = true;
 }
 
-function capture(){
- selection.value=null;
- const currentSelection=window.getSelection();
- if(!currentSelection?.rangeCount||currentSelection.isCollapsed)return;
- const range=currentSelection.getRangeAt(0);
- const element=node=>node.nodeType===1?node:node.parentElement;
- const block=element(range.startContainer)?.closest('[data-block]');
- if(!block||!paper.value?.contains(block)||!block.contains(range.endContainer))return;
- // Placeholder lengths differ from source text. Always map plain text endpoints
- // through their original offsets, and never interpret a placeholder as source text.
- if([...block.querySelectorAll('.tr-mark')].some(mark=>range.intersectsNode(mark)))return;
- const offset=(node,position)=>{
-  const span=element(node)?.closest('[data-source-start]');
-  if(!span||!block.contains(span))return null;
-  const prefix=range.cloneRange();prefix.selectNodeContents(span);prefix.setEnd(node,position);
-  return Number(span.dataset.sourceStart)+points(prefix.toString()).length;
- };
- const start=offset(range.startContainer,range.startOffset),end=offset(range.endContainer,range.endOffset);
- if(start===null||end===null||start>=end)return;
- selection.value={block_id:block.dataset.block,start,end,text:range.toString()};
+function openHelp() {
+  shell.showHelp.value = true;
 }
 
-function addRegion(location){const block=blocks.value.find(b=>b.id===location.block_id);if(!block)return;const target=adjusting.value?selected.value:null;if(fields.value.some(f=>f.id!==target&&f.block_id===location.block_id&&(location.start===location.end&&f.start===f.end?location.start===f.start:location.start===location.end?f.start<=location.start&&location.start<f.end:f.start===f.end?location.start<=f.start&&f.start<location.end:location.start<f.end&&location.end>f.start))){error.value='选区与已有字段重叠，请调整范围';return;}if(adjusting.value&&field.value){Object.assign(field.value,{block_id:location.block_id,start:location.start,end:location.end,confirmed:false});}else{const id=crypto.randomUUID();fields.value.push({id,name:'新增填写区域',block_id:location.block_id,start:location.start,end:location.end,type:'text',policy:'manual',required:true,max_length:200,minimum:null,maximum:null,options:[],origin:'manual',confirmed:false});selected.value=id;}dirty.value=true;picker.value=false;adjusting.value=false;selection.value=null;error.value='';window.getSelection()?.removeAllRanges();}
-function beginAdd(adjust=false){mode.value='structure';adjusting.value=adjust;insertBlank.value=false;picker.value=true;}
-const pickBlock=ref(''),pickStart=ref(0),pickEnd=ref(1),insertBlank=ref(false);
-const chosenBlock=computed(()=>blocks.value.find(b=>b.id===pickBlock.value));
-watch(pickBlock,()=>{pickStart.value=0;pickEnd.value=chosenBlock.value?.kind==='cell'?points(chosenBlock.value.text).length:Math.min(1,points(chosenBlock.value?.text||'').length);});
-async function save(){
- if(busy.value||!record.value)return false;
- busy.value=true;saving.value=true;error.value='';
- try{
-  record.value=await shell.api(base()+'/review','PUT',{revision:record.value.revision,source_id:record.value.source_id,fields:fields.value});
-  fields.value=record.value.review_draft?.fields||fields.value;dirty.value=false;savedAt.value=record.value.updated_at;
-  shell.notify(`草稿已保存，共 ${fields.value.length} 个填写区域`);
-  return true;
- }catch(e){error.value=`保存失败：${e.message}。当前编辑内容已保留`;return false;}
- finally{busy.value=false;saving.value=false;}
+function change() {
+  if (field.value) field.value.confirmed = false;
+  dirty.value = true;
 }
 
-function confirmAll(value){
- if(busy.value||!fields.value.length)return;
- let count=0;
- for(const item of fields.value){if(item.confirmed!==value){item.confirmed=value;count++;}}
- if(!count)return;
- dirty.value=true;
- shell.notify(value?`已确认全部 ${fields.value.length} 个填写区域，请保存草稿`:`已取消全部确认，请保存草稿`);
+function select(id) {
+  selected.value = id;
+  requestAnimationFrame(() => {
+    document.getElementById('region-' + id)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
 }
-function confirmField(){if(!field.value)return;field.value.confirmed=true;dirty.value=true;const next=fields.value.find(f=>!f.confirmed);if(next)select(next.id);}
-function remove(){fields.value=fields.value.filter(f=>f.id!==selected.value);selected.value=fields.value[0]?.id||'';dirty.value=true;confirmModal.value='';}
-async function extract(){confirmModal.value='';busy.value=true;extracting.value=true;error.value='';extractionReport.value=null;try{const response=await shell.api(base()+'/extract-fields','POST',{revision:record.value.revision,model_config_data:shell.model,existing_fields:fields.value});extractionReport.value={count:response.fields.length,skipped:response.skipped||[],supplemented:response.supplemented||0,preserved:response.preserved||0};if(response.fields.length){fields.value=response.fields;selected.value=fields.value[0]?.id||'';dirty.value=true;shell.notify(`已提取 ${fields.value.length} 个填写区域，请逐项核验`);}}catch(e){error.value=e.message;}finally{busy.value=false;extracting.value=false;}}
 
-async function publish(){confirmModal.value='';if(dirty.value&&!await save())return;busy.value=true;try{await shell.api(base()+'/publish','POST',{revision:record.value.revision});await load();shell.notify('已发布模板规则版本');}catch(e){error.value=e.message;}finally{busy.value=false;}}
-async function trial(event){const file=event.target.files[0];event.target.value='';if(!file)return;validationFilename.value=file.name;if(dirty.value&&!await save())return;busy.value=true;error.value='';try{const upload=await readDocument(file);result.value=await shell.api(base()+'/trial','POST',{source_id:upload.source_id,revision:record.value.revision});}catch(e){error.value=e.message;}finally{busy.value=false;}}
+function pieces(block) {
+  const text = points(block.text);
+  const rows = fields.value
+    .filter((f) => f.block_id === block.id)
+    .map((f) => ({ field: f, ...fieldBounds(f, text) }))
+    .sort((a, b) => a.start - b.start);
 
-onBeforeRouteLeave(()=>{if(busy.value)return false;return !dirty.value||window.confirm('存在未保存规则，确定离开？');});
+  let cursor = 0;
+  const out = [];
+  for (const row of rows) {
+    if (row.start > cursor) {
+      out.push({ text: text.slice(cursor, row.start).join(''), start: cursor });
+    }
+    out.push({ text: text.slice(row.start, row.end).join(''), start: row.start, field: row.field });
+    cursor = row.end;
+  }
+  if (cursor < text.length) {
+    out.push({ text: text.slice(cursor).join(''), start: cursor });
+  }
+  return out;
+}
+
+function capture() {
+  selection.value = null;
+  const currentSelection = window.getSelection();
+  if (!currentSelection?.rangeCount || currentSelection.isCollapsed) return;
+  const range = currentSelection.getRangeAt(0);
+  const element = (node) => (node.nodeType === 1 ? node : node.parentElement);
+  const block = element(range.startContainer)?.closest('[data-block]');
+  if (!block || !paper.value?.contains(block) || !block.contains(range.endContainer)) return;
+
+  // Placeholder lengths differ from source text. Always map plain text endpoints
+  // through their original offsets, and never interpret a placeholder as source text.
+  if ([...block.querySelectorAll('.tr-mark')].some((mark) => range.intersectsNode(mark))) return;
+
+  const offset = (node, position) => {
+    const span = element(node)?.closest('[data-source-start]');
+    if (!span || !block.contains(span)) return null;
+    const prefix = range.cloneRange();
+    prefix.selectNodeContents(span);
+    prefix.setEnd(node, position);
+    return Number(span.dataset.sourceStart) + points(prefix.toString()).length;
+  };
+
+  const start = offset(range.startContainer, range.startOffset);
+  const end = offset(range.endContainer, range.endOffset);
+  if (start === null || end === null || start >= end) return;
+  selection.value = { block_id: block.dataset.block, start, end, text: range.toString() };
+}
+
+function addRegion(location) {
+  const block = blocks.value.find((b) => b.id === location.block_id);
+  if (!block) return;
+  const target = adjusting.value ? selected.value : null;
+
+  const isOverlap = fields.value.some((f) => {
+    if (f.id === target || f.block_id !== location.block_id) return false;
+    if (location.start === location.end && f.start === f.end) return location.start === f.start;
+    if (location.start === location.end) return f.start <= location.start && location.start < f.end;
+    if (f.start === f.end) return location.start <= f.start && f.start < location.end;
+    return location.start < f.end && location.end > f.start;
+  });
+
+  if (isOverlap) {
+    error.value = '选区与已有字段重叠，请调整范围';
+    return;
+  }
+
+  if (adjusting.value && field.value) {
+    Object.assign(field.value, {
+      block_id: location.block_id,
+      start: location.start,
+      end: location.end,
+      confirmed: false,
+    });
+  } else {
+    const id = crypto.randomUUID();
+    fields.value.push({
+      id,
+      name: '新增填写区域',
+      block_id: location.block_id,
+      start: location.start,
+      end: location.end,
+      type: 'text',
+      policy: 'manual',
+      required: true,
+      max_length: 200,
+      minimum: null,
+      maximum: null,
+      options: [],
+      origin: 'manual',
+      confirmed: false,
+    });
+    selected.value = id;
+  }
+
+  dirty.value = true;
+  picker.value = false;
+  adjusting.value = false;
+  selection.value = null;
+  error.value = '';
+  window.getSelection()?.removeAllRanges();
+}
+
+function beginAdd(adjust = false) {
+  mode.value = 'structure';
+  adjusting.value = adjust;
+  insertBlank.value = false;
+  picker.value = true;
+}
+
+async function save() {
+  if (busy.value || !record.value) return false;
+  busy.value = true;
+  saving.value = true;
+  error.value = '';
+  try {
+    record.value = await shell.api(base() + '/review', 'PUT', {
+      revision: record.value.revision,
+      source_id: record.value.source_id,
+      fields: fields.value,
+    });
+    fields.value = record.value.review_draft?.fields || fields.value;
+    dirty.value = false;
+    savedAt.value = record.value.updated_at;
+    shell.notify(`草稿已保存，共 ${fields.value.length} 个填写区域`);
+    return true;
+  } catch (e) {
+    error.value = `保存失败：${e.message}。当前编辑内容已保留`;
+    return false;
+  } finally {
+    busy.value = false;
+    saving.value = false;
+  }
+}
+
+function confirmAll(value) {
+  if (busy.value || !fields.value.length) return;
+  let count = 0;
+  for (const item of fields.value) {
+    if (item.confirmed !== value) {
+      item.confirmed = value;
+      count++;
+    }
+  }
+  if (!count) return;
+  dirty.value = true;
+  shell.notify(value ? `已确认全部 ${fields.value.length} 个填写区域，请保存草稿` : `已取消全部确认，请保存草稿`);
+}
+
+function confirmField() {
+  if (!field.value) return;
+  field.value.confirmed = true;
+  dirty.value = true;
+  const next = fields.value.find((f) => !f.confirmed);
+  if (next) select(next.id);
+}
+
+function remove() {
+  fields.value = fields.value.filter((f) => f.id !== selected.value);
+  selected.value = fields.value[0]?.id || '';
+  dirty.value = true;
+  confirmModal.value = '';
+}
+
+async function extract() {
+  confirmModal.value = '';
+  busy.value = true;
+  extracting.value = true;
+  error.value = '';
+  extractionReport.value = null;
+  try {
+    const response = await shell.api(base() + '/extract-fields', 'POST', {
+      revision: record.value.revision,
+      model_config_data: shell.model,
+      existing_fields: fields.value,
+    });
+    extractionReport.value = {
+      count: response.fields.length,
+      skipped: response.skipped || [],
+      supplemented: response.supplemented || 0,
+      preserved: response.preserved || 0,
+    };
+    if (response.fields.length) {
+      fields.value = response.fields;
+      selected.value = fields.value[0]?.id || '';
+      dirty.value = true;
+      shell.notify(`已提取 ${fields.value.length} 个填写区域，请逐项核验`);
+    }
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    busy.value = false;
+    extracting.value = false;
+  }
+}
+
+async function publish() {
+  confirmModal.value = '';
+  if (dirty.value && !await save()) return;
+  busy.value = true;
+  try {
+    await shell.api(base() + '/publish', 'POST', { revision: record.value.revision });
+    await load();
+    shell.notify('已发布模板规则版本');
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function trial(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  validationFilename.value = file.name;
+  if (dirty.value && !await save()) return;
+  busy.value = true;
+  error.value = '';
+  try {
+    const upload = await readDocument(file);
+    result.value = await shell.api(base() + '/trial', 'POST', {
+      source_id: upload.source_id,
+      revision: record.value.revision,
+    });
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    busy.value = false;
+  }
+}
+
+onBeforeRouteLeave(() => {
+  if (busy.value) return false;
+  return !dirty.value || window.confirm('存在未保存规则，确定离开？');
+});
 </script>
 <template>
- <div class="template-review">
-  <div v-if="error" class="tr-error" role="alert">{{error}} <button @click="error=''">关闭</button></div>
-  <template v-if="record">
-   <header class="tr-heading">
-    <div class="tr-heading-copy">
-     <h1><span class="tr-document-name" :title="record.name">{{record.name}}</span><span class="tr-status-badge" :class="{'is-published':record.review_status==='published'&&!dirty}">{{dirty?'有未保存更改':record.review_status==='published'?'已发布':'待人工核验'}}</span></h1>
+  <div class="template-review">
+    <div v-if="error" class="tr-error" role="alert">
+      {{ error }}
+      <button @click="error = ''">关闭</button>
     </div>
-    <div class="tr-actions">
-     <details class="tr-settings"><summary class="button">核验设置 <span class="tr-chevron"></span></summary><div class="tr-settings-menu"><p :title="record.filename">{{record.filename}}</p><button @click="openModel">模型配置</button><button @click="openHelp">操作手册</button><div v-if="warnings.length" class="tr-settings-warning"><b>部分内容需人工关注</b><p>{{warnings.join('；')}}。这些内容需人工核对，验证报告会列出检查范围。</p></div></div></details>
-     <button class="button" :disabled="busy" @click="confirmModal='extract'"><ReviewIcon name="sparkles"/>{{extracting?'正在提取…':'AI 提取'}}</button>
-     <button class="button" :disabled="busy" @click="save"><ReviewIcon name="save"/>{{saving?'保存中…':'保存草稿'}}</button>
-     <span class="tr-readiness" :class="{ready}" :title="readinessReason">{{!fields.length?'尚未添加区域':ready?'全部已确认':`待核验 ${fields.length-confirmed} 项`}}</span>
-     <button class="button" :title="readinessReason" :disabled="busy||!ready" @click="trialFile.click()">验证合同</button>
-     <button class="button primary" :title="readinessReason" :disabled="busy||!ready" @click="confirmModal='publish'">发布版本<ReviewIcon name="arrow"/></button>
-    </div>
-   </header>
-   <div v-if="extracting" class="tr-extraction-status" role="status" aria-live="polite"><span class="tr-spinner" aria-hidden="true"></span><div><strong>正在识别合同填写区域</strong><p>AI 正在分析原文并校验字段位置，请稍候。</p></div></div>
-   <div v-else-if="extractionReport" class="tr-extraction-status" role="status" aria-live="polite"><div><strong>{{extractionReport.count ? `已识别 ${extractionReport.count} 个填写区域，请逐项核验` : '本次未识别到可定位的填写区域，已有标记已保留'}}</strong><p v-if="extractionReport.supplemented||extractionReport.preserved">保留已有 {{extractionReport.preserved}} 个字段；补充识别 {{extractionReport.supplemented}} 个空栏。新增区域需核验。</p><p v-if="!extractionReport.count">可以在原文中选中文字，或通过“手动添加”标记位置。</p><details v-if="extractionReport.skipped.length"><summary>{{extractionReport.skipped.length}} 个候选未通过定位校验，查看原因</summary><p v-for="(item,i) in extractionReport.skipped" :key="i">{{item.name}}：{{item.reason}}</p></details></div></div>
-   <div class="tr-workspace" :class="{'is-busy':busy}">
-    <aside class="tr-panel tr-fields-panel"><div class="tr-title"><span>填写区域 <small class="tr-count">{{fields.length}}</small></span><button :disabled="busy" @click="beginAdd()"><ReviewIcon name="plus"/>手动添加</button></div><div class="tr-progress"><div class="tr-progress-caption"><span>核验进度</span><strong>{{confirmed}} <span>/ {{fields.length}}</span></strong></div><div><i :style="{width:(fields.length?confirmed/fields.length*100:0)+'%'}"></i></div><p v-if="fields.length" class="tr-progress-help">{{ready?'全部区域已确认，可以验证合同或发布版本。':'可逐项核验，也可全部确认；修改规则后对应区域需重新确认。'}}</p></div><div v-if="fields.length" class="tr-field-tools"><div class="tr-search"><ReviewIcon name="search"/><input v-model="fieldSearch" type="search" placeholder="搜索填写区域" aria-label="搜索填写区域"></div><div><button :class="{active:fieldFilter==='all'}" @click="fieldFilter='all'">全部 {{fields.length}}</button><button :class="{active:fieldFilter==='pending'}" @click="fieldFilter='pending'">待核验 {{fields.length-confirmed}}</button></div></div><div v-if="fields.length" class="tr-field-list"><button v-for="f in visibleFields" :key="f.id" class="tr-field" :class="{selected:selected===f.id,'is-confirmed':f.confirmed}" :aria-pressed="selected===f.id" :disabled="busy" @click="select(f.id)"><b>{{String(f.number).padStart(2,'0')}}</b><span>{{f.name}}<small>{{f.origin==='ai'?'AI 提取':f.origin==='rule'?'空栏识别':'手动添加'}} · {{f.policy==='manual'?'转人工':'按规则校验'}}</small></span><em :title="f.confirmed?'已确认':'待核验'">{{f.confirmed?'✓':'○'}}</em></button><div v-if="fields.length&&!visibleFields.length" class="tr-empty tr-no-matches">{{fieldFilter==='pending'&&!fieldSearch?'全部区域已核验完成':'没有匹配的填写区域'}}</div></div><div v-if="!fields.length" class="tr-empty tr-empty-fields"><span class="tr-empty-icon" aria-hidden="true">＋</span><h3>添加第一个填写区域</h3><p>让 AI 识别合同中的可填内容，<br>也可以选中正文手动标记。</p><button class="button tr-extract-button" :disabled="busy" @click="confirmModal='extract'">✧ AI 智能提取</button></div></aside>
-    <section class="tr-panel tr-document-panel"><div class="tr-title"><span>模板内容 <small class="tr-document-caption">字段占位符预览</small></span><div class="tr-document-tools"><details v-if="mode==='structure'" class="tr-view-options"><summary>标记选项 <span class="tr-chevron"></span></summary><div class="tr-view-options-menu"><label class="tr-location-toggle"><input type="checkbox" v-model="showLocations">显示段落位置</label><p>蓝色或绿色占位符代表可填写字段；点击可设置规则。选中固定文字可添加新字段，原文件可在“原文对照”查看。</p><div class="tr-document-legend"><span><i></i>待核验区域</span><span><i class="is-confirmed"></i>已确认区域</span></div></div></details><div class="tr-tabs"><button :class="{active:mode==='structure'}" @click="mode='structure'">模板预览</button><button :class="{active:mode==='original'}" @click="mode='original'">原文对照</button></div></div></div><iframe v-if="mode==='original'" class="tr-iframe" :src="'/static/document-preview.html?readonly=1&source='+record.source_id" title="上传原文对照"></iframe><div v-else class="tr-paper-wrap"><article ref="paper" class="tr-paper" @mouseup="capture"><template v-for="block in blocks" :key="block.id"><small v-if="showLocations" class="tr-block-label">{{block.section}} · {{block.kind==='cell'?'表格单元格':'段落'}} · {{block.id}}</small><p :data-block="block.id" :class="{'tr-cell':block.kind==='cell','tr-document-heading':block===blocks[0]&&block.text.length<50&&!/[：:；;。]/.test(block.text)&&!fields.some(f=>f.block_id===block.id)}"><template v-for="(part,i) in pieces(block)" :key="i"><span v-if="part.field" :id="'region-'+part.field.id" class="tr-mark" :class="{selected:selected===part.field.id,confirmed:part.field.confirmed,manual:part.field.policy==='manual'}" @click="selected=part.field.id" :title="part.field.name">{{placeholder(part.field.name)}}</span><span v-else :data-source-start="part.start">{{part.text}}</span></template></p></template></article></div><div v-if="selection" class="tr-selection"><span>已选 {{selection.end-selection.start}} 字符</span><button class="button primary" :disabled="busy" @mousedown.prevent @click="addRegion(selection)">{{adjusting?'更新到此位置':'＋ 添加填写区域'}}</button><button @click="selection=null;adjusting=false">取消</button></div></section>
-    <aside class="tr-panel tr-inspector"><div class="tr-title"><span>字段核验</span> <small v-if="field">{{field?.origin==='ai'?'AI 候选':field?.origin==='rule'?'空栏识别':'人工标记'}}</small></div><div v-if="fields.length" class="tr-bulk-actions"><button class="button soft" :disabled="busy||ready" @click="confirmAll(true)"><ReviewIcon name="check"/>全部确认</button><button class="button" :disabled="busy||!confirmed" @click="confirmAll(false)">取消全部确认</button></div><div v-if="field" class="tr-rule"><div class="tr-rule-heading"><span>当前区域 · {{String(fields.findIndex(f=>f.id===selected)+1).padStart(2,'0')}}</span><b :class="{confirmed:field.confirmed}">{{field.confirmed?'已确认':'待核验'}}</b></div><h2>{{field.name}}</h2><div class="tr-range"><button @click="beginAdd(true)">调整范围</button><button @click="confirmModal='delete'">删除标记</button></div><div class="tr-section-label">基本信息</div><label>字段名称<input aria-label="字段名称" v-model="field.name" maxlength="100" @input="change"></label><label>填写类型<select v-model="field.type" @change="change"><option value="text">文本</option><option value="integer">整数</option><option value="date">日期 YYYY-MM-DD</option><option value="enum">枚举选项</option></select></label><div class="tr-section-label">校验规则</div><label>免审处理<select aria-label="免审处理" v-model="field.policy" @change="change"><option value="manual">填写后转人工审批</option><option value="conditional">符合规则时允许免审</option></select></label><label>最大字符数<input v-model.number="field.max_length" type="number" min="1" max="2000" @input="change"></label><div v-if="field.type==='integer'" class="tr-number"><label>下限<input v-model.number="field.minimum" type="number" @input="change"></label><label>上限<input v-model.number="field.maximum" type="number" @input="change"></label></div><label v-if="field.type==='enum'">允许值（每行一项）<textarea :value="field.options.join('\n')" @input="field.options=$event.target.value.split('\n');change()"></textarea></label><label class="tr-checkbox">必须填写<input v-model="field.required" type="checkbox" @change="change"></label><div class="tr-note">此字段会替换模板中标记的内容。若位置不正确，请调整范围；固定条款应保持不变。</div></div><div v-else class="tr-empty tr-empty-rule"><span class="tr-empty-icon" aria-hidden="true"><ReviewIcon name="search"/></span><h3>{{fields.length?'待核验填写规则':'待提取填写区域'}}</h3><p>{{fields.length?'选择左侧区域，核对原文位置并设置填写规则。':'提取合同中的填写区域，再逐项确认位置与规则。'}}</p><button v-if="!fields.length" class="button primary" :disabled="busy" @click="confirmModal='extract'">立即智能提取</button></div><div v-if="field" class="tr-rule-footer"><button class="button primary tr-full" :disabled="busy||!field.name.trim()" @click="confirmField">{{field.confirmed?'已确认 · 下一项':'确认并下一项'}}</button><p>{{ready?'全部区域已确认，可保存并验证合同':'确认位置与规则后，继续核验下一区域'}}</p></div></aside>
-   </div><div class="tr-foot"><time v-if="savedAt&&!dirty" :datetime="savedAt">上次保存 {{new Date(savedAt).toLocaleTimeString('zh-CN',{hour12:false})}}</time><span>{{saving?'正在保存…':busy?'正在处理，请稍候…':dirty?'尚未保存':'已保存'}}</span></div>
-  </template><div v-else-if="!error" class="tr-empty">正在加载模板…</div>
-  <input ref="trialFile" type="file" accept=".docx" hidden @change="trial">
-  <Teleport to="body"><div v-if="picker" class="tr-overlay" @click.self="picker=false"><section class="tr-dialog" role="dialog" aria-modal="true" aria-label="手动标记位置"><h2>{{adjusting?'调整填写范围':'手动添加填写区域'}}</h2><p>可直接选中原文，或指定段落 / 表格单元格内的字符范围。字符位置从 1 开始。</p><label>原文位置<select aria-label="原文位置" v-model="pickBlock"><option value="">请选择位置</option><option v-for="b in blocks" :key="b.id" :value="b.id">{{b.id}} · {{b.kind==='cell'?'表格':'段落'}} · {{b.text.slice(0,60)}}</option></select></label><template v-if="chosenBlock"><div class="tr-quote">{{chosenBlock.text}}</div><label class="tr-checkbox"><span>在空栏插入字段（保留原文字）</span><input v-model="insertBlank" type="checkbox"></label><label v-if="insertBlank">插入位置（0为段首，段尾为{{points(chosenBlock.text).length}}）<input aria-label="插入位置" v-model.number="pickStart" type="number" min="0" :max="points(chosenBlock.text).length"></label><div v-else class="tr-number"><label>开始位置<input aria-label="开始位置" :value="pickStart+1" type="number" min="1" :max="points(chosenBlock.text).length" @input="pickStart=Number($event.target.value)-1"></label><label>结束位置（包含）<input aria-label="结束位置（包含）" v-model.number="pickEnd" type="number" min="1" :max="points(chosenBlock.text).length"></label></div><div class="tr-quote">{{insertBlank?'将在此位置插入填写字段':'选中：'+points(chosenBlock.text).slice(pickStart,pickEnd).join('')}}</div></template><footer><button class="button" @click="picker=false">返回正文选择</button><button class="button primary" :disabled="!chosenBlock||pickStart<0||pickStart>points(chosenBlock.text).length||(!insertBlank&&(pickEnd<=pickStart||pickEnd>points(chosenBlock.text).length))" @click="addRegion({block_id:pickBlock,start:pickStart,end:insertBlank?pickStart:pickEnd})">保存位置</button></footer></section></div>
-   <div v-if="confirmModal" class="tr-overlay"><section class="tr-dialog" role="dialog" aria-modal="true"><h2>{{{extract:'AI 提取候选字段',publish:'发布模板版本',delete:'删除填写标记'}[confirmModal]}}</h2><p>{{{extract:'提取将保留已有字段、规则与确认状态，并补充遗漏的填写位置。新增字段仍需核验。',publish:'将保存当前规则并创建不可变的发布版本。后续修改草稿不会覆盖历史版本。',delete:'删除后原文保持不变，该位置将作为固定内容检查。'}[confirmModal]}}</p><footer><button class="button" @click="confirmModal=''">取消</button><button class="button primary" @click="confirmModal==='extract'?extract():confirmModal==='publish'?publish():remove()">确认</button></footer></section></div>
-   <TemplateValidationReport v-if="result" :result="result" :filename="validationFilename" :template-name="record?.name||''" @close="result=null" @locate="id=>{result=null;mode='structure';select(id)}"/>
 
-  </Teleport>
- </div>
+    <template v-if="record">
+      <header class="tr-heading">
+        <div class="tr-heading-copy">
+          <h1>
+            <span class="tr-document-name" :title="record.name">{{ record.name }}</span>
+            <span
+              class="tr-status-badge"
+              :class="{ 'is-published': record.review_status === 'published' && !dirty }"
+            >
+              {{ dirty ? '有未保存更改' : record.review_status === 'published' ? '已发布' : '待人工核验' }}
+            </span>
+          </h1>
+        </div>
+
+        <div class="tr-actions">
+          <details class="tr-settings">
+            <summary class="button">
+              核验设置 <span class="tr-chevron"></span>
+            </summary>
+            <div class="tr-settings-menu">
+              <p :title="record.filename">{{ record.filename }}</p>
+              <button @click="openModel">模型配置</button>
+              <button @click="openHelp">操作手册</button>
+              <div v-if="warnings.length" class="tr-settings-warning">
+                <b>部分内容需人工关注</b>
+                <p>{{ warnings.join('；') }}。这些内容需人工核对，验证报告会列出检查范围。</p>
+              </div>
+            </div>
+          </details>
+
+          <button class="button" :disabled="busy" @click="confirmModal = 'extract'">
+            <ReviewIcon name="sparkles" />
+            {{ extracting ? '正在提取…' : 'AI 提取' }}
+          </button>
+          <button class="button" :disabled="busy" @click="save">
+            <ReviewIcon name="save" />
+            {{ saving ? '保存中…' : '保存草稿' }}
+          </button>
+          <span class="tr-readiness" :class="{ ready }" :title="readinessReason">
+            {{ !fields.length ? '尚未添加区域' : ready ? '全部已确认' : `待核验 ${fields.length - confirmed} 项` }}
+          </span>
+          <button class="button" :title="readinessReason" :disabled="busy || !ready" @click="trialFile.click()">
+            验证合同
+          </button>
+          <button class="button primary" :title="readinessReason" :disabled="busy || !ready" @click="confirmModal = 'publish'">
+            发布版本
+            <ReviewIcon name="arrow" />
+          </button>
+        </div>
+      </header>
+
+      <!-- 提取进度提示 -->
+      <div v-if="extracting" class="tr-extraction-status" role="status" aria-live="polite">
+        <span class="tr-spinner" aria-hidden="true"></span>
+        <div>
+          <strong>正在识别合同填写区域</strong>
+          <p>AI 正在分析原文并校验字段位置，请稍候。</p>
+        </div>
+      </div>
+      <div v-else-if="extractionReport" class="tr-extraction-status" role="status" aria-live="polite">
+        <div>
+          <strong>
+            {{ extractionReport.count ? `已识别 ${extractionReport.count} 个填写区域，请逐项核验` : '本次未识别到可定位的填写区域，已有标记已保留' }}
+          </strong>
+          <p v-if="extractionReport.supplemented || extractionReport.preserved">
+            保留已有 {{ extractionReport.preserved }} 个字段；补充识别 {{ extractionReport.supplemented }} 个空栏。新增区域需核验。
+          </p>
+          <p v-if="!extractionReport.count">可以在原文中选中文字，或通过“手动添加”标记位置。</p>
+          <details v-if="extractionReport.skipped.length">
+            <summary>{{ extractionReport.skipped.length }} 个候选未通过定位校验，查看原因</summary>
+            <p v-for="(item, i) in extractionReport.skipped" :key="i">{{ item.name }}：{{ item.reason }}</p>
+          </details>
+        </div>
+      </div>
+
+      <!-- 三栏工作区 -->
+      <div class="tr-workspace" :class="{ 'is-busy': busy }">
+        <!-- 左侧：填写区域列表 -->
+        <aside class="tr-panel tr-fields-panel">
+          <div class="tr-title">
+            <span>填写区域 <small class="tr-count">{{ fields.length }}</small></span>
+            <button :disabled="busy" @click="beginAdd()">
+              <ReviewIcon name="plus" />手动添加
+            </button>
+          </div>
+
+          <div class="tr-progress">
+            <div class="tr-progress-caption">
+              <span>核验进度</span>
+              <strong>{{ confirmed }} <span>/ {{ fields.length }}</span></strong>
+            </div>
+            <div>
+              <i :style="{ width: (fields.length ? confirmed / fields.length * 100 : 0) + '%' }"></i>
+            </div>
+            <p v-if="fields.length" class="tr-progress-help">
+              {{ ready ? '全部区域已确认，可以验证合同或发布版本。' : '可逐项核验，也可全部确认；修改规则后对应区域需重新确认。' }}
+            </p>
+          </div>
+
+          <div v-if="fields.length" class="tr-field-tools">
+            <div class="tr-search">
+              <ReviewIcon name="search" />
+              <input v-model="fieldSearch" type="search" placeholder="搜索填写区域" aria-label="搜索填写区域" />
+            </div>
+            <div>
+              <button :class="{ active: fieldFilter === 'all' }" @click="fieldFilter = 'all'">全部 {{ fields.length }}</button>
+              <button :class="{ active: fieldFilter === 'pending' }" @click="fieldFilter = 'pending'">待核验 {{ fields.length - confirmed }}</button>
+            </div>
+          </div>
+
+          <div v-if="fields.length" class="tr-field-list">
+            <button
+              v-for="f in visibleFields"
+              :key="f.id"
+              class="tr-field"
+              :class="{ selected: selected === f.id, 'is-confirmed': f.confirmed }"
+              :aria-pressed="selected === f.id"
+              :disabled="busy"
+              @click="select(f.id)"
+            >
+              <b>{{ String(f.number).padStart(2, '0') }}</b>
+              <span>
+                {{ f.name }}
+                <small>{{ f.origin === 'ai' ? 'AI 提取' : f.origin === 'rule' ? '空栏识别' : '手动添加' }} · {{ f.policy === 'manual' ? '转人工' : '按规则校验' }}</small>
+              </span>
+              <em :title="f.confirmed ? '已确认' : '待核验'">{{ f.confirmed ? '✓' : '○' }}</em>
+            </button>
+            <div v-if="fields.length && !visibleFields.length" class="tr-empty tr-no-matches">
+              {{ fieldFilter === 'pending' && !fieldSearch ? '全部区域已核验完成' : '没有匹配的填写区域' }}
+            </div>
+          </div>
+
+          <div v-if="!fields.length" class="tr-empty tr-empty-fields">
+            <span class="tr-empty-icon" aria-hidden="true">＋</span>
+            <h3>添加第一个填写区域</h3>
+            <p>让 AI 识别合同中的可填内容，<br>也可以选中正文手动标记。</p>
+            <button class="button tr-extract-button" :disabled="busy" @click="confirmModal = 'extract'">
+              ✧ AI 智能提取
+            </button>
+          </div>
+        </aside>
+
+        <!-- 中间：正文/预览 -->
+        <section class="tr-panel tr-document-panel">
+          <div class="tr-title">
+            <span>模板内容 <small class="tr-document-caption">字段占位符预览</small></span>
+            <div class="tr-document-tools">
+              <details v-if="mode === 'structure'" class="tr-view-options">
+                <summary>标记选项 <span class="tr-chevron"></span></summary>
+                <div class="tr-view-options-menu">
+                  <label class="tr-location-toggle">
+                    <input type="checkbox" v-model="showLocations" />显示段落位置
+                  </label>
+                  <p>蓝色或绿色占位符代表可填写字段；点击可设置规则。选中固定文字可添加新字段，原文件可在“原文对照”查看。</p>
+                  <div class="tr-document-legend">
+                    <span><i></i>待核验区域</span>
+                    <span><i class="is-confirmed"></i>已确认区域</span>
+                  </div>
+                </div>
+              </details>
+              <div class="tr-tabs">
+                <button :class="{ active: mode === 'structure' }" @click="mode = 'structure'">模板预览</button>
+                <button :class="{ active: mode === 'original' }" @click="mode = 'original'">原文对照</button>
+              </div>
+            </div>
+          </div>
+
+          <iframe
+            v-if="mode === 'original'"
+            class="tr-iframe"
+            :src="'/static/document-preview.html?readonly=1&source=' + record.source_id"
+            title="上传原文对照"
+          ></iframe>
+
+          <div v-else class="tr-paper-wrap">
+            <article ref="paper" class="tr-paper" @mouseup="capture">
+              <template v-for="block in blocks" :key="block.id">
+                <small v-if="showLocations" class="tr-block-label">
+                  {{ block.section }} · {{ block.kind === 'cell' ? '表格单元格' : '段落' }} · {{ block.id }}
+                </small>
+                <p
+                  :data-block="block.id"
+                  :class="{
+                    'tr-cell': block.kind === 'cell',
+                    'tr-document-heading': block === blocks[0] && block.text.length < 50 && !/[：:；;。]/.test(block.text) && !fields.some(f => f.block_id === block.id)
+                  }"
+                >
+                  <template v-for="(part, i) in pieces(block)" :key="i">
+                    <span
+                      v-if="part.field"
+                      :id="'region-' + part.field.id"
+                      class="tr-mark"
+                      :class="{
+                        selected: selected === part.field.id,
+                        confirmed: part.field.confirmed,
+                        manual: part.field.policy === 'manual'
+                      }"
+                      @click="selected = part.field.id"
+                      :title="part.field.name"
+                    >{{ placeholder(part.field.name) }}</span>
+                    <span v-else :data-source-start="part.start">{{ part.text }}</span>
+                  </template>
+                </p>
+              </template>
+            </article>
+          </div>
+
+          <div v-if="selection" class="tr-selection">
+            <span>已选 {{ selection.end - selection.start }} 字符</span>
+            <button class="button primary" :disabled="busy" @mousedown.prevent @click="addRegion(selection)">
+              {{ adjusting ? '更新到此位置' : '＋ 添加填写区域' }}
+            </button>
+            <button @click="selection = null; adjusting = false">取消</button>
+          </div>
+        </section>
+
+        <!-- 右侧：字段核验检视器 -->
+        <aside class="tr-panel tr-inspector">
+          <div class="tr-title">
+            <span>字段核验</span>
+            <small v-if="field">{{ field?.origin === 'ai' ? 'AI 候选' : field?.origin === 'rule' ? '空栏识别' : '人工标记' }}</small>
+          </div>
+
+          <div v-if="fields.length" class="tr-bulk-actions">
+            <button class="button soft" :disabled="busy || ready" @click="confirmAll(true)">
+              <ReviewIcon name="check" />全部确认
+            </button>
+            <button class="button" :disabled="busy || !confirmed" @click="confirmAll(false)">
+              取消全部确认
+            </button>
+          </div>
+
+          <div v-if="field" class="tr-rule">
+            <div class="tr-rule-heading">
+              <span>当前区域 · {{ String(fields.findIndex(f => f.id === selected) + 1).padStart(2, '0') }}</span>
+              <b :class="{ confirmed: field.confirmed }">{{ field.confirmed ? '已确认' : '待核验' }}</b>
+            </div>
+            <h2>{{ field.name }}</h2>
+
+            <div class="tr-range">
+              <button @click="beginAdd(true)">调整范围</button>
+              <button @click="confirmModal = 'delete'">删除标记</button>
+            </div>
+
+            <div class="tr-section-label">基本信息</div>
+            <label>
+              字段名称
+              <input aria-label="字段名称" v-model="field.name" maxlength="100" @input="change" />
+            </label>
+            <label>
+              填写类型
+              <select v-model="field.type" @change="change">
+                <option value="text">文本</option>
+                <option value="integer">整数</option>
+                <option value="date">日期 YYYY-MM-DD</option>
+                <option value="enum">枚举选项</option>
+              </select>
+            </label>
+
+            <div class="tr-section-label">校验规则</div>
+            <label>
+              免审处理
+              <select aria-label="免审处理" v-model="field.policy" @change="change">
+                <option value="manual">填写后转人工审批</option>
+                <option value="conditional">符合规则时允许免审</option>
+              </select>
+            </label>
+            <label>
+              最大字符数
+              <input v-model.number="field.max_length" type="number" min="1" max="2000" @input="change" />
+            </label>
+
+            <div v-if="field.type === 'integer'" class="tr-number">
+              <label>
+                下限
+                <input v-model.number="field.minimum" type="number" @input="change" />
+              </label>
+              <label>
+                上限
+                <input v-model.number="field.maximum" type="number" @input="change" />
+              </label>
+            </div>
+
+            <label v-if="field.type === 'enum'">
+              允许值（每行一项）
+              <textarea :value="field.options.join('\n')" @input="field.options = $event.target.value.split('\n'); change()"></textarea>
+            </label>
+
+            <label class="tr-checkbox">
+              必须填写
+              <input v-model="field.required" type="checkbox" @change="change" />
+            </label>
+
+            <div class="tr-note">
+              此字段会替换模板中标记的内容。若位置不正确，请调整范围；固定条款应保持不变。
+            </div>
+          </div>
+
+          <div v-else class="tr-empty tr-empty-rule">
+            <span class="tr-empty-icon" aria-hidden="true"><ReviewIcon name="search" /></span>
+            <h3>{{ fields.length ? '待核验填写规则' : '待提取填写区域' }}</h3>
+            <p>{{ fields.length ? '选择左侧区域，核对原文位置并设置填写规则。' : '提取合同中的填写区域，再逐项确认位置与规则。' }}</p>
+            <button v-if="!fields.length" class="button primary" :disabled="busy" @click="confirmModal = 'extract'">
+              立即智能提取
+            </button>
+          </div>
+
+          <div v-if="field" class="tr-rule-footer">
+            <button
+              class="button primary tr-full"
+              :disabled="busy || !field.name.trim()"
+              @click="confirmField"
+            >
+              {{ field.confirmed ? '已确认 · 下一项' : '确认并下一项' }}
+            </button>
+            <p>{{ ready ? '全部区域已确认，可保存并验证合同' : '确认位置与规则后，继续核验下一区域' }}</p>
+          </div>
+        </aside>
+      </div>
+
+      <div class="tr-foot">
+        <time v-if="savedAt && !dirty" :datetime="savedAt">
+          上次保存 {{ new Date(savedAt).toLocaleTimeString('zh-CN', { hour12: false }) }}
+        </time>
+        <span>{{ saving ? '正在保存…' : busy ? '正在处理，请稍候…' : dirty ? '尚未保存' : '已保存' }}</span>
+      </div>
+    </template>
+
+    <div v-else-if="!error" class="tr-empty">正在加载模板…</div>
+
+    <input ref="trialFile" type="file" accept=".docx" hidden @change="trial" />
+
+    <Teleport to="body">
+      <!-- 手动添加/调整位置弹窗 -->
+      <div v-if="picker" class="tr-overlay" @click.self="picker = false">
+        <section class="tr-dialog" role="dialog" aria-modal="true" aria-label="手动标记位置">
+          <h2>{{ adjusting ? '调整填写范围' : '手动添加填写区域' }}</h2>
+          <p>可直接选中原文，或指定段落 / 表格单元格内的字符范围。字符位置从 1 开始。</p>
+          <label>
+            原文位置
+            <select aria-label="原文位置" v-model="pickBlock">
+              <option value="">请选择位置</option>
+              <option v-for="b in blocks" :key="b.id" :value="b.id">
+                {{ b.id }} · {{ b.kind === 'cell' ? '表格' : '段落' }} · {{ b.text.slice(0, 60) }}
+              </option>
+            </select>
+          </label>
+          <template v-if="chosenBlock">
+            <div class="tr-quote">{{ chosenBlock.text }}</div>
+            <label class="tr-checkbox">
+              <span>在空栏插入字段（保留原文字）</span>
+              <input v-model="insertBlank" type="checkbox" />
+            </label>
+            <label v-if="insertBlank">
+              插入位置（0为段首，段尾为{{ points(chosenBlock.text).length }}）
+              <input aria-label="插入位置" v-model.number="pickStart" type="number" min="0" :max="points(chosenBlock.text).length" />
+            </label>
+            <div v-else class="tr-number">
+              <label>
+                开始位置
+                <input
+                  aria-label="开始位置"
+                  :value="pickStart + 1"
+                  type="number"
+                  min="1"
+                  :max="points(chosenBlock.text).length"
+                  @input="pickStart = Number($event.target.value) - 1"
+                />
+              </label>
+              <label>
+                结束位置（包含）
+                <input
+                  aria-label="结束位置（包含）"
+                  v-model.number="pickEnd"
+                  type="number"
+                  min="1"
+                  :max="points(chosenBlock.text).length"
+                />
+              </label>
+            </div>
+            <div class="tr-quote">
+              {{ insertBlank ? '将在此位置插入填写字段' : '选中：' + points(chosenBlock.text).slice(pickStart, pickEnd).join('') }}
+            </div>
+          </template>
+          <footer>
+            <button class="button" @click="picker = false">返回正文选择</button>
+            <button
+              class="button primary"
+              :disabled="!chosenBlock || pickStart < 0 || pickStart > points(chosenBlock.text).length || (!insertBlank && (pickEnd <= pickStart || pickEnd > points(chosenBlock.text).length))"
+              @click="addRegion({ block_id: pickBlock, start: pickStart, end: insertBlank ? pickStart : pickEnd })"
+            >
+              保存位置
+            </button>
+          </footer>
+        </section>
+      </div>
+
+      <!-- 确认模态框 -->
+      <div v-if="confirmModal" class="tr-overlay">
+        <section class="tr-dialog" role="dialog" aria-modal="true">
+          <h2>{{ { extract: 'AI 提取候选字段', publish: '发布模板版本', delete: '删除填写标记' }[confirmModal] }}</h2>
+          <p>
+            {{ {
+              extract: '提取将保留已有字段、规则与确认状态，并补充遗漏的填写位置。新增字段仍需核验。',
+              publish: '将保存当前规则并创建不可变的发布版本。后续修改草稿不会覆盖历史版本。',
+              delete: '删除后原文保持不变，该位置将作为固定内容检查。'
+            }[confirmModal] }}
+          </p>
+          <footer>
+            <button class="button" @click="confirmModal = ''">取消</button>
+            <button
+              class="button primary"
+              @click="confirmModal === 'extract' ? extract() : confirmModal === 'publish' ? publish() : remove()"
+            >
+              确认
+            </button>
+          </footer>
+        </section>
+      </div>
+
+      <!-- 验证报告 -->
+      <TemplateValidationReport
+        v-if="result"
+        :result="result"
+        :filename="validationFilename"
+        :template-name="record?.name || ''"
+        @close="result = null"
+        @locate="id => { result = null; mode = 'structure'; select(id) }"
+      />
+    </Teleport>
+  </div>
 </template>
 <style scoped>
 .template-review{--ink:#334155;--muted:#64748b;--line:#e2e8f0;--accent:#2563eb;color:var(--ink);font-family:inherit;display:flex;flex-direction:column;min-height:0;height:100%;font-size:13px}
