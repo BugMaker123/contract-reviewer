@@ -62,8 +62,6 @@ async def observable_events(events, snapshot, config, checkpoint=None):
     task = asyncio.create_task(produce())
     try:
         while True:
-            if time.monotonic() - started > 360:
-                raise TimeoutError('审查超过 6 分钟，已停止等待；请缩短合同或检查模型服务后重试')
             try:
                 kind, data = await asyncio.wait_for(queue.get(), timeout=10)
             except asyncio.TimeoutError:

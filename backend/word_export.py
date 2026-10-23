@@ -71,7 +71,8 @@ def add_revision(paragraph, old, new, counter, date):
             value = OxmlElement('w:delText' if kind == 'del' else 'w:t')
             value.set(qn('xml:space'), 'preserve'); value.text = line; node.append(value)
         wrapper.append(node); paragraph._p.append(wrapper)
-    for tag, a, b, c, d in SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
+    from .text_search import revision_opcodes
+    for tag, a, b, c, d in revision_opcodes(old, new):
         if tag == 'equal':
             append(old[a:b])
         else:

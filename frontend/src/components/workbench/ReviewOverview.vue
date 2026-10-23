@@ -7,8 +7,7 @@ const result = computed(() => workspace.run?.result);
 const admissionLabel = computed(() => ({pass:'已通过',rejected:'未通过',needs_review:'待确认'})[result.value?.admission?.status]);
 </script>
 <template>
-  <details class="wb-functional-overview">
-    <summary>审查结论与执行记录</summary>
+  <section class="wb-functional-overview">
     <div class="overview-body">
       <div class="overview-version">
         <label for="overview-version-select">审查版本</label>
@@ -27,5 +26,5 @@ const admissionLabel = computed(() => ({pass:'已通过',rejected:'未通过',ne
         <p v-if="context.resultStale.value" class="overview-notice">正文或条件已改变，请重新审查；以上结论属于旧版本。</p>
       </template>
     </div>
-  </details>
+  </section>
 </template>

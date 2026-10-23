@@ -9,8 +9,9 @@ export default {
 <template>
   <section class="prototype-view-switch" aria-label="文档修订工具栏">
     <div class="revision-view-tabs" role="tablist" aria-label="修订显示方式">
+      <button v-for="mode in [{id:'markup',name:'全部修订标记'},{id:'original',name:'原始文本'},{id:'current',name:'最终清洁效果'}]" :key="mode.id" role="tab" :aria-selected="revisionMode === mode.id" :class="{active:revisionMode === mode.id}" class="wb-visible-view-tab" @click="revisionMode = mode.id">{{ mode.name }}</button>
       <details class="wb-menu revision-view-menu">
-        <summary aria-label="更多文档视图"><span class="revision-view-caption">文档视图</span><strong>{{ { markup: '全部修订标记', original: '原始文本', current: '当前采纳稿', compare: '前后对比' }[revisionMode] }}</strong><ChevronIcon /></summary>
+        <summary aria-label="更多文档视图"><span v-if="revisionMode === 'compare'">前后对比</span><ChevronIcon /></summary>
         <div class="wb-popover" @click="$event.target.closest('button') && $event.currentTarget.closest('details').removeAttribute('open')">
           <button
             v-for="mode in [
@@ -42,4 +43,11 @@ export default {
 .prototype-view-switch .revision-view-menu .wb-popover > button { display:flex; align-items:center; justify-content:space-between; width:100%; padding:9px 11px; min-height:0; line-height:1.5; border:0; border-radius:6px; background:transparent; text-align:left; color:#475569; }
 .revision-view-menu .wb-popover > button:hover { background:#f1f5f9; }.revision-view-menu .wb-popover > button.is-selected { background:#eff6ff; color:#2563eb; }
 .revision-view-menu button strong { display:block; font-size:12px; font-weight:600; }.revision-view-menu button small { display:block; margin-top:4px; font-size:10px; font-weight:400; color:#94a3b8; }.view-check { color:#2563eb; padding-left:12px; }
+</style>
+
+<style scoped>
+.prototype-view-switch .revision-view-tabs.revision-view-tabs { display:flex; align-items:center; padding:3px; border:1px solid #dce5f1; border-radius:7px; background:#f1f5f9; }
+.wb-visible-view-tab { border:0; background:transparent; color:#647b9e; padding:6px 9px; font-size:12px; border-radius:4px; white-space:nowrap; }
+.wb-visible-view-tab.active { background:#fff; color:#2563eb; box-shadow:0 1px 3px #1e355012; }
+.prototype-view-switch .revision-view-tabs .revision-view-menu > summary { padding:6px; border:0; background:transparent; }
 </style>

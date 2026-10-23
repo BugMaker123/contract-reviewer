@@ -1,10 +1,11 @@
 <script>
 import { ref, watch } from "vue";
 import ManualIssue from "./ManualIssue.vue";
+import SummaryPanel from "./SummaryPanel.vue";
 import RevisionActions from "./RevisionActions.vue";
 import StaleReviewNotice from "./StaleReviewNotice.vue";
 export default {
-  components: { RevisionActions, ManualIssue, StaleReviewNotice },
+  components: { RevisionActions, ManualIssue, StaleReviewNotice, SummaryPanel },
   props: { context: { type: Object, required: true } },
   setup(props) {
     const expandedIssueId = ref(null);
@@ -41,7 +42,7 @@ export default {
     }"
   >
     <div class="wb-sidebar-heading">
-      <strong v-show="opinionsOpen" id="opinion-drawer-title">审查建议
+      <strong v-show="opinionsOpen" id="opinion-drawer-title">AI 审查建议
         <span v-if="!resultStale" class="wb-sidebar-count">{{
           reviewIssues.length
         }}</span></strong
@@ -61,17 +62,18 @@ export default {
 
       <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
       <section class="wb-opinion-toolbar" aria-label="审查建议筛选">
+        <SummaryPanel :context="context" />
         <div v-if="opinionsOpen && reviewReady && !resultStale && revisionMode !== 'compare'" class="wb-batch-actions" role="group" aria-label="批量处理本轮审查意见">
           <button class="batch-accept" :disabled="revisionReadOnly || !pendingApplicableCount" @click="acceptAllRevisions" title="采纳本轮全部待处理修订建议"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 12 4 4 9-9M12 16l9-9"/></svg><span>一键全部采纳</span></button>
           <button class="batch-cancel" :disabled="revisionReadOnly || !undoableRevisionCount" @click="undoAllReviewDecisions" title="撤销本轮全部采纳、拒绝及待复核决定，恢复待处理"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5 4 10l5 5M4 10h9a6 6 0 0 1 0 12" transform="translate(0 -2)"/></svg><span>一键撤销</span></button>
           <button class="batch-cancel batch-cancel-accepted" :disabled="revisionReadOnly || !appliedIssueIds.length" @click="cancelAllAcceptedRevisions" title="仅取消本轮已采纳修订"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg><span>一键取消已采纳</span></button>
           <button v-if="pendingCriticalCount && pendingLowRiskCount" class="batch-safe-accept" :disabled="revisionReadOnly || !pendingLowRiskCount" @click="acceptLowRiskRevisions" :title="`保留 ${pendingCriticalCount} 项重大风险供人工复核，仅批量采纳 ${pendingLowRiskCount} 项一般与优化建议`"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>仅采纳低风险 ({{ pendingLowRiskCount }})</span></button>
         </div>
+        <p v-if="batchResult" class="wb-batch-result" role="status">{{ batchResult }}</p>
+        <p v-if="reviewReady && !revisionReadOnly && !pendingApplicableCount && pendingRevisionCount" class="wb-batch-result">待处理意见尚无可采纳修订，请展开意见生成或手动填写修订后再采纳。</p>
         <input v-model="issueSearch" placeholder="搜索条款或意见" aria-label="搜索审查意见" class="wb-opinion-search" />
         <div class="wb-opinion-filter-row">
-          <select v-model="severityFilter" aria-label="筛选风险等级">
-            <option value="all">全部风险等级</option><option value="critical">重大风险</option><option value="warning">一般风险</option><option value="info">优化建议</option><option value="favorable">有利条款</option>
-          </select>
+
           <select v-model="handlingFilter" aria-label="筛选处理状态">
             <option value="all">全部处理状态</option><option value="pending">待处理</option><option value="applied">已采纳</option><option value="rejected">不采纳</option><option value="needs_review">待复核</option>
           </select>

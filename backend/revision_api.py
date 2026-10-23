@@ -36,8 +36,6 @@ def create_revision_router(repository, builder):
         repo = repository()
         run = editable_run(repo, run_id, request.revision)
         issue = issue_for(run, issue_id)
-        if any(item.get('conflict_with') for item in run['result'].get('requirement_findings', [])):
-            raise HTTPException(409, '审查要求存在冲突，请明确要求并重新审查后再生成修订。')
         original, kind = revision_anchor(run, issue, request)
         prompt = f'''{STANCE_INSTRUCTIONS}{REWRITE_INSTRUCTIONS}
 为合同中选定的一处条款生成完整修订文本。处理方式：{'新增缺失条款到合同文末' if kind == 'insert' else '替换所选原文条款'}。只处理本次指定的一处条款，不把跨条款风险汇总写成一段合同正文。
@@ -96,7 +94,9 @@ def create_revision_router(repository, builder):
         document, layout, warnings = review_document(run, repository(), builder, display)
         content = [visible_paragraph_text(p._p) for p in paragraphs(document)]
         ids, _ = revision_plan(run)
-        items = [{**issue, 'state': 'applied' if issue['id'] in run['applied'] else run.get('decisions', {}).get(issue['id'], 'pending'),
+        segments = {segment['id']: segment.get('content', '') for segment in run['result'].get('segments', [])}
+        items = [{**issue, 'segment_text': segments.get(issue.get('segment_id'), ''),
+                  'state': 'applied' if issue['id'] in run['applied'] else run.get('decisions', {}).get(issue['id'], 'pending'),
                   'in_document': issue['id'] in ids} for issue in run['result']['issues'] if not is_prompt_requirement_issue(issue, run['input'])]
         suffix = '-修订稿' if display == 'markup' else '-当前稿' if display == 'current' else '-原始稿'
         return {'id': run['input'].get('source_id'), 'name': run['input']['title'] + suffix + '.docx', 'extension': '.docx',

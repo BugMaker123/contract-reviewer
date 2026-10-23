@@ -133,8 +133,9 @@ def compare_documents(request: DocumentComparison):
         if tag != 'equal':
             changes.append({'kind':tag, 'original_start':a, 'original_end':b, 'revised_start':c, 'revised_end':d})
             left, right = '\n'.join(before[a:b]), '\n'.join(after[c:d])
-            # Character-level edits preserve unchanged words within a revised paragraph.
-            for kind, x, y, u, v in SequenceMatcher(None, left, right, autojunk=len(left)+len(right)>24000).get_opcodes():
+            # Chinese word boundaries preserve complete legal terms in the diff.
+            from .text_search import revision_opcodes
+            for kind, x, y, u, v in revision_opcodes(left, right):
                 if kind == 'equal':
                     continue
                 if x < y:
@@ -349,17 +350,19 @@ async def retry_review(run_id: str, request: RetryReviewInput):
     task = repo.get(previous['task_id'], 'task')
     if previous['status'] not in ('failed', 'interrupted'):
         raise HTTPException(409, '只有失败或中断的审查可以重试')
-    if previous.get('baseline_kind') != 'task' or previous['input'].get('prior_resolutions') or not matching_input(task, previous['input']):
+    if not matching_input(task, previous['input']):
         raise HTTPException(409, '合同或审查条件已变化，请发起新一轮审查')
     get_review_queue().ensure_capacity()
-    run = repo.start_run(task['id'], 'task', None, request.task_revision)
+    run = repo.start_run(task['id'], previous.get('baseline_kind', 'task'), None, request.task_revision)
+    run = repo.update(run['id'], {'input': previous['input'], 'parent_run_id': previous.get('parent_run_id'),
+        'progress_log': previous.get('progress_log', []), 'audit_trace': previous.get('audit_trace', [])[-256:]})
     checkpoint = previous.get('checkpoint')
     if checkpoint:
         run = repo.update(run['id'], {'checkpoint': checkpoint, 'retry_of': run_id, 'last_node': checkpoint['node']})
     else:
         run = repo.update(run['id'], {'retry_of': run_id})
     review_jobs.launch(repo, run, request.model_config_data.model_dump(), review_events, checkpoint)
-    return {'run_id': run['id'], 'resumed_from': checkpoint['node'] if checkpoint else None}
+    return {'run_id': run['id'], 'resumed_from': checkpoint.get('phase', checkpoint['node']) if checkpoint else None}
 
 
 @router.post('/api/runs/{run_id}/cancel')

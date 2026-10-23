@@ -924,7 +924,7 @@ export function useWorkbench() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || '重试请求失败');
       await workspace.refresh();
-      const stageNames = { segment_contract: '条款提取', compliance_check: '合规检查', balance_review: '法务研判', aggregate_and_redline: '问题归并', synthesize_summary: '全文意见汇总' };
+      const stageNames = { admission: '准入核验', requirements: '要求核验', checklist: '清单核验', tools: '证据核验', rewrite: '条款改写', verification: '建议稿核验', differences: '合同差异分析', segment_contract: '条款提取', compliance_check: '合规检查', balance_review: '法务研判', aggregate_and_redline: '问题归并', synthesize_summary: '全文意见汇总' };
       showToast(data.resumed_from ? `已保留${stageNames[data.resumed_from] || '上一阶段'}结果，继续后续审查` : '已重新开始审查；上一轮没有可复用的阶段结果');
       await startReview(data.run_id);
     } catch (error) {

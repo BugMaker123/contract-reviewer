@@ -1,11 +1,11 @@
 .workbench-view {
   box-sizing: border-box;
-  padding-left: 236px;
+  padding-left: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-@media (max-width: 800px) { .workbench-view { padding-left: 76px; } }
+
 
 /* The prototype's document and review rail replace the former three pane layout. */
 .workbench-view .prototype-workbench-main { gap:16px; padding:16px; background:#f4f7fb; }
@@ -2637,3 +2637,57 @@
     flex: 0 0 auto;
   }
 }
+
+/* Full-width review workspace: overview, document, suggestions. */
+.workbench-view .review-workbench-main { gap:0; padding:0; background:#f7f9fc; }
+.workbench-view .workbench-global-header { gap:14px; }
+.workbench-view .wb-workspace-link { padding:5px 11px; border:1px solid #dce5f1; border-radius:6px; color:#39577f; font-size:12px; }
+.workbench-view .workbench-nav-actions { margin-left:auto; }
+.workbench-view .review-workbench-main > .wb-summary-panel:not(.is-collapsed) { flex:0 0 21%; width:21% !important; border-right:1px solid #dce5f1; border-radius:0; }
+.workbench-view .review-workbench-main > .wb-opinion-drawer { flex:0 0 24%; width:24% !important; min-width:340px; border-left:1px solid #dce5f1; border-radius:0; }
+.workbench-view .review-workbench-main > section { min-width:0; border-radius:0; }
+.workbench-view .wb-sidebar-heading { height:48px; min-height:48px; background:#fff; }
+.workbench-view .wb-summary-content { padding:14px; }
+.workbench-view .wb-nav-risk-grid { gap:8px; }
+.workbench-view .wb-nav-risk-grid > div { display:flex; flex-direction:column; gap:6px; padding:10px; border:1px solid #dce5f1; background:#fff; border-radius:8px; }
+.workbench-view .wb-nav-issue { display:block; width:100%; margin-top:10px; padding:12px; text-align:left; background:#fff; border:1px solid #dce5f1; border-radius:8px; }
+.workbench-view .wb-nav-issue.is-critical { border-color:#fecaca; background:#fff8f8; }
+.workbench-view .wb-nav-issue strong { font-size:12px; line-height:1.6; }
+.workbench-view .wb-nav-issue p { margin:6px 0 0; color:#647b9e; font-size:12px; line-height:1.8; }
+@media(max-width:1100px) {
+ .workbench-view .review-workbench-main > .wb-summary-panel:not(.is-collapsed) { flex-basis:240px; width:240px !important; }
+ .workbench-view .review-workbench-main > .wb-opinion-drawer { flex-basis:320px; width:320px !important; min-width:280px; }
+}
+
+/* Menu on the left; review overview and suggestions share the right rail. */
+.workbench-view { padding-left:236px; }
+.workbench-view .review-workbench-rail { display:flex; flex-direction:column; flex:0 0 clamp(380px,34vw,600px); width:clamp(380px,34vw,600px); min-width:0; border-left:1px solid #dce5f1; overflow:hidden; background:#fff; }
+.workbench-view .review-workbench-rail > .wb-summary-panel { flex:none; width:100% !important; max-width:none; min-width:0; max-height:34%; border-bottom:1px solid #dce5f1; }
+.workbench-view .review-workbench-rail > .wb-opinion-drawer { flex:1; width:100% !important; min-width:0; max-width:none; min-height:0; }
+.workbench-view .review-workbench-rail .wb-edge-resize { display:none; }
+.workbench-view .review-workbench-rail .wb-summary-content { padding:10px 14px; }
+.workbench-view .review-workbench-rail .wb-sidebar-heading { height:42px; min-height:42px; }
+.workbench-view .review-workbench-rail .wb-nav-status-card { padding:10px 12px; }
+.workbench-view .prototype-risk-card[data-decision="pending"],
+.workbench-view .prototype-risk-card[data-decision="needs_review"] { border-color:#fecaca; background:#fffafa; }
+.workbench-view .prototype-risk-card:not([data-decision="applied"]) .revision-diff-suggested ins { color:#c32b38 !important; background:#fff1f2; }
+.workbench-view .prototype-risk-card[data-decision="applied"] .revision-diff-suggested ins { color:#167343 !important; background:#e5f5eb; }
+@media(max-width:800px) { .workbench-view {padding-left:76px;} .workbench-view .review-workbench-rail {flex-basis:340px;width:340px;} }
+
+.workbench-view .wb-batch-result { margin:8px 0; padding:8px 10px; border:1px solid #dce5f1; border-radius:6px; background:#f8fafc; color:#475569; font-size:12px; line-height:1.7; overflow-wrap:anywhere; }
+
+/* Risk totals are the suggestion list's filter controls. */
+.workbench-view .wb-integrated-overview { padding-bottom:12px; margin-bottom:12px; border-bottom:1px solid #e2e8f0; }
+.workbench-view .wb-integrated-overview .wb-nav-status-heading { margin-bottom:10px; font-size:12px; color:#475569; }
+.workbench-view .wb-risk-filter-tabs { display:flex; gap:8px; }
+.workbench-view .wb-risk-filter-tabs button { display:flex; flex:1; min-width:0; flex-direction:column; gap:5px; align-items:center; padding:10px 4px; border:1px solid #dce5f1; border-radius:8px; background:#fff; color:#64748b; font-size:12px; cursor:pointer; }
+.workbench-view .wb-risk-filter-tabs button strong { font-size:18px; }
+.workbench-view .wb-risk-filter-tabs .risk-critical strong { color:#dc2626; }
+.workbench-view .wb-risk-filter-tabs .risk-warning strong { color:#d97706; }
+.workbench-view .wb-risk-filter-tabs .risk-info strong { color:#2563eb; }
+.workbench-view .wb-risk-filter-tabs .risk-favorable strong { color:#15803d; }
+.workbench-view .wb-risk-filter-tabs button:hover { background:#f8fafc; border-color:#93b4ed; }
+.workbench-view .wb-risk-filter-tabs button.active { border-color:#2563eb; background:#eff6ff; color:#1d4ed8; box-shadow:0 0 0 1px #2563eb; }
+.workbench-view .wb-risk-filter-tabs button.risk-critical.active { border-color:#dc2626; background:#fff1f2; color:#b91c1c; box-shadow:0 0 0 1px #dc2626; }
+.workbench-view .wb-risk-filter-tabs button.risk-warning.active { border-color:#d97706; background:#fffbeb; color:#b45309; box-shadow:0 0 0 1px #d97706; }
+.workbench-view .wb-opinion-filter-row select { flex:1; width:100%; }

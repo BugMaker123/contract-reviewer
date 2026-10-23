@@ -1,11 +1,13 @@
 <script>
 import { ref, watch, onMounted, onScopeDispose } from "vue";
 import ChevronIcon from "../ChevronIcon.vue";
+import ReviewOverviewDialog from "./ReviewOverviewDialog.vue";
 export default {
-  components: { ChevronIcon },
+  components: { ChevronIcon, ReviewOverviewDialog },
   props: { context: { type: Object, required: true } },
   setup(props) {
     const exportOpen = ref(false);
+    const overviewOpen = ref(false);
     const closeExport = (event) => {
       if (event.type === 'keydown' ? event.key === 'Escape' : !event.target.closest('.wb-export-menu')) exportOpen.value = false;
     };
@@ -28,7 +30,7 @@ export default {
       props.context.workspace.exportScope = scope;
       return props.context.workspace.exportWord();
     };
-    return { ...props.context, exportOpen, download, toggleExport };
+    return { ...props.context, overviewOpen, exportOpen, download, toggleExport };
   },
 };
 </script>
@@ -142,6 +144,7 @@ export default {
           </section>
         </div>
       </details>
+      <button class="wb-overview-action" @click="overviewOpen = true">审查结论与执行记录</button>
       <button @click="showReportModal = true" :disabled="!reviewResult" class="wb-report-action">审查意见书</button>
 
       <button v-if="!isReviewing && workspace.task?.running_run" class="wb-background-progress" @click="startReview(workspace.task.running_run)">查看后台进度</button>
@@ -232,6 +235,7 @@ export default {
 
     </div>
   </header>
+  <ReviewOverviewDialog v-if="overviewOpen" :context="context" @close="overviewOpen = false" />
   <div v-if="showReviewBaseline" class="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-6">
     <section class="bg-white rounded-xl p-6 w-full max-w-lg space-y-4" role="dialog" aria-modal="true" aria-label="选择重新审查稿件">
       <h2 class="font-semibold">重新审查哪个稿件？</h2>

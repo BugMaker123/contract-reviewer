@@ -65,7 +65,7 @@ def launch(repo, run, config, review_events, checkpoint=None):
     job.ticket = job.queue.enqueue(group, key(repo, run['id']), queue_changed)
 
     async def execute():
-        progress, trace = [], []
+        progress, trace = list(run.get('progress_log', [])), list(run.get('audit_trace', []))
         completed = False
         last_trace_write = 0
         try:

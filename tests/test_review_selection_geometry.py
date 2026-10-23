@@ -25,6 +25,25 @@ def test_issue_navigation_and_advice_share_one_accordion(revision_client):
             browser.close()
 
 
+def test_issue_without_evidence_uses_its_contract_segment_for_markup(revision_client):
+    from backend import workspace_api
+    task, run = seed_review(revision_client)
+    issue = {**run['result']['issues'][0], 'evidence': '', 'redline': None}
+    result = {**run['result'], 'issues': [issue], 'segments': [{'id': issue['segment_id'], 'content': '1. 验收后付款。'}]}
+    workspace_api.repo.update(run['id'], {'result': result})
+    with live_server() as base, sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page(viewport={'width': 1600, 'height': 900})
+            page.goto(base + '/workbench?task=' + task['id'])
+            preview = page.frame_locator('iframe[title="合同修订文档"]')
+            expect(preview.locator('.review-pending')).to_have_count(1)
+            page.locator('#card-payment .prototype-locate').click()
+            expect(preview.locator('#review-selection')).to_be_visible()
+        finally:
+            browser.close()
+
+
 def test_continuous_clause_has_one_box_inside_viewport(revision_client):
     from backend import workspace_api
     task, run = seed_review(revision_client)

@@ -177,7 +177,7 @@ def get_llm_client(model_cfg: Dict[str, Any]) -> Optional[ChatOpenAI]:
             api_key=api_key.strip(),
             base_url=base_url.strip(),
             temperature=temperature,
-            timeout=60.0,  # 全文审查与改写允许较长响应时间
+            timeout=180.0,  # 单次请求超时；整轮审查不设总时限
             max_retries=0  # 不重复重试，避免耗时翻倍
         )
     except Exception as e:

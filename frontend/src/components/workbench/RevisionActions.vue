@@ -38,7 +38,8 @@ export default {
       </div>
     </div>
     <p v-else class="revision-empty">
-      此项尚未生成条款修订。请先确认处理位置，再生成建议或手动填写修订。
+      <template v-if="issue.rewrite_warning">未生成修订：{{ issue.rewrite_warning }}</template>
+      <template v-else>此项尚未生成条款修订。展开“调整修订”可生成建议或手动填写。</template>
     </p>
     <div v-if="needsRevisionTarget(issue)" class="revision-target-editor">
       <strong>指定这条意见的处理位置</strong>

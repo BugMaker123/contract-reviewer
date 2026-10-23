@@ -58,7 +58,7 @@ def test_failed_review_retries_from_persisted_graph_checkpoint(isolated_workspac
         task = client.get('/api/tasks/' + task['id']).json()
         response = client.post('/api/runs/' + previous['id'] + '/retry', json={'task_revision': task['revision']})
         assert response.status_code == 200
-        assert response.json()['resumed_from'] == 'synthesize_summary'
+        assert response.json()['resumed_from'] == previous['checkpoint'].get('phase', 'synthesize_summary')
         retried = client.get('/api/runs/' + response.json()['run_id'] + '/stream')
         assert 'event: complete' in retried.text
         current = workspace_api.repo.get(response.json()['run_id'], 'run')
@@ -106,3 +106,79 @@ def test_public_model_summary_streams_before_review_is_finished():
             await stream.aclose()
 
     asyncio.run(run())
+
+
+def test_observer_does_not_stop_at_six_minutes(monkeypatch):
+    from backend import review_progress
+    from types import SimpleNamespace
+    ticks = iter([0, 400, 800, 1200, 1600])
+    monkeypatch.setattr(review_progress, 'time', SimpleNamespace(monotonic=lambda: next(ticks, 2000)))
+    async def events(snapshot, config):
+        yield 'complete', {'ok': True}
+    async def collect():
+        return [item async for item in review_progress.observable_events(events, {'text':'合同'}, {})]
+    assert ('complete', {'ok':True}) in asyncio.run(collect())
+
+
+def test_resume_after_rewrite_reuses_admission_graph_and_requirements(monkeypatch):
+    from backend import workspace_review as review
+    from copy import deepcopy
+    snapshot = {'title':'续审','text':'1. 验收后付款。','type':'采购合同','role':'中立',
+                'mode':'quick','scale':'中立','background':'','focus':'','references':[],
+                'requirements':[{'id':'r1','text':'明确付款期限','priority':'required','source':'人工'}]}
+    calls = {'admit':0,'verify':0,'rewrite':0}
+    async def admission(*args):
+        calls['admit'] += 1
+        return {'source':'rules'}
+    async def verify(*args, **kwargs):
+        calls['verify'] += 1
+        if kwargs.get('text') and calls['verify'] == 2:
+            raise RuntimeError('connection lost during final verification')
+        return []
+    async def rewrite(result, *args):
+        calls['rewrite'] += 1
+        result['issues'] = [{'id':'payment','severity':'warning','redline':{
+            'original_text':snapshot['text'],'suggested_text':'1. 验收后30日付款。','change_type':'replace'}}]
+    monkeypatch.setattr(review, 'admit', admission)
+    monkeypatch.setattr(review, 'verify_requirements', verify)
+    monkeypatch.setattr(review, 'consolidate_revisions', rewrite)
+    monkeypatch.setattr(graph, 'get_llm_client', lambda config:None)
+    saved = None
+    async def first():
+        nonlocal saved
+        async for kind, data in review.review_events(snapshot, {}):
+            if kind == 'checkpoint': saved = deepcopy(data)
+    import pytest
+    with pytest.raises(RuntimeError): asyncio.run(first())
+    assert saved['phase'] == 'rewrite'
+    def no_repeat(*args): raise AssertionError('completed graph was repeated')
+    monkeypatch.setattr(graph, 'node_balance_review', no_repeat)
+    async def resume():
+        return [item async for item in review.review_events(snapshot, {}, saved)]
+    events = asyncio.run(resume())
+    assert events[-1][0] == 'complete'
+    assert calls == {'admit':1,'verify':3,'rewrite':1}
+
+
+def test_retry_preserves_accepted_baseline_memory(monkeypatch):
+    from backend import workspace_api
+    monkeypatch.setattr(graph, 'get_llm_client', lambda config:None)
+    with TestClient(app) as client:
+        task = client.post('/api/tasks', json={'title':'续审已采纳稿','text':'验收后付款。','mode':'quick'}).json()
+        client.post('/api/tasks/' + task['id'] + '/review/stream', json={})
+        task = client.get('/api/tasks/' + task['id']).json()
+        previous = workspace_api.repo.get(task['active_run'], 'run')
+        memory = [{'issue_title':'付款期限','accepted_text':'已约定付款期限'}]
+        workspace_api.repo.update_review(previous['id'], {
+            'status':'interrupted','baseline_kind':'accepted',
+            'input':{**previous['input'],'prior_resolutions':memory}
+        }, task_changes={'status':'interrupted'})
+        task = client.get('/api/tasks/' + task['id']).json()
+        response = client.post('/api/runs/' + previous['id'] + '/retry', json={'task_revision':task['revision']})
+        assert response.status_code == 200
+        identifier = response.json()['run_id']
+        client.get('/api/runs/' + identifier + '/stream')
+        current = workspace_api.repo.get(identifier, 'run')
+        assert current['baseline_kind'] == 'accepted'
+        assert current['input']['prior_resolutions'] == memory
+        assert current['parent_run_id'] == previous.get('parent_run_id')

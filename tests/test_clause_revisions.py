@@ -74,3 +74,16 @@ def test_distinct_clauses_keep_independent_decisions_and_valid_edits(monkeypatch
     assert len(result['issues']) == 2
     output = revised_text({'input': {'text': text}, 'result': result}, ['rate', 'payment'])
     assert '明确税率' in output and '30日' in output
+
+
+def test_conflicting_role_instructions_do_not_remove_unrelated_rewrite_context():
+    snapshot = {'text': '合同原文', 'focus': '核对主体信息\n甲方税率调整规则\n乙方税率调整规则\n核对付款期限',
+                'requirements': [{'id': 'tax-a'}, {'id': 'tax-b'}, {'id': 'delivery'}]}
+    findings = [{'id': 'focus-2', 'conflict_with': ['focus-3']},
+                {'id': 'focus-3', 'conflict_with': ['focus-2']},
+                {'id': 'tax-a', 'conflict_with': ['tax-b']},
+                {'id': 'tax-b', 'conflict_with': ['tax-a']}]
+    context = review.rewrite_context_without_conflicts(snapshot, findings)
+    assert context['focus'] == '核对主体信息\n核对付款期限'
+    assert context['requirements'] == [{'id': 'delivery'}]
+    assert snapshot['focus'].count('\n') == 3

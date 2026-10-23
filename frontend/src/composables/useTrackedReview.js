@@ -37,6 +37,8 @@ export function useTrackedReview(context) {
     revisionMode.value === "compare" && context.documentCompare.value &&
     !isReviewing.value && !["running", "queued"].includes(workspace.task?.status));
   const revisionBusy = ref(false);
+  const batchBusy = ref(false);
+  const batchResult = ref("");
   const revisionDocumentLoaded = ref(false);
   const revisionRenderedVersion = ref(0);
   const revisionInstructions = reactive({});
@@ -110,6 +112,7 @@ export function useTrackedReview(context) {
   const revisionReadOnly = computed(
     () =>
       revisionBusy.value ||
+      batchBusy.value ||
       workspace.historical ||
       workspace.loading ||
       isReviewing.value ||
@@ -221,12 +224,12 @@ export function useTrackedReview(context) {
       );
     return data;
   };
-  const writable = () => {
-    if (revisionReadOnly.value || !workspace.run) return false;
-    return true;
-  };
-  const setReviewDecision = async (issue, decision) => {
-    if (!writable() || (decision === "applied" && !issue.redline)) return false;
+  const canHandleRevision = () => !!workspace.run && !revisionBusy.value &&
+    !workspace.historical && !workspace.loading && !isReviewing.value &&
+    !resultStale.value && !["running", "queued"].includes(workspace.task?.status);
+  const writable = () => canHandleRevision() && !batchBusy.value;
+  const setReviewDecision = async (issue, decision, inBatch = false) => {
+    if (!(inBatch ? canHandleRevision() : writable()) || (decision === "applied" && !issue.redline)) return false;
     focusedIssueId.value = issue.id;
     revisionBusy.value = true;
     revisionErrors[issue.id] = "";
@@ -240,6 +243,7 @@ export function useTrackedReview(context) {
       workspace.decisions = { ...workspace.decisions, [issue.id]: decision };
       await workspace.flush();
       focusedIssueId.value = issue.id;
+      if (!inBatch) batchResult.value = "";
       message(
         decision === "applied"
           ? "已采纳修订，当前稿已更新"
@@ -252,6 +256,7 @@ export function useTrackedReview(context) {
       appliedIssueIds.value = previousApplied;
       workspace.decisions = previousDecisions;
       revisionErrors[issue.id] = error.message;
+      if (!inBatch) message("处理失败：" + error.message);
       return false;
     } finally {
       revisionBusy.value = false;
@@ -266,18 +271,26 @@ export function useTrackedReview(context) {
           !["applied", "rejected"].includes(workspace.decisions[issue.id]),
       ).length,
   );
-  const acceptAllRevisions = async () => {
-    const issues = reviewIssues.value.filter(
-      (issue) =>
-        issue.redline &&
-        !appliedIssueIds.value.includes(issue.id) &&
-        !["applied", "rejected"].includes(workspace.decisions[issue.id]),
-    );
-    for (const issue of issues) {
-      if (!(await setReviewDecision(issue, "applied"))) return;
-    }
-    if (issues.length) message("已采纳 " + issues.length + " 项修订");
+  const acceptRevisionBatch = async (issues) => {
+    if (!writable() || !issues.length) return false;
+    batchBusy.value = true;
+    batchResult.value = "正在采纳修订…";
+    let accepted = 0;
+    const failures = [];
+    try {
+      for (const issue of issues) {
+        if (await setReviewDecision(issue, "applied", true)) accepted++;
+        else failures.push({id:issue.id, title:issue.issue_title, reason:revisionErrors[issue.id] || "当前版本不可编辑"});
+      }
+      batchResult.value = `已采纳 ${accepted} 项` + (failures.length ? `，${failures.length} 项未采纳：` + failures.map(item => `${item.title}（${item.reason}）`).join("；") : "，当前稿已更新");
+      if (failures.length) selectIssue(failures[0].id);
+      message(batchResult.value);
+      return failures.length === 0;
+    } finally { batchBusy.value = false; }
   };
+  const acceptAllRevisions = () => acceptRevisionBatch(reviewIssues.value.filter(issue =>
+    issue.redline && !appliedIssueIds.value.includes(issue.id) && !["applied", "rejected"].includes(workspace.decisions[issue.id])
+  ));
   const pendingCriticalCount = computed(
     () =>
       reviewIssues.value.filter(
@@ -298,19 +311,9 @@ export function useTrackedReview(context) {
           !["applied", "rejected"].includes(workspace.decisions[issue.id]),
       ).length,
   );
-  const acceptLowRiskRevisions = async () => {
-    const issues = reviewIssues.value.filter(
-      (issue) =>
-        issue.redline &&
-        issue.severity !== "critical" &&
-        !appliedIssueIds.value.includes(issue.id) &&
-        !["applied", "rejected"].includes(workspace.decisions[issue.id]),
-    );
-    for (const issue of issues) {
-      if (!(await setReviewDecision(issue, "applied"))) return;
-    }
-    if (issues.length) message("已采纳 " + issues.length + " 项一般与优化建议（已保留重大风险供人工复核）");
-  };
+  const acceptLowRiskRevisions = () => acceptRevisionBatch(reviewIssues.value.filter(issue =>
+    issue.redline && issue.severity !== "critical" && !appliedIssueIds.value.includes(issue.id) && !["applied", "rejected"].includes(workspace.decisions[issue.id])
+  ));
   const undoableRevisionIds = computed(() => reviewIssues.value.filter(issue =>
     appliedIssueIds.value.includes(issue.id) || ['applied', 'rejected', 'needs_review'].includes(workspace.decisions[issue.id])
   ).map(issue => issue.id));
@@ -328,7 +331,8 @@ export function useTrackedReview(context) {
       workspace.decisions = decisions;
       // Persist the whole batch once, with the run revision checked by the server.
       await workspace.flush();
-      message(`已撤销 ${identifiers.length} 项处理决定，恢复为待处理`);
+      batchResult.value = `已撤销 ${identifiers.length} 项处理决定，恢复为待处理`;
+      message(batchResult.value);
       return true;
     } catch (error) {
       appliedIssueIds.value = previousApplied;
@@ -351,7 +355,8 @@ export function useTrackedReview(context) {
       appliedIssueIds.value = [];
       workspace.decisions = decisions;
       await workspace.flush();
-      message(`已取消 ${identifiers.length} 项采纳，恢复为待处理`);
+      batchResult.value = `已取消 ${identifiers.length} 项采纳，恢复为待处理`;
+      message(batchResult.value);
       return true;
     } catch (error) {
       appliedIssueIds.value = previousApplied;
@@ -519,7 +524,7 @@ export function useTrackedReview(context) {
   window.addEventListener("message", handleMessage);
   onScopeDispose(() => window.removeEventListener("message", handleMessage));
   const guard = () => {
-    if (revisionBusy.value) {
+    if (revisionBusy.value || batchBusy.value) {
       message("本条修订正在处理，请等待完成后再切换");
       return false;
     }
@@ -552,6 +557,8 @@ export function useTrackedReview(context) {
     moveRevision,
     setReviewDecision,
     pendingApplicableCount,
+    batchResult,
+    batchBusy,
     acceptAllRevisions,
     pendingCriticalCount,
     pendingLowRiskCount,

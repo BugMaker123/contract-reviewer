@@ -94,6 +94,27 @@ def test_rewrite_missing_clause_retries_and_recovers(monkeypatch):
     assert client.calls == 2
 
 
+def test_rewrite_keeps_valid_clauses_when_batch_is_incomplete(monkeypatch):
+    class Client:
+        calls = 0
+
+        async def ainvoke(self, messages):
+            self.calls += 1
+            return SimpleNamespace(content=json.dumps({'revisions': [
+                {'id': 'a', 'suggested_text': '修订后的第一条'},
+                {'id': 'b', 'suggested_text': '原文第二条'},
+            ]}))
+
+    client = Client()
+    monkeypatch.setattr(graph, 'get_llm_client', lambda config: client)
+    result = asyncio.run(workspace_review.model_json({
+        '_required_json_arrays': ['revisions'],
+        '_revision_originals': {'a': '原文第一条', 'b': '原文第二条', 'c': '原文第三条'},
+    }, '改写'))
+    assert result['revisions'] == [{'id': 'a', 'suggested_text': '修订后的第一条'}]
+    assert client.calls == 1
+
+
 def test_zero_retries_stops_after_first_response(monkeypatch):
     class Client:
         calls = 0

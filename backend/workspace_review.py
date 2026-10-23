@@ -1,5 +1,6 @@
 import json
 import asyncio
+from copy import deepcopy
 from difflib import SequenceMatcher
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -33,19 +34,25 @@ async def model_json(config, prompt):
             for key in config.get('_required_json_arrays', []):
                 if not isinstance(parsed.get(key), list) or not parsed[key]:
                     raise graph.ModelCallError(f'模型回复缺少非空 {key} 数组')
-                if key == 'revisions' and any(not isinstance(r, dict) or not r.get('id') or
-                                              not isinstance(r.get('suggested_text'), str) or not r['suggested_text'].strip()
-                                              for r in parsed[key]):
-                    raise graph.ModelCallError('revisions 中每项必须含 id 与非空 suggested_text')
                 if key == 'revisions' and config.get('_revision_originals'):
                     originals = config['_revision_originals']
-                    ids = [r['id'] for r in parsed[key]]
-                    if len(ids) != len(set(ids)) or set(ids) != set(originals):
-                        raise graph.ModelCallError('revisions 必须逐条覆盖所有请求的条款 ID，不得遗漏、重复或添加其他条款')
-                    if any(r['suggested_text'].strip() == originals[r['id']].strip() for r in parsed[key]):
-                        raise graph.ModelCallError('改写内容与原文完全相同，请根据已列问题生成实际修订')
-                    if any(r['suggested_text'].count('待确认') > originals[r['id']].count('待确认') for r in parsed[key]):
-                        raise graph.ModelCallError('改写新增了待确认占位符；请保留原有空白，不新增表单字段，把需用户补充的信息留在风险说明中')
+                    valid = {}
+                    expanded_placeholder = False
+                    for revision in parsed[key]:
+                        if (not isinstance(revision, dict) or not revision.get('id') or
+                                not isinstance(revision.get('suggested_text'), str)):
+                            continue
+                        identifier = revision['id']
+                        suggested = revision['suggested_text'].strip()
+                        if identifier in originals and suggested.count('待确认') > originals[identifier].count('待确认'):
+                            expanded_placeholder = True
+                        if (identifier in originals and identifier not in valid and
+                                suggested != originals[identifier].strip() and
+                                suggested.count('待确认') <= originals[identifier].count('待确认')):
+                            valid[identifier] = revision
+                    if not valid:
+                        raise graph.ModelCallError('改写新增了待确认占位符；请保留原有空白，不新增表单字段，把需用户补充的信息留在风险说明中' if expanded_placeholder else '模型未返回可应用的条款修订')
+                    parsed[key] = list(valid.values())
             return parsed
         except Exception as error:
             delay = graph.prepare_model_retry(messages, error, attempt, limit, response)
@@ -272,10 +279,32 @@ async def consolidate_revisions(result, snapshot, config):
         result['summary'][severity + '_count'] = sum(i['severity'] == severity for i in merged)
 
 
+def rewrite_context_without_conflicts(snapshot, findings):
+    """Keep unrelated review instructions while omitting contradictory pairs."""
+    conflicting_ids = {finding['id'] for finding in findings if finding.get('conflict_with')}
+    focus_lines = [line.strip() for line in (snapshot.get('focus') or '').splitlines() if line.strip()]
+    return {**snapshot, 'focus': '\n'.join(
+        line for index, line in enumerate(focus_lines, 1) if f'focus-{index}' not in conflicting_ids
+    ), 'requirements': [
+        requirement for requirement in snapshot.get('requirements') or []
+        if requirement.get('id') not in conflicting_ids
+    ]}
+
+
 async def review_events(snapshot, config, checkpoint=None):
     """Yield actual finished stages, then one complete result."""
     requirements = requirements_for(snapshot)
-    admission = await admit(snapshot, config, model_json)
+    memory = deepcopy((checkpoint or {}).get('memory', {}))
+    saved_graph = {key: deepcopy(checkpoint[key]) for key in ('node', 'state') if checkpoint and key in checkpoint}
+    def save_stage(phase):
+        return {'node': saved_graph.get('node', 'admission'), 'state': deepcopy(saved_graph.get('state', {})),
+                'phase': phase, 'memory': deepcopy(memory)}
+    if 'admission' not in memory:
+        memory['admission'] = await admit(snapshot, config, model_json)
+        yield 'checkpoint', save_stage('admission')
+    else:
+        emit_progress('plan', '已恢复准入结论及已完成阶段，继续未完成的步骤。')
+    admission = memory['admission']
     plan = build_plan(snapshot, requirements)
     emit_progress('plan', '审查计划：' + ' → '.join(item['title'] for item in plan), plan=plan)
     mode = snapshot['mode']
@@ -297,13 +326,15 @@ async def review_events(snapshot, config, checkpoint=None):
             for node in remaining:
                 update = await asyncio.to_thread(getattr(graph, 'node_' + node), state)
                 state.update(update)
-                yield 'checkpoint', {'node': node, 'state': {**state, 'model_config': {}}}
+                saved_graph = {'node': node, 'state': deepcopy({**state, 'model_config': {}})}
+                yield 'checkpoint', save_stage(node)
                 yield 'node_update', event(node, update.get('execution_logs', [{}])[-1].get('detail', '已完成'))
         else:
             async for output in graph.review_graph_app.astream(state):
                 for node, update in output.items():
                     state.update(update)
-                    yield 'checkpoint', {'node': node, 'state': {**state, 'model_config': {}}}
+                    saved_graph = {'node': node, 'state': deepcopy({**state, 'model_config': {}})}
+                    yield 'checkpoint', save_stage(node)
                     yield 'node_update', event(node, update.get('execution_logs', [{}])[-1].get('detail', '已完成'))
         result = {'segments': state['segments'], 'issues': state['all_issues'], 'summary': state['overall_summary'],
                   'tax_settlement': state.get('tax_settlement_audit'), 'logs': state['execution_logs']}
@@ -343,7 +374,10 @@ async def review_events(snapshot, config, checkpoint=None):
                    'legal_basis': '与本次选定的参考合同对照', 'risk_analysis': '此项为文本差异，法律与商业影响尚待人工核验。',
                    'negotiation_strategy': '核对变更是否符合交易约定及企业要求。', 'redline': None,
                    'evidence': diff['current'], 'diff': diff} for i, diff in enumerate(diffs)]
-        assessed, warning = await assess_differences(snapshot, diffs, config)
+        if 'differences' not in memory:
+            memory['differences'] = await assess_differences(snapshot, diffs, config)
+            yield 'checkpoint', save_stage('differences')
+        assessed, warning = memory['differences']
         for issue in issues:
             finding = assessed.get(issue['id'])
             if not finding:
@@ -363,9 +397,15 @@ async def review_events(snapshot, config, checkpoint=None):
         logs.append({'node': 'balance_review', 'detail': '[' + source + '] 已完成检查'})
         result['logs'] = logs
         yield 'node_update', event('synthesize_summary', '已汇总检查结果')
-    findings = await verify_requirements(snapshot, requirements, config, model_json)
+    if 'requirements' not in memory:
+        memory['requirements'] = await verify_requirements(snapshot, requirements, config, model_json)
+        yield 'checkpoint', save_stage('requirements')
+    findings = deepcopy(memory['requirements'])
     if mode == 'checklist':
-        checklist_findings, checklist_warning = await evaluate_checklist(snapshot, config, findings)
+        if 'checklist' not in memory:
+            memory['checklist'] = await evaluate_checklist(snapshot, config, findings)
+            yield 'checkpoint', save_stage('checklist')
+        checklist_findings, checklist_warning = deepcopy(memory['checklist'])
         result['checklist_findings'] = checklist_findings
         for finding in checklist_findings:
             if finding['status'] not in ('fail', 'needs_review'):
@@ -384,7 +424,10 @@ async def review_events(snapshot, config, checkpoint=None):
             result['warning'] = ' '.join(filter(None, [result.get('warning'), checklist_warning]))
         yield 'node_update', event('checklist', checklist_summary)
     if snapshot.get('execution') == 'react':
-        result['tool_verification'] = await evidence_loop(snapshot, findings, config, model_json)
+        if 'tools' not in memory:
+            memory['tools'] = await evidence_loop(snapshot, findings, config, model_json)
+            yield 'checkpoint', save_stage('tools')
+        result['tool_verification'] = deepcopy(memory['tools'])
     result['requirement_findings'] = findings
     result['priority_review'] = {
         'total': len(findings), 'counts': {status: sum(item['status'] == status for item in findings) for status in ('pass', 'fail', 'needs_review', 'not_applicable')},
@@ -403,18 +446,28 @@ async def review_events(snapshot, config, checkpoint=None):
     result['issues'].extend(requirement_issues)
     conflicts = any(item.get('conflict_with') for item in findings)
     if conflicts:
-        for issue in result['issues']:
-            issue['redline'] = None
-            issue['rewrite_warning'] = '审查要求存在冲突，请先明确要求后重新审查。'
-        result['warning'] = '审查要求存在冲突，本次保留风险意见，暂停生成自动修订。'
-    elif mode in ('quick', 'deep', 'checklist'):
-        await consolidate_revisions(result, snapshot, config)
+        result['warning'] = '部分审查要求存在冲突；相关要求请人工确认，其他条款仍可查看修订建议。'
+    if mode in ('quick', 'deep', 'checklist'):
+        rewrite_snapshot = snapshot
+        if conflicts:
+            # Conflicting instructions must not erase unrelated tracked changes or
+            # enter the rewrite prompt as simultaneous requirements.
+            rewrite_snapshot = rewrite_context_without_conflicts(snapshot, findings)
+        if 'rewritten' not in memory:
+            await consolidate_revisions(result, rewrite_snapshot, config)
+            memory['rewritten'] = deepcopy(result)
+            yield 'checkpoint', save_stage('rewrite')
+        else:
+            result = deepcopy(memory['rewritten'])
     if requirements and any(i.get('redline') for i in result['issues']):
         from .revisions import revised_text
         from fastapi import HTTPException
         try:
             proposed = revised_text({'input': snapshot, 'result': result}, [i['id'] for i in result['issues'] if i.get('redline')])
-            result['proposed_requirement_findings'] = await verify_requirements(snapshot, requirements, config, model_json, text=proposed)
+            if 'proposed_verification' not in memory:
+                memory['proposed_verification'] = await verify_requirements(snapshot, requirements, config, model_json, text=proposed)
+                yield 'checkpoint', save_stage('verification')
+            result['proposed_requirement_findings'] = deepcopy(memory['proposed_verification'])
         except HTTPException:
             result['proposed_requirement_findings'] = [{**item, 'status': 'needs_review', 'evidence': '',
                 'explanation': '修订重叠或无法唯一定位，未能生成完整建议稿用于核验。', 'conflict_with': []} for item in requirements]

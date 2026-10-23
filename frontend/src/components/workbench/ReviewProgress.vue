@@ -222,7 +222,7 @@ const severityName = (severity) =>
             ? queued ? "排队第 " + queuePosition + " 位" : "正在处理：" + steps[activeStep]
             : succeeded ? "共 " + items.length + " 项审查意见" : "本轮未完成审查"
         }}</span
-        ><button v-if="!running && value('reviewError')" class="review-result-button" :disabled="value('retryingReview')" @click="context.retryReview">{{ value('retryingReview') ? '正在重试…' : value('workspace')?.task?.running_run ? '重新连接进度' : '重试本轮审查' }}</button><button
+        ><button v-if="!running && value('reviewError')" class="review-result-button" :disabled="value('retryingReview')" @click="context.retryReview">{{ value('retryingReview') ? '正在重试…' : value('workspace')?.task?.running_run ? '重新连接进度' : '继续本轮审查' }}</button><button
           v-if="!running"
           class="review-result-button"
           @click="context.closeReviewDialog"

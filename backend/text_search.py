@@ -37,3 +37,19 @@ def search_excerpt(text, query):
                         'match_type': 'segmented', 'terms': terms}
             first = lowered.find(terms[0], first + 1)
     return None
+
+
+def revision_opcodes(original, revised):
+    """Word-level edits with exact character offsets, including whitespace."""
+    from difflib import SequenceMatcher
+
+    before = list(_tokenizer.cut(original, HMM=False))
+    after = list(_tokenizer.cut(revised, HMM=False))
+    def offsets(tokens):
+        result = [0]
+        for token in tokens:
+            result.append(result[-1] + len(token))
+        return result
+    left, right = offsets(before), offsets(after)
+    for tag, a, b, c, d in SequenceMatcher(None, before, after, autojunk=False).get_opcodes():
+        yield tag, left[a], left[b], right[c], right[d]

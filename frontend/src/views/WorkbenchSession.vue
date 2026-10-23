@@ -3,7 +3,6 @@ import { ref } from "vue";
 import { useTrackedReview } from "../composables/useTrackedReview.js";
 import { useWorkbench } from "../composables/useWorkbench.js";
 import WorkbenchHeader from "../components/workbench/WorkbenchHeader.vue";
-import SummaryPanel from "../components/workbench/SummaryPanel.vue";
 import DocumentPanel from "../components/workbench/DocumentPanel.vue";
 import OpinionsPanel from "../components/workbench/OpinionsPanel.vue";
 import WorkbenchToast from "../components/workbench/WorkbenchToast.vue";
@@ -15,10 +14,10 @@ import WorkbenchModelSettings from "../components/workbench/WorkbenchModelSettin
 import ReportPreview from "../components/workbench/ReportPreview.vue";
 import WorkspaceSidebar from "../components/portal/WorkspaceSidebar.vue";
 
+
 export default {
   components: {
     WorkbenchHeader,
-    SummaryPanel,
     DocumentPanel,
     OpinionsPanel,
     WorkbenchToast,
@@ -116,7 +115,7 @@ export default {
     <WorkbenchToast :context="context" />
     <ReviewProgress :context="context" />
     <header class="workbench-global-header">
-      <div class="prototype-breadcrumb">合同工作 <span>/</span><a href="/records" @click.prevent="workspace.leaveFor('/records')">审查记录</a><span>/</span><strong>审查工作台</strong></div>
+      <div class="workbench-global-brand"><a href="/" @click.prevent="workspace.leaveFor('/')"><span>⚖</span><strong>LexisGraph</strong></a></div><a class="wb-workspace-link" href="/records" @click.prevent="workspace.leaveFor('/records')">工作台⌄</a>
       <div class="workbench-nav-actions flex items-center gap-4">
         <a v-if="fromDraftUrl" class="app-draft-link flex items-center gap-1 text-xs text-blue-600 hover:underline" :href="fromDraftUrl" @click.prevent="workspace.leaveFor(fromDraftUrl)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14" /></svg>
@@ -125,10 +124,9 @@ export default {
       </div>
     </header>
     <WorkbenchHeader :context="context" />
-    <main class="prototype-workbench-main flex-1 flex overflow-hidden">
+    <main class="review-workbench-main flex-1 flex overflow-hidden">
       <DocumentPanel :context="context" />
-      <div class="prototype-review-rail" :style="rightWidth ? { width: rightWidth, flex: '0 0 auto' } : {}">
-        <SummaryPanel :context="context" />
+      <div class="review-workbench-rail" :style="rightWidth ? { width:rightWidth, flex:'0 0 auto' } : {}">
         <OpinionsPanel :context="context" />
       </div>
     </main>
