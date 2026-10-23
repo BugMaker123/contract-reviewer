@@ -10,18 +10,25 @@ export function useTrackedReview(context) {
     focusedIssueId,
     isReviewing,
   } = context;
-  const displayKey = () => `LEXIS_REVIEW_DISPLAY:${workspace.taskId || "unsaved"}`;
+  const getTaskId = () => {
+    const raw = workspace.taskId;
+    return (raw && typeof raw.value !== "undefined" ? raw.value : raw) || "";
+  };
+  const displayKey = () => `LEXIS_REVIEW_DISPLAY:${getTaskId() || "unsaved"}`;
   let savedMode = "markup";
   try {
     const taskMode = sessionStorage.getItem(displayKey());
     const legacyMode = sessionStorage.getItem("LEXIS_REVIEW_DISPLAY");
-    savedMode = taskMode || (["markup", "current", "original"].includes(legacyMode) ? legacyMode : "markup");
+    savedMode = taskMode || (["markup", "current", "original", "compare"].includes(legacyMode) ? legacyMode : "markup");
   } catch {}
   const revisionMode = ref(
     ["markup", "current", "original", "compare"].includes(savedMode) ? savedMode : "markup",
   );
   watch(revisionMode, (mode) => {
-    try { sessionStorage.setItem(displayKey(), mode); } catch {}
+    try {
+      sessionStorage.setItem(displayKey(), mode);
+      sessionStorage.setItem("LEXIS_REVIEW_DISPLAY", mode);
+    } catch {}
   });
   watch(isReviewing, (running) => {
     if (running) revisionMode.value = "markup";

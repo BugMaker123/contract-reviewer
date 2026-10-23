@@ -35,6 +35,11 @@ class ExtractRequirements(BaseModel):
     model_config_data: ModelConfig = Field(default_factory=ModelConfig)
 
 
+class RetryReviewInput(BaseModel):
+    task_revision: int = Field(ge=1)
+    model_config_data: ModelConfig = Field(default_factory=ModelConfig)
+
+
 @router.post('/api/requirements/extract')
 async def extract_requirements(request: ExtractRequirements):
     material = request.material
@@ -335,6 +340,28 @@ async def resume_review(run_id: str):
     return StreamingResponse(review_jobs.subscribe(repo, run_id), media_type='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
 
+@router.post('/api/runs/{run_id}/retry')
+async def retry_review(run_id: str, request: RetryReviewInput):
+    from .review_queue import get_review_queue
+    from .revisions import matching_input
+
+    previous = repo.get(run_id, 'run')
+    task = repo.get(previous['task_id'], 'task')
+    if previous['status'] not in ('failed', 'interrupted'):
+        raise HTTPException(409, '只有失败或中断的审查可以重试')
+    if previous.get('baseline_kind') != 'task' or previous['input'].get('prior_resolutions') or not matching_input(task, previous['input']):
+        raise HTTPException(409, '合同或审查条件已变化，请发起新一轮审查')
+    get_review_queue().ensure_capacity()
+    run = repo.start_run(task['id'], 'task', None, request.task_revision)
+    checkpoint = previous.get('checkpoint')
+    if checkpoint:
+        run = repo.update(run['id'], {'checkpoint': checkpoint, 'retry_of': run_id, 'last_node': checkpoint['node']})
+    else:
+        run = repo.update(run['id'], {'retry_of': run_id})
+    review_jobs.launch(repo, run, request.model_config_data.model_dump(), review_events, checkpoint)
+    return {'run_id': run['id'], 'resumed_from': checkpoint['node'] if checkpoint else None}
+
+
 @router.post('/api/runs/{run_id}/cancel')
 async def cancel_review(run_id: str):
     run = repo.get(run_id, 'run')
@@ -448,6 +475,8 @@ def save_handling(run_id: str, request: HandlingInput):
 
 
 def run_view(run):
+    if 'checkpoint' in run:
+        run = {key: value for key, value in run.items() if key != 'checkpoint'}
     if run.get('current_verification'):
         run['current_verification_valid'] = run['current_verification'].get('digest') == current_digest(run)
     if run.get('result'):

@@ -21,6 +21,20 @@ const empty = () => ({
 });
 
 const brief = reactive(empty());
+if (!route.params.id) {
+  try {
+    const cached = sessionStorage.getItem('contract_drafting_new_brief');
+    if (cached) Object.assign(brief, JSON.parse(cached));
+  } catch {}
+}
+import { watch } from 'vue';
+watch(brief, (val) => {
+  if (!route.params.id) {
+    try {
+      sessionStorage.setItem('contract_drafting_new_brief', JSON.stringify(val));
+    } catch {}
+  }
+}, { deep: true });
 const draft = ref(null);
 const title = ref('');
 const text = ref('');
@@ -120,6 +134,7 @@ function generate() {
       model_config_data: shell.model,
     });
     shell.notify('合同草稿已生成并保存');
+    sessionStorage.removeItem('contract_drafting_new_brief');
     busy.value = false;
     await router.replace('/drafting/' + saved.id + '/edit');
     Object.assign(brief, empty());
@@ -165,6 +180,7 @@ function review() {
       focus: saved.brief.requirements,
     });
     busy.value = false;
+    try { sessionStorage.setItem('workbench_return_to', '/drafting/' + saved.id + '/edit'); } catch {}
     await router.push('/workbench?task=' + task.id);
   }, 'review');
 }

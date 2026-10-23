@@ -154,11 +154,22 @@ export default {
           class="flex-1 w-full border-0"
           style="min-height: 400px"
         ></iframe>
-        <div v-else class="flex-1 overflow-y-auto p-8" id="contract-viewer">
+        <div v-else class="flex-1 overflow-y-auto p-6 lg:p-8" id="contract-viewer">
           <div
             v-if="viewMode === 'raw'"
-            class="max-w-4xl mx-auto bg-white border border-slate-200 rounded-xl p-10 shadow-sm"
+            class="wb-document-paper max-w-4xl mx-auto bg-white border border-slate-200/90 rounded-2xl p-6 lg:p-10 shadow-sm"
           >
+            <div class="wb-paper-header flex items-center justify-between pb-4 mb-6 border-b border-slate-100">
+              <div class="flex items-center gap-2.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+                <div class="text-sm font-semibold text-slate-800 truncate max-w-md">{{ workspace.task?.title || '合同正文阅读与风险对照' }}</div>
+                <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">DOCX · 原文</span>
+              </div>
+              <div class="text-xs text-slate-400">
+                共 {{ formattedLines.length }} 段落
+              </div>
+            </div>
+
             <div
               v-for="(line, idx) in formattedLines"
               :key="idx"
@@ -170,7 +181,7 @@ export default {
                   : '',
               ]"
               @click="line.issueId && selectIssue(line.issueId)"
-              class="py-1 px-3 text-[15px] leading-relaxed transition-all cursor-pointer flex items-start space-x-4 hover:bg-slate-50/80"
+              class="wb-clause-row py-1.5 px-3.5 text-[15px] leading-relaxed transition-all cursor-pointer flex items-start space-x-4 rounded-lg hover:bg-slate-50/80 mb-1"
             >
               <span
                 class="w-8 shrink-0 text-right text-xs font-mono text-slate-400 select-none pt-1"
@@ -184,17 +195,19 @@ export default {
                 {{ line.text }}
               </div>
 
-              <span
-                v-if="line.severity"
-                class="shrink-0 text-xs px-2 py-0.5 rounded font-semibold uppercase self-center"
-                :class="
-                  line.severity === 'critical'
-                    ? 'bg-red-100 text-red-700 border border-red-200'
-                    : 'bg-amber-100 text-amber-700 border border-amber-200'
-                "
-              >
-                {{ severityLabel(line.severity) }}
-              </span>
+              <div v-if="line.severity" class="wb-margin-tag shrink-0 self-center">
+                <span
+                  class="text-xs px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider inline-flex items-center gap-1"
+                  :class="
+                    line.severity === 'critical'
+                      ? 'bg-red-50 text-red-700 border border-red-200 shadow-sm'
+                      : 'bg-amber-50 text-amber-700 border border-amber-200 shadow-sm'
+                  "
+                >
+                  <span class="w-1.5 h-1.5 rounded-full" :class="line.severity === 'critical' ? 'bg-red-500' : 'bg-amber-500'"></span>
+                  {{ severityLabel(line.severity) }}
+                </span>
+              </div>
             </div>
 
             <div

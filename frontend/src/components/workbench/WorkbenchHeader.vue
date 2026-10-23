@@ -195,6 +195,19 @@ export default {
         }}</span>
       </button>
       <button
+        v-if="!workspace.conditions.source_id && !workspace.task?.source_id && workspace.task?.status !== 'completed'"
+        @click="openEditor"
+        :disabled="
+          documentSaving ||
+          workspace.historical ||
+          workspace.loading ||
+          revisionBusy
+        "
+        class="wb-edit-action"
+      >
+        编辑正文
+      </button>
+      <button
         @click="saveDocument"
         :disabled="
           documentSaving ||

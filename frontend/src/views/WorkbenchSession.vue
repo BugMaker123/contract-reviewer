@@ -13,6 +13,7 @@ import ReviewConditions from "../components/workbench/ReviewConditions.vue";
 import DocumentEditor from "../components/workbench/DocumentEditor.vue";
 import WorkbenchModelSettings from "../components/workbench/WorkbenchModelSettings.vue";
 import ReportPreview from "../components/workbench/ReportPreview.vue";
+import WorkspaceSidebar from "../components/portal/WorkspaceSidebar.vue";
 
 export default {
   components: {
@@ -27,6 +28,7 @@ export default {
     DocumentEditor,
     WorkbenchModelSettings,
     ReportPreview,
+    WorkspaceSidebar,
   },
   emits: ["ready"],
   setup(_props, { emit }) {
@@ -92,6 +94,8 @@ export default {
       resetRightWidth,
     });
 
+    const searchParams = new URLSearchParams(location.search);
+    const fromDraftUrl = ref(searchParams.get('draft_id') ? '/drafting/' + searchParams.get('draft_id') + '/edit' : (sessionStorage.getItem('workbench_return_to') || ''));
     return {
       ...context,
       context,
@@ -101,28 +105,32 @@ export default {
       startRightResize,
       resetLeftWidth,
       resetRightWidth,
+      fromDraftUrl,
     };
   },
 };
 </script>
 <template>
   <div class="workbench-view flex flex-col h-screen overflow-hidden" :class="{'navigation-collapsed': !summaryOpen}">
+    <WorkspaceSidebar active="records" :before-navigate="workspace.leaveFor" />
     <WorkbenchToast :context="context" />
     <ReviewProgress :context="context" />
     <header class="workbench-global-header">
-      <div class="workbench-global-brand">
-        <a href="/" @click.prevent="workspace.leaveFor('/')" title="返回主页"><span>⚖</span><strong>LexisGraph</strong></a>
+      <div class="prototype-breadcrumb">合同工作 <span>/</span><a href="/records" @click.prevent="workspace.leaveFor('/records')">审查记录</a><span>/</span><strong>审查工作台</strong></div>
+      <div class="workbench-nav-actions flex items-center gap-4">
+        <a v-if="fromDraftUrl" class="app-draft-link flex items-center gap-1 text-xs text-blue-600 hover:underline" :href="fromDraftUrl" @click.prevent="workspace.leaveFor(fromDraftUrl)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14" /></svg>
+          返回合同草稿
+        </a>
       </div>
-      <a class="app-home-link" href="/" @click.prevent="workspace.leaveFor('/')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14" /></svg>
-        返回主页
-      </a>
     </header>
     <WorkbenchHeader :context="context" />
-    <main class="flex-1 flex overflow-hidden">
-      <SummaryPanel :context="context" :style="leftWidth ? { width: leftWidth, flex: '0 0 auto' } : {}" />
+    <main class="prototype-workbench-main flex-1 flex overflow-hidden">
       <DocumentPanel :context="context" />
-      <OpinionsPanel :context="context" :style="rightWidth ? { width: rightWidth, flex: '0 0 auto' } : {}" />
+      <div class="prototype-review-rail" :style="rightWidth ? { width: rightWidth, flex: '0 0 auto' } : {}">
+        <SummaryPanel :context="context" />
+        <OpinionsPanel :context="context" />
+      </div>
     </main>
     <ClauseEditor :context="context" />
     <ReviewConditions :context="context" />

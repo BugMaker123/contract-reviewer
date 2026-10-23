@@ -137,6 +137,7 @@ export function useWorkbench() {
   const issueSearch = ref("");
   const handlingFilter = ref("all");
   const reviewError = ref("");
+  const retryingReview = ref(false);
   const reviewedAt = ref("");
   const reviewedInput = ref(null);
   const saveStatus = ref("当前会话自动保存");
@@ -898,6 +899,41 @@ export function useWorkbench() {
   };
 
   const showReviewBaseline = ref(false), reviewBaselineChoice = ref('task');
+  const retryReview = async () => {
+    if (retryingReview.value || isReviewing.value) return;
+    const runningId = workspace.task?.running_run;
+    if (runningId) return startReview(runningId);
+    const failed = workspace.task?.runs?.find((run) => ['failed', 'interrupted'].includes(run.status));
+    if (!failed) return requestReview();
+    retryingReview.value = true;
+    try {
+      const response = await fetch(`/api/runs/${failed.id}/retry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task_revision: workspace.task.revision,
+          model_config_data: {
+            model_name: selectedModel.value === 'custom' ? modelConfig.value.model_name : selectedModel.value,
+            api_key: modelConfig.value.api_key,
+            base_url: modelConfig.value.base_url,
+            temperature: 0.1,
+            max_retries: modelConfig.value.max_retries,
+          },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || '重试请求失败');
+      await workspace.refresh();
+      const stageNames = { segment_contract: '条款提取', compliance_check: '合规检查', balance_review: '法务研判', aggregate_and_redline: '问题归并', synthesize_summary: '全文意见汇总' };
+      showToast(data.resumed_from ? `已保留${stageNames[data.resumed_from] || '上一阶段'}结果，继续后续审查` : '已重新开始审查；上一轮没有可复用的阶段结果');
+      await startReview(data.run_id);
+    } catch (error) {
+      reviewError.value = error.message;
+      showToast(error.message);
+    } finally {
+      retryingReview.value = false;
+    }
+  };
   const requestReview = () => {
     if (!workspace.run?.result) return startReview();
     reviewBaselineChoice.value = !resultStale.value && appliedIssueIds.value.length ? 'accepted' : 'task';
@@ -1397,6 +1433,8 @@ export function useWorkbench() {
     issueSearch,
     handlingFilter,
     reviewError,
+    retryingReview,
+    retryReview,
     reviewedAt,
     resultStale,
     saveStatus,

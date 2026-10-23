@@ -1,11 +1,31 @@
 <script>
+import { ref, watch } from "vue";
 import ManualIssue from "./ManualIssue.vue";
 import RevisionActions from "./RevisionActions.vue";
 import StaleReviewNotice from "./StaleReviewNotice.vue";
 export default {
   components: { RevisionActions, ManualIssue, StaleReviewNotice },
   props: { context: { type: Object, required: true } },
-  setup: (props) => props.context,
+  setup(props) {
+    const expandedIssueId = ref(null);
+    watch(props.context.focusedIssueId, (id) => {
+      if (id) expandedIssueId.value = id;
+    });
+    watch(props.context.reviewIssues, (issues) => {
+      if (!issues.some((issue) => issue.id === expandedIssueId.value)) {
+        expandedIssueId.value = props.context.focusedIssueId.value || issues[0]?.id || null;
+      }
+    }, { immediate: true });
+    const toggleIssue = (issue) => {
+      if (expandedIssueId.value === issue.id) {
+        expandedIssueId.value = null;
+      } else {
+        expandedIssueId.value = issue.id;
+        props.context.selectIssue(issue.id);
+      }
+    };
+    return { ...props.context, expandedIssueId, toggleIssue };
+  },
 };
 </script>
 
@@ -63,20 +83,25 @@ export default {
         </div>
 
       </section>
-        <h3 v-if="reviewResult && !isReviewing" class="wb-full-analysis-title">全文风险分析 <span>{{ filteredIssues.length }} 项意见</span></h3>
+        <h3 v-if="reviewResult && !isReviewing" class="wb-full-analysis-title">问题定位与审查建议 <span>{{ filteredIssues.length }} 项意见</span></h3>
         <div
-          v-for="issue in filteredIssues"
+          v-for="(issue, index) in filteredIssues"
           :key="issue.id"
           :id="'card-' + issue.id"
-          @click="highlightInContract(issue)"
           :data-decision="appliedIssueIds.includes(issue.id) ? 'applied' : (workspace.decisions[issue.id] || 'pending')"
           :class="
             focusedIssueId === issue.id
               ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md'
               : 'border-slate-200 hover:border-slate-300 shadow-sm'
           "
-          class="prototype-risk-card bg-white border rounded-xl p-5 transition cursor-pointer"
+          class="prototype-risk-card wb-issue-accordion bg-white border rounded-xl transition"
         >
+          <button type="button" class="wb-issue-accordion-trigger" :aria-expanded="expandedIssueId === issue.id" :aria-controls="'issue-detail-' + issue.id" @click="toggleIssue(issue)">
+            <span class="wb-nav-index">{{ String(index + 1).padStart(2, '0') }}</span>
+            <span class="wb-issue-accordion-copy"><strong>{{ issue.issue_title }}</strong><small>{{ issue.clause_title }} · {{ severityLabel(issue.severity) }} · {{ workspace.decisionName(issue.id) }}</small></span>
+            <span class="wb-issue-accordion-chevron" aria-hidden="true">⌄</span>
+          </button>
+          <div v-show="expandedIssueId === issue.id" :id="'issue-detail-' + issue.id" class="wb-issue-accordion-detail">
           <div class="compact-card-top flex items-center justify-between mb-2">
             <span
               class="text-xs font-bold text-slate-600 truncate max-w-[240px]"
@@ -283,6 +308,7 @@ export default {
             </div>
           </details>
 
+          </div>
         </div>
 
         <div

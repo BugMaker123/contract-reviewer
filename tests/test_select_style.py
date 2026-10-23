@@ -24,6 +24,8 @@ def test_select_chevrons_do_not_tile_after_workbench_styles_load(client):
                 assert 'data:image/svg+xml' in style['image'], style
         for route in ['/', '/records', '/checklists']:
             page.goto(base + route)
+            if route == '/' and page.locator('select').count() == 0:
+                page.get_by_role('button', name='AI 智能全面审查').click()
             expect(page.locator('select').first).to_be_visible()
             check_selects()
         page.goto(base+'/workbench?task='+task['id'])

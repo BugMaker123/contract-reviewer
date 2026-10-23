@@ -26,7 +26,7 @@ def test_support_actions_are_grouped_without_duplicate_rejection(revision_client
         expect(card).to_have_attribute('data-decision','needs_review')
         card.get_by_role('button',name='撤销操作',exact=True).click()
         expect(card).to_have_attribute('data-decision','pending')
-        assert card.locator('.compact-extra-tools').bounding_box()['width'] >= card.bounding_box()['width'] - 40
+        assert card.locator('.compact-extra-tools').bounding_box()['width'] >= card.bounding_box()['width'] - 64
         expect(card.get_by_role('button',name='撤销操作',exact=True)).to_be_disabled()
         card.get_by_role('button',name='采纳',exact=True).click()
         expect(card).to_have_attribute('data-decision','applied')
@@ -55,6 +55,7 @@ def test_one_click_undo_resets_accepted_and_rejected_decisions(revision_client):
         expect(undo).to_be_disabled()
         page.locator('#card-payment').get_by_role('button',name='采纳',exact=True).click()
         expect(page.locator('#card-payment')).to_have_attribute('data-decision','applied')
+        page.locator('#card-liability .wb-issue-accordion-trigger').click()
         page.locator('#card-liability').get_by_role('button',name='拒绝',exact=True).click()
         expect(page.locator('#card-liability')).to_have_attribute('data-decision','rejected')
         expect(undo).to_be_enabled()

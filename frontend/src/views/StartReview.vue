@@ -1,18 +1,36 @@
 <script setup>
 import {ref, computed, watch} from 'vue';
-import {useRoute, onBeforeRouteLeave} from 'vue-router';
+import {useRoute, useRouter, onBeforeRouteLeave} from 'vue-router';
 import AiReview from './AiReview.vue';
 import TemplateCheckReport from '../components/portal/TemplateCheckReport.vue';
 import {usePortalShell} from '../stores/portal.js';
 import {readDocument} from '../portal/services/documents.js';
+import HomeLanding from '../components/portal/HomeLanding.vue';
 const route = useRoute();
+const router = useRouter();
 const shell = usePortalShell();
-const stage = ref(route.query.checklist ? 'ai' : 'choose');
+const recentTasks = computed(() => shell.recentTasks.value.slice(0, 3));
+const stage = ref(
+  route.path === '/reviews/new' || route.query.checklist || route.query.stage === 'ai' || route.query.mode === 'ai'
+    ? 'ai'
+    : route.path === '/template-checks/new' || route.query.stage === 'template'
+      ? 'template'
+      : 'choose'
+);
 const aiBusy = ref(false), templates = ref([]), selected = ref('');
 const loading = ref(false), busy = ref(false), error = ref('');
 const contract = ref(null), result = ref(null), importedContract = ref(null);
 const template = computed(() => templates.value.find(t => t.id === selected.value));
-watch(() => route.query.checklist, value => { if (value) stage.value = 'ai'; });
+
+if (stage.value === 'template') {
+  openTemplate();
+}
+
+watch(() => [route.path, route.query.checklist, route.query.stage, route.query.mode], ([path, checklist, st, mode]) => {
+  if (path === '/reviews/new' || checklist || st === 'ai' || mode === 'ai') stage.value = 'ai';
+  else if (path === '/template-checks/new' || st === 'template') openTemplate();
+  else stage.value = 'choose';
+});
 onBeforeRouteLeave(() => {
   if (busy.value) {
     shell.notify('正在处理，请稍后再切换页面');
@@ -82,88 +100,11 @@ async function verify() {
 <template><div class="review-entry"><div v-if="stage==='ai'||stage==='template'" class="review-page-heading">
   <div><h1>{{stage==='ai'?'新建合同审查':'已有标准模板核验'}}</h1>
   <p>{{stage==='ai'?'配置审查视角与关注事项，识别合同中的法律与商务风险。':'选择已发布的基准模板，验证合同文字与填写规则'}}</p></div>
-  <button class="review-mode-switch" :disabled="busy||aiBusy" @click="stage='choose'">
-    <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg>
+  <button class="review-mode-switch" :disabled="busy||aiBusy" @click="router.push('/')">
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg>
     重新选择审查方式
   </button>
-  <RouterLink v-if="stage==='template'" to="/validation-records" class="review-mode-switch">核验记录</RouterLink>
-</div><KeepAlive><AiReview v-if="stage==='ai'" :imported-contract="importedContract" @processing="aiBusy=$event"/></KeepAlive><template v-if="stage!=='ai'"><div v-if="error" role="alert" class="entry-error">{{error}} <button v-if="stage==='template'" class="btn btn-secondary" :disabled="loading||busy" @click="openTemplate">刷新模板列表</button></div><section v-if="stage==='choose'">
-
-
-        <div class="page-header">
-          <div class="page-title">
-            <h1>选择本次审查方式</h1>
-            <p>根据合同类型与拟定来源，选择适合的审查方式</p>
-          </div>
-        </div>
-
-        <div class="cards-grid">
-          <!-- AI Review Option -->
-          <div class="choice-card" @click="stage='ai'" role="button" tabindex="0" @keydown.enter="stage='ai'" @keydown.space.prevent="stage='ai'">
-            <div class="choice-header">
-              <div class="card-icon ai">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
-              </div>
-              <span class="card-tag">合同风险分析</span>
-            </div>
-            <h2>AI 智能全面审查</h2>
-            <p class="desc">适合外部拟定、非标合同或复杂谈判文本。结合自选法律立场与关注事项，识别合同风险并提供修改建议。</p>
-            <div class="features-list">
-              <span class="feature-chip">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                全文风险识别
-              </span>
-              <span class="feature-chip">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                甲乙双向立场定制
-              </span>
-              <span class="feature-chip">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                修改红线建议
-              </span>
-            </div>
-            <div class="action-link">
-              <span>进入 AI 智能审查</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-            </div>
-          </div>
-
-          <!-- Template Review Option -->
-          <div class="choice-card" @click="openTemplate" role="button" tabindex="0" @keydown.enter="openTemplate" @keydown.space.prevent="openTemplate">
-            <div class="choice-header">
-              <div class="card-icon template">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>
-              </div>
-              <span class="card-tag" style="background:#ecfdf5;color:#059669;">已发布模板规则</span>
-            </div>
-            <h2>已有标准模板核验</h2>
-            <p class="desc">适合基于企业标准模板所填写的合同。比对固定条款是否发生变更，自动核查必填字段、金额范围、账期及特定合规规则。</p>
-            <div class="features-list">
-              <span class="feature-chip">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                固定条款变更核查
-              </span>
-              <span class="feature-chip">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                填写项逻辑与格式校验
-              </span>
-              <span class="feature-chip">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                已配置字段规则校验
-              </span>
-            </div>
-            <div class="action-link" style="color: #059669;">
-              <span>选择模板并校验</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-            </div>
-          </div>
-        </div>
-
-        <div class="notice-bar">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--slate-400); flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
-          <span>模板校验依据已发布版本的字段规则和固定内容计算结果，并自动保存统计与差异报告。</span>
-        </div>
-      </section>
+</div><KeepAlive><AiReview v-if="stage==='ai'" :imported-contract="importedContract" @processing="aiBusy=$event"/></KeepAlive><template v-if="stage!=='ai'"><div v-if="error" role="alert" class="entry-error">{{error}} <button v-if="stage==='template'" class="btn btn-secondary" :disabled="loading||busy" @click="openTemplate">刷新模板列表</button></div><HomeLanding v-if="stage==='choose'" :tasks="recentTasks" @review="router.push('/reviews/new')" @template="router.push('/template-checks/new')"/>
 <section v-if="stage==='template'">
 <div class="stepper"><div class="step-item active"><span class="step-num">1</span>选择基准模板与文档</div><div class="step-divider"></div><div class="step-item" :class="{active:busy}"><span class="step-num">2</span>自动化比对</div><div class="step-divider"></div><div class="step-item"><span class="step-num">3</span>生成核验报告</div></div>
 <div class="panel"><p v-if="loading" role="status">正在读取已发布模板…</p><div v-else-if="!templates.length" class="notice-bar">暂无已发布模板。请先在 <RouterLink to="/templates">合同模板</RouterLink> 中配置字段规则并发布。<button class="btn btn-secondary" @click="openTemplate">重新加载</button></div>
@@ -365,131 +306,136 @@ async function verify() {
     .cards-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 24px;
+      gap: 18px;
       margin: 10px 0 24px;
     }
 
     .choice-card {
       background: #ffffff;
-      border: 2px solid var(--slate-200);
-      border-radius: var(--radius-xl);
-      padding: 36px 32px;
+      border: 1px solid var(--slate-200);
+      border-radius: 12px;
+      padding: 24px;
       text-align: left;
       cursor: pointer;
-      transition: var(--transition);
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
       position: relative;
       display: flex;
       flex-direction: column;
-      box-shadow: var(--shadow-sm);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+      outline: none;
     }
 
     .choice-card:hover {
-      border-color: var(--primary);
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-hover);
+      border-color: #3b82f6;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
     }
 
     .choice-header {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
-      margin-bottom: 22px;
+      margin-bottom: 16px;
     }
 
     .card-icon {
-      width: 58px;
-      height: 58px;
-      border-radius: var(--radius-md);
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
       display: grid;
       place-items: center;
-      font-size: 24px;
-      transition: var(--transition);
+      font-size: 22px;
+      flex-shrink: 0;
     }
 
     .card-icon.ai {
-      background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
-      color: var(--accent);
-      border: 1px solid #c7d2fe;
+      background: #eff6ff;
+      color: var(--primary);
+      border: 1px solid #bfdbfe;
     }
 
     .card-icon.template {
-      background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+      background: #ecfdf5;
       color: #059669;
       border: 1px solid #a7f3d0;
     }
 
-    .choice-card:hover .card-icon {
-      transform: scale(1.08);
-    }
-
     .card-tag {
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 500;
       padding: 3px 8px;
       border-radius: 6px;
-      background: var(--slate-100);
-      color: var(--slate-500);
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+      letter-spacing: 0.01em;
     }
 
     .choice-card h2 {
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--slate-900);
-      margin-bottom: 10px;
+      font-size: 16px;
+      font-weight: 650;
+      color: #0f172a;
+      margin: 0 0 8px;
+      letter-spacing: -0.2px;
     }
 
     .choice-card p.desc {
-      font-size: 13.5px;
-      color: var(--slate-500);
-      line-height: 1.65;
-      margin-bottom: 20px;
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.6;
+      margin: 0 0 18px;
       flex: 1;
     }
 
     .features-list {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 26px;
+      gap: 7px;
+      margin-bottom: 20px;
     }
 
     .feature-chip {
-      font-size: 12px;
-      padding: 4px 10px;
-      background: var(--slate-50);
-      border: 1px solid var(--slate-200);
+      font-size: 11.5px;
+      font-weight: 450;
+      padding: 3px 9px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
       border-radius: 6px;
-      color: var(--slate-600);
+      color: #475569;
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
+    }
+
+    .choice-card:hover .feature-chip {
+      background: #f1f5f9;
+      color: #1e293b;
     }
 
     .action-link {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
-      color: var(--primary);
+      color: #2563eb;
       margin-top: auto;
-    }
-
-    .choice-card:hover .action-link {
-      gap: 10px;
+      padding-top: 14px;
+      border-top: 1px solid #f1f5f9;
     }
 
     /* Notice Bar */
     .notice-bar {
       display: flex;
       align-items: center;
-      gap: 10px;
-      background: #f8fafc;
-      border: 1px solid var(--slate-200);
-      border-radius: var(--radius-sm);
-      padding: 12px 18px;
-      font-size: 12.5px;
-      color: var(--slate-500);
+      gap: 12px;
+      background: linear-gradient(90deg, #f0f7ff 0%, #f8fafc 100%);
+      border: 1px solid #dbeafe;
+      border-left: 3px solid #3b82f6;
+      border-radius: 12px;
+      padding: 14px 20px;
+      font-size: 13px;
+      color: #334155;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
     }
 
     /* ================= STEPPER ================= */
@@ -854,13 +800,13 @@ async function verify() {
       }
     }
 
-button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #93c5fd;outline-offset:3px}.review-entry{width:100%;max-width:none;margin:0;color:var(--slate-800)}.choice-card:focus-visible{outline:3px solid #93c5fd;outline-offset:4px}.entry-error{background:#fef2f2;color:#b91c1c;padding:14px;border-radius:8px;margin-bottom:20px}.btn:disabled{opacity:.5;cursor:not-allowed}.difference{border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin:16px 0}.difference h3{font-size:14px;margin-bottom:12px}.difference>div{display:grid;grid-template-columns:1fr 1fr;gap:12px}.difference p{background:#f8fafc;padding:15px;white-space:pre-wrap;overflow-wrap:anywhere}.difference b{display:block;margin-bottom:8px}.scope{display:block}.scope p{margin-top:8px}.table-container{overflow:auto}td{overflow-wrap:anywhere;max-width:350px}.result-pass{background:#ecfdf5;border-color:#a7f3d0}.result-pass .result-banner-icon{background:#059669}.result-pass h2,.result-pass p{color:#047857}@media(max-width:700px){.stepper{flex-wrap:wrap}.step-divider{display:none}.difference>div{grid-template-columns:1fr}.panel-footer{gap:12px;flex-wrap:wrap}.form-label{flex-wrap:wrap;gap:6px}.panel{padding:20px}table{min-width:650px}}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #93c5fd;outline-offset:3px}.review-entry{width:100%;max-width:1200px;margin:0 auto;color:var(--slate-800)}.choice-card:focus-visible{outline:3px solid #93c5fd;outline-offset:4px}.entry-error{background:#fef2f2;color:#b91c1c;padding:14px;border-radius:8px;margin-bottom:20px}.btn:disabled{opacity:.5;cursor:not-allowed}.difference{border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin:16px 0}.difference h3{font-size:14px;margin-bottom:12px}.difference>div{display:grid;grid-template-columns:1fr 1fr;gap:12px}.difference p{background:#f8fafc;padding:15px;white-space:pre-wrap;overflow-wrap:anywhere}.difference b{display:block;margin-bottom:8px}.scope{display:block}.scope p{margin-top:8px}.table-container{overflow:auto}td{overflow-wrap:anywhere;max-width:350px}.result-pass{background:#ecfdf5;border-color:#a7f3d0}.result-pass .result-banner-icon{background:#059669}.result-pass h2,.result-pass p{color:#047857}@media(max-width:700px){.stepper{flex-wrap:wrap}.step-divider{display:none}.difference>div{grid-template-columns:1fr}.panel-footer{gap:12px;flex-wrap:wrap}.form-label{flex-wrap:wrap;gap:6px}.panel{padding:20px}table{min-width:650px}}
 
-.review-page-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin:0 0 24px}
-.review-page-heading h1{margin:0;font-size:22px;line-height:1.4;font-weight:750;letter-spacing:-.4px;color:#0f172a}
-.review-page-heading p{margin:8px 0 0;font-size:12px;line-height:1.7;color:#64748b}
-.review-mode-switch{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:8px 13px;border:1px solid #dce3ed;border-radius:8px;background:#fff;color:#475569;font-size:12px;line-height:1.5;font-weight:500;white-space:nowrap;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
-.review-mode-switch:hover:not(:disabled){color:#2563eb;border-color:#b8cdf6;background:#f8faff}
-.review-mode-switch:disabled{opacity:.45;cursor:not-allowed}
+.review-page-heading{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:0 auto 20px;max-width:1200px;width:100%;padding-bottom:14px;border-bottom:1px solid #eef2f6}
+.review-page-heading h1{margin:0;font-size:22px;line-height:1.3;font-weight:700;letter-spacing:-.4px;color:#0f172a}
+.review-page-heading p{margin:6px 0 0;font-size:13px;line-height:1.6;color:#64748b}
+.review-mode-switch{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:8px 14px;border:1px solid #dce3ed;border-radius:9px;background:#fff;color:#475569;font-size:12px;line-height:1.5;font-weight:600;white-space:nowrap;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,0.04);transition:all .2s cubic-bezier(0.16,1,0.3,1)}
+.review-mode-switch:hover:not(:disabled){color:#2563eb;border-color:#b8cdf6;background:#f8faff;transform:translateY(-1px);box-shadow:0 3px 8px rgba(37,99,235,0.12)}
+.review-mode-switch:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
 @media(max-width:650px){.review-page-heading{gap:16px;flex-wrap:wrap;margin-bottom:20px}.review-page-heading h1{font-size:20px}.review-mode-switch{min-height:34px}.review-page-heading p{font-size:12px}}
 </style>

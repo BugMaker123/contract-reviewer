@@ -3,6 +3,28 @@ from test_ui_composition import live_server
 from playwright.sync_api import sync_playwright, expect
 
 
+def test_issue_navigation_and_advice_share_one_accordion(revision_client):
+    task, _ = seed_review(revision_client)
+    with live_server() as base, sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page(viewport={'width': 1600, 'height': 1000})
+            page.goto(base + '/workbench?task=' + task['id'])
+            expect(page.locator('#review-summary-panel .wb-nav-issues')).to_have_count(0)
+            payment = page.locator('#card-payment .wb-issue-accordion-trigger')
+            liability = page.locator('#card-liability .wb-issue-accordion-trigger')
+            expect(payment).to_have_attribute('aria-expanded', 'true')
+            expect(liability).to_have_attribute('aria-expanded', 'false')
+            liability.click()
+            expect(payment).to_have_attribute('aria-expanded', 'false')
+            expect(liability).to_have_attribute('aria-expanded', 'true')
+            expect(page.locator('#card-liability .prototype-locate')).to_be_visible()
+            liability.click()
+            expect(liability).to_have_attribute('aria-expanded', 'false')
+        finally:
+            browser.close()
+
+
 def test_continuous_clause_has_one_box_inside_viewport(revision_client):
     from backend import workspace_api
     task, run = seed_review(revision_client)

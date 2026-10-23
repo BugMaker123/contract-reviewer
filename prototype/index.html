@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>LexisGraph · 交互原型</title>
+    <style>
+        :root {
+            font-family: Inter, "Microsoft YaHei", system-ui, sans-serif;
+            color: #18243b;
+            background: #f4f7fb;
+            font-size: 14px
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+            font: inherit
+        }
+
+        button {
+            cursor: pointer
+        }
+
+        button:disabled {
+            opacity: .5;
+            cursor: not-allowed
+        }
+
+        .app {
+            display: grid;
+            grid-template-columns: 236px minmax(0, 1fr);
+            min-height: 100vh
+        }
+
+        .side {
+            background: #17243a;
+            color: #b8c6d9;
+            padding: 24px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 22px
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            color: white;
+            font-weight: 800;
+            font-size: 18px;
+            padding: 0 10px
+        }
+
+        .mark {
+            width: 32px;
+            height: 32px;
+            display: grid;
+            place-items: center;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #5a78f6, #31b5e9);
+            box-shadow: 0 6px 18px #426fff66
+        }
+
+        .side small {
+            padding: 0 14px;
+            color: #8092ae;
+            font-size: 11px;
+            letter-spacing: .13em
+        }
+
+        .nav {
+            display: grid;
+            gap: 3px
+        }
+
+        .nav button {
+            width: 100%;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: none;
+            color: #b8c6d9;
+            border: 0;
+            border-radius: 10px;
+            text-align: left;
+            padding: 11px 13px
+        }
+
+        .nav button:hover,
+        .nav button.active {
+            background: #ffffff18;
+            color: white
+        }
+
+        .nav button.active {
+            box-shadow: inset 3px 0 #71a7ff
+        }
+
+        .nav i {
+            width: 18px;
+            font-size: 16px;
+            font-style: normal;
+            text-align: center
+        }
+
+        .side-foot {
+            margin-top: auto;
+            padding: 12px;
+            border-top: 1px solid #ffffff1c;
+            color: #8fa0b8;
+            font-size: 12px
+        }
+
+        .main {
+            min-width: 0
+        }
+
+        .top {
+            height: 68px;
+            background: #fff;
+            border-bottom: 1px solid #e4eaf2;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            gap: 18px
+        }
+
+        .crumb {
+            font-size: 13px;
+            color: #75839b
+        }
+
+        .crumb strong {
+            color: #18243b
+        }
+
+        .top-right {
+            display: flex;
+            gap: 12px;
+            align-items: center
+        }
+
+        .badge {
+            border-radius: 100px;
+            padding: 5px 9px;
+            background: #edf3ff;
+            color: #3564bd;
+            font-size: 12px;
+            white-space: nowrap
+        }
+
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #e3ebf9;
+            display: grid;
+            place-items: center
+        }
+
+        .content {
+            padding: 29px 32px;
+            max-width: 1580px;
+            margin: auto
+        }
+
+        .head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 18px;
+            margin-bottom: 22px
+        }
+
+        .head h1 {
+            font-size: 26px;
+            letter-spacing: -.04em;
+            margin: 0 0 7px
+        }
+
+        .muted {
+            color: #697990
+        }
+
+        .head p,
+        .card p {
+            margin: 0;
+            color: #697990;
+            line-height: 1.6
+        }
+
+        .actions,
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap
+        }
+
+        .btn {
+            border: 1px solid #dce4ef;
+            background: #fff;
+            color: #273b58;
+            border-radius: 9px;
+            padding: 9px 13px;
+            min-height: 37px;
+            transition: .18s
+        }
+
+        .btn:hover {
+            border-color: #a9c0e9;
+            background: #f8fbff;
+            transform: translateY(-1px)
+        }
+
+        .primary {
+            background: #315fd3;
+            color: #fff;
+            border-color: #315fd3;
+            box-shadow: 0 5px 14px #315fd330
+        }
+
+        .primary:hover {
+            background: #254eb9;
+            color: #fff
+        }
+
+        .subtle {
+            background: #f1f5fa
+        }
+
+        .danger {
+            color: #ba4652
+        }
+
+        .grid {
+            display: grid;
+            gap: 18px
+        }
+
+        .two {
+            grid-template-columns: minmax(0, 1.1fr) minmax(330px, .9fr)
+        }
+
+        .three {
+            grid-template-columns: repeat(3, minmax(0, 1fr))
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid #e1e7f0;
+            border-radius: 15px;
+            box-shadow: 0 5px 24px #273b5608;
+            padding: 20px
+        }
+
+        .card h2 {
+            font-size: 16px;
+            margin: 0 0 15px
+        }
+
+        .card h3 {
+            font-size: 14px;
+            margin: 0 0 10px
+        }
+
+        .stat strong {
+            font-size: 30px;
+            display: block;
+            letter-spacing: -.05em;
+            margin: 7px 0
+        }
+
+        .stat span {
+            color: #6f7d92
+        }
+
+        .section {
+            margin-top: 19px
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 13px
+        }
+
+        .section-title h2 {
+            margin: 0;
+            font-size: 18px
+        }
+
+        .choice {
+            display: flex;
+            gap: 6px;
+            background: #f0f3f8;
+            padding: 4px;
+            border-radius: 10px;
+            flex-wrap: wrap
+        }
+
+        .choice button {
+            border: 0;
+            background: transparent;
+            border-radius: 7px;
+            padding: 8px 12px;
+            color: #60708a
+        }
+
+        .choice button.active {
+            background: #fff;
+            color: #244fba;
+            box-shadow: 0 2px 6px #243c5d16
+        }
+
+        .field {
+            display: grid;
+            gap: 6px;
+            margin-bottom: 13px;
+            font-size: 12px;
+            font-weight: 650;
+            color: #465671
+        }
+
+        .field input,
+        .field select,
+        .field textarea,
+        .search {
+            width: 100%;
+            border: 1px solid #dce4ee;
+            border-radius: 9px;
+            padding: 10px 11px;
+            background: #fff;
+            color: #1d2b44;
+            outline: none
+        }
+
+        .field input:focus,
+        .field select:focus,
+        .field textarea:focus,
+        .search:focus {
+            border-color: #6d98ec;
+            box-shadow: 0 0 0 3px #dfeaff
+        }
+
+        .field textarea {
+            resize: vertical;
+            min-height: 80px
+        }
+
+        .form-two {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px
+        }
+
+        .drop {
+            border: 1.5px dashed #b9c9df;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            background: #f9fbff;
+            cursor: pointer;
+            transition: .18s
+        }
+
+        .drop:hover,
+        .drop.drag {
+            border-color: #5c86dc;
+            background: #edf4ff
+        }
+
+        .drop b {
+            display: block;
+            margin: 7px
+        }
+
+        .drop input {
+            display: none
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #77869c
+        }
+
+        .notice {
+            border-radius: 10px;
+            background: #f0f5ff;
+            color: #4b6389;
+            padding: 11px 13px;
+            font-size: 12px;
+            line-height: 1.5
+        }
+
+        .list {
+            display: grid;
+            gap: 8px
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 11px 12px;
+            border: 1px solid #e5eaf2;
+            border-radius: 10px;
+            background: white;
+            text-align: left;
+            width: 100%;
+            color: inherit
+        }
+
+        .list-item:hover,
+        .list-item.selected {
+            border-color: #9db8ed;
+            background: #f5f8ff
+        }
+
+        .pill {
+            border-radius: 100px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 650;
+            white-space: nowrap;
+            background: #edf3fb;
+            color: #58708f
+        }
+
+        .pill.high {
+            background: #fff0f0;
+            color: #be4d57
+        }
+
+        .pill.medium {
+            background: #fff5df;
+            color: #a56b15
+        }
+
+        .pill.good {
+            background: #eaf8f0;
+            color: #28835b
+        }
+
+        .pill.wait {
+            background: #eef1f6;
+            color: #62728a
+        }
+
+        .table-wrap {
+            overflow: auto
+        }
+
+        .table {
+            border-collapse: collapse;
+            width: 100%;
+            white-space: nowrap
+        }
+
+        .table th,
+        .table td {
+            text-align: left;
+            padding: 13px 11px;
+            border-bottom: 1px solid #edf0f5
+        }
+
+        .table th {
+            font-size: 12px;
+            color: #6b7d94;
+            background: #f8fafd
+        }
+
+        .table tr:last-child td {
+            border-bottom: 0
+        }
+
+        .table button {
+            padding: 6px 9px;
+            min-height: 29px
+        }
+
+        .workbench {
+            display: grid;
+            grid-template-columns: minmax(240px, 23%) minmax(360px, 1fr) minmax(290px, 28%);
+            gap: 14px;
+            align-items: start
+        }
+
+        .workbench .card {
+            min-height: 610px
+        }
+
+        .issue {
+            cursor: pointer
+        }
+
+        .issue strong {
+            font-size: 13px
+        }
+
+        .issue small {
+            display: block;
+            color: #74839a;
+            margin-top: 5px
+        }
+
+        .paper {
+            background: #fff;
+            box-shadow: 0 10px 34px #1b2a4314;
+            border: 1px solid #e8edf4;
+            border-radius: 9px;
+            margin: 14px auto;
+            padding: 35px 38px;
+            max-width: 660px;
+            min-height: 470px;
+            line-height: 1.85
+        }
+
+        .paper h2 {
+            text-align: center;
+            font-size: 19px
+        }
+
+        .clause {
+            padding: 8px;
+            border-radius: 7px;
+            margin: 8px -8px;
+            cursor: pointer
+        }
+
+        .clause:hover,
+        .clause.selected {
+            background: #fff7e8
+        }
+
+        .clause.selected {
+            box-shadow: inset 3px 0 #e9a84b
+        }
+
+        .diff-old,
+        .diff-new {
+            padding: 13px;
+            border-radius: 8px;
+            line-height: 1.6;
+            margin: 8px 0;
+            white-space: pre-wrap
+        }
+
+        .diff-old {
+            background: #fff0ef;
+            color: #8f4042;
+            border-left: 3px solid #dc7772
+        }
+
+        .diff-new {
+            background: #eaf8f1;
+            color: #286b4a;
+            border-left: 3px solid #60b78b
+        }
+
+        .tabs {
+            display: flex;
+            gap: 6px;
+            border-bottom: 1px solid #e4eaf2;
+            margin-bottom: 14px
+        }
+
+        .tabs button {
+            background: none;
+            border: 0;
+            padding: 10px 13px;
+            color: #708096;
+            border-bottom: 2px solid transparent
+        }
+
+        .tabs button.active {
+            color: #315fd3;
+            border-bottom-color: #315fd3
+        }
+
+        .status-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 10px 0;
+            border-bottom: 1px solid #edf0f5
+        }
+
+        .doc-edit {
+            width: 100%;
+            min-height: 360px;
+            border: 0;
+            outline: 0;
+            line-height: 1.8;
+            resize: vertical;
+            color: #1d2b44
+        }
+
+        .empty {
+            padding: 45px;
+            text-align: center;
+            color: #74839a
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1c304e;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px #1b2b4d4d;
+            z-index: 30
+        }
+
+        .modal-back {
+            position: fixed;
+            inset: 0;
+            background: #14213c7a;
+            display: grid;
+            place-items: center;
+            padding: 20px;
+            z-index: 20
+        }
+
+        .modal {
+            background: white;
+            border-radius: 16px;
+            max-width: 560px;
+            width: 100%;
+            padding: 22px;
+            box-shadow: 0 22px 80px #10203b55
+        }
+
+        .modal h2 {
+            margin: 0 0 15px
+        }
+
+        .hide {
+            display: none !important
+        }
+
+        @media(max-width:1100px) {
+            .workbench {
+                grid-template-columns: 260px minmax(0, 1fr)
+            }
+
+            .workbench>:last-child {
+                grid-column: 1/-1;
+                min-height: 0
+            }
+        }
+
+        @media(max-width:760px) {
+            .app {
+                grid-template-columns: 1fr
+            }
+
+            .side {
+                position: static;
+                padding: 12px;
+                gap: 9px
+            }
+
+            .side small,
+            .side-foot {
+                display: none
+            }
+
+            .nav {
+                display: flex;
+                overflow: auto
+            }
+
+            .nav button {
+                white-space: nowrap
+            }
+
+            .top {
+                padding: 0 15px
+            }
+
+            .content {
+                padding: 19px 13px
+            }
+
+            .two,
+            .three,
+            .workbench {
+                grid-template-columns: 1fr
+            }
+
+            .workbench>:last-child {
+                grid-column: auto
+            }
+
+            .form-two {
+                grid-template-columns: 1fr
+            }
+
+            .head {
+                display: block
+            }
+
+            .head .actions {
+                margin-top: 13px
+            }
+        }
+
+        @media(prefers-reduced-motion:reduce) {
+            * {
+                transition: none !important;
+                scroll-behavior: auto !important
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <aside class="side">
+            <div class="brand"><span class="mark">◇</span> LexisGraph</div><small>工作空间</small>
+            <nav id="nav" class="nav"></nav>
+            <div class="side-foot">交互原型 · 示例数据<br>所有操作仅在本页演示</div>
+        </aside>
+        <div class="main">
+            <header class="top">
+                <div class="crumb">合同工作 <span style="margin:0 7px">/</span> <strong id="crumb"></strong></div>
+                <div class="top-right"><span class="badge">本地演示</span><button class="btn"
+                        onclick="openModal('model')">模型配置</button><span class="avatar">法</span></div>
+            </header>
+            <main id="view" class="content"></main>
+        </div>
+    </div>
+    <div id="toast" class="toast hide" role="status"></div>
+    <div id="modal" class="modal-back hide" onclick="if(event.target===this)closeModal()">
+        <div class="modal" id="modal-body"></div>
+    </div>
+    <script>
+        const menus = [['start', '新建审查', '⌂'], ['records', '审查记录', '▤'], ['validations', '模板核验记录', '☑'], ['drafts', '合同起草', '✎'], ['templates', '合同模板', '▧'], ['checklists', '审查清单', '☷'], ['categories', '业务分类', '▦']];
+        const sample = `云服务采购协议\n\n甲方：星河科技有限公司\n乙方：远山云计算有限公司\n\n第一条 服务内容\n乙方向甲方提供云计算资源、系统维护及技术支持。\n\n第二条 服务期限\n本协议自双方签署之日起生效，服务期限为十二个月。\n\n第三条 付款安排\n甲方应在收到乙方合格发票后五个工作日内支付全部服务费用。\n\n第四条 责任限制\n乙方对因服务中断造成的损失不承担任何责任。\n\n第五条 数据与保密\n双方应对履约中获悉的商业秘密承担保密义务。`;
+        let state = { page: 'start', flow: 'choose', stance: '中立审慎', scale: '标准', source: '', file: '', category: '', focus: '', background: '', selectedIssue: 0, tab: 'opinions', mode: 'marked', reviewStatus: '待处理', issues: [{ title: '付款期限较短', level: 'medium', levelName: '中风险', clause: '第三条 付款安排', old: '甲方应在收到乙方合格发票后五个工作日内支付全部服务费用。', next: '甲方应在收到乙方合格发票并完成验收后十五个工作日内支付相应费用。', reason: '建议将付款与验收节点关联，明确可执行的付款条件。', status: '待处理' }, { title: '免责范围过宽', level: 'high', levelName: '高风险', clause: '第四条 责任限制', old: '乙方对因服务中断造成的损失不承担任何责任。', next: '乙方因故意或重大过失造成服务中断的，应承担相应赔偿责任；其他责任以本合同已支付服务费为限。', reason: '全面免责可能使损失分配失衡，应保留故意及重大过失责任。', status: '待处理' }, { title: '保密期限未明确', level: 'medium', levelName: '中风险', clause: '第五条 数据与保密', old: '双方应对履约中获悉的商业秘密承担保密义务。', next: '双方应对履约中获悉的商业秘密承担保密义务；商业秘密在其仍构成商业秘密期间持续受保护。', reason: '补足保密义务的存续安排，减少终止后的解释争议。', status: '待处理' }], draftTitle: '云服务采购协议', draftText: '', draftReq: '', draftType: '服务采购合同', draftPerspective: '中立审慎', draftPartyA: '星河科技有限公司', draftPartyB: '远山云计算有限公司', draftSaved: false, recordFilter: '', templateFilter: '', checkFilter: '', categoryFilter: '', selectedTemplate: '云服务采购标准模板', validationFile: '', validationResult: false };
+        const records = [['云服务采购协议', '风险审查', '复核中', '2026-10-22'], ['技术保密协议', '风险审查', '已完成', '2026-10-20'], ['办公设备采购合同', '模板核验', '需人工确认', '2026-10-18']];
+        const templates = [['云服务采购标准模板', 'DOCX', '已发布 · v3', '采购合同'], ['技术保密协议模板', 'DOCX', '规则草稿', '保密协议'], ['设备交付确认书', 'PDF', '仅原件预览', '采购合同']];
+        const checklists = [['采购合同审查清单', '采购合同', '已发布 · v4'], ['信息技术服务清单', '技术服务', '已发布 · v2'], ['保密协议审查清单', '保密协议', '草稿']];
+        const categories = [['采购合同', 'CG-01', '2 份清单'], ['技术服务', 'IT-02', '1 份清单'], ['保密协议', 'NDA-03', '1 份清单']];
+        const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const B = (label, fn, cls = '') => `<button class="btn ${cls}" onclick="${fn}">${label}</button>`;
+        const P = (name, cls = '') => `<span class="pill ${cls}">${esc(name)}</span>`;
+        const header = (title, desc, actions = '') => `<div class="head"><div><h1>${title}</h1><p>${desc}</p></div><div class="actions">${actions}</div></div>`;
+        function toast(msg) { let e = document.getElementById('toast'); e.textContent = msg; e.classList.remove('hide'); clearTimeout(window.tt); window.tt = setTimeout(() => e.classList.add('hide'), 3000) }
+        function nav(page) { state.page = page; history.replaceState(null, '', '#' + page); render(); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+        function render() { document.getElementById('nav').innerHTML = menus.map(([key, name, icon]) => `<button class="${state.page === key ? 'active' : ''}" onclick="nav('${key}')"><i>${icon}</i>${name}</button>`).join(''); document.getElementById('crumb').textContent = menus.find(x => x[0] === state.page)?.[1] || '工作台'; document.getElementById('view').innerHTML = ({ start: renderStart, workbench: renderWorkbench, records: renderRecords, validations: renderValidations, drafts: renderDrafts, templates: renderTemplates, checklists: renderChecklists, categories: renderCategories })[state.page](); }
+        function set(k, v) { state[k] = v; render() }
+        function renderStart() { let choice = state.flow === 'choose'; return header('开始一项合同工作', '从风险审查或标准模板核验开始，已有工作可以从记录中继续。', B('查看审查记录', "nav('records')")) + `<div class="grid two"><section class="card"><div class="section-title"><h2>新建任务</h2>${P(choice ? '选择方式' : state.flow === 'ai' ? '风险审查' : '模板核验')}</div><div class="choice" style="margin-bottom:18px"><button class="${choice ? 'active' : ''}" onclick="set('flow','choose')">选择方式</button><button class="${state.flow === 'ai' ? 'active' : ''}" onclick="set('flow','ai')">风险审查</button><button class="${state.flow === 'template' ? 'active' : ''}" onclick="set('flow','template')">模板核验</button></div>${choice ? `<div class="list"><button class="list-item" onclick="set('flow','ai')"><span><b>AI 风险审查</b><br><span class="hint">上传合同、设置立场与要求，进入三栏审查工作台</span></span><span>→</span></button><button class="list-item" onclick="set('flow','template')"><span><b>标准模板核验</b><br><span class="hint">对照已发布的 DOCX 模板规则，检查填写内容</span></span><span>→</span></button></div>` : state.flow === 'ai' ? renderAiForm() : renderTemplateForm()}</section><section class="card"><h2>继续已有工作</h2><div class="list">${records.map(r => `<button class="list-item" onclick="${r[1] === '模板核验' ? "nav('validations')" : "nav('workbench')"}"><span><b>${r[0]}</b><br><span class="hint">${r[1]} · ${r[3]}</span></span>${P(r[2], r[2] === '已完成' ? 'good' : 'wait')}</button>`).join('')}</div><div class="section"><div class="notice">当前页面为交互原型，文件选择、审核动作和保存状态仅用于展示操作流程，不连接后端。</div></div></section></div>` }
+        function renderAiForm() { return `<div class="field">合同来源<div class="choice"><button class="${!state.source ? 'active' : ''}" onclick="set('source','')">上传文件</button><button class="${state.source === 'paste' ? 'active' : ''}" onclick="set('source','paste')">粘贴正文</button></div></div>${state.source === 'paste' ? `<label class="field">合同正文<textarea oninput="state.contractText=this.value" placeholder="粘贴合同正文…">${esc(state.contractText || '')}</textarea></label>` : `<label class="drop" id="drop"><input type="file" accept=".docx,.pdf,.txt" onchange="chooseFile(this,'file')"><span style="font-size:25px">⇧</span><b>${esc(state.file || '拖入合同文件，或点击选择')}</b><span class="hint">支持 DOCX、文字型 PDF、TXT · 最大 10 MB</span></label>`}<div class="form-two"><label class="field">审查立场<select onchange="state.stance=this.value"><option ${state.stance === '中立审慎' ? 'selected' : ''}>中立审慎</option><option ${state.stance === '甲方立场' ? 'selected' : ''}>甲方立场</option><option ${state.stance === '乙方立场' ? 'selected' : ''}>乙方立场</option></select></label><label class="field">审查尺度<select onchange="state.scale=this.value"><option>标准</option><option>快速</option><option>深入</option></select></label></div><label class="field">业务分类<select onchange="state.category=this.value"><option>暂不选择</option>${categories.map(c => `<option>${c[0]}</option>`).join('')}</select></label><label class="field">企业审查清单<select><option>不使用清单</option>${checklists.map(c => `<option>${c[0]}</option>`).join('')}</select></label><label class="field">交易背景（选填）<textarea oninput="state.background=this.value" placeholder="交易目的、参与方、金额、履约场景…">${esc(state.background)}</textarea></label><label class="field">重点要求（选填）<textarea oninput="state.focus=this.value" placeholder="例如：重点关注付款、数据安全和责任限制…">${esc(state.focus)}</textarea></label><div class="row">${B('添加制度资料', "openModal('policy')")}${B('开始审查', "startReview()", 'primary')}</div>` }
+        function renderTemplateForm() { return `<label class="field">已发布的基准模板<select onchange="state.selectedTemplate=this.value">${templates.filter(x => x[1] === 'DOCX').map(t => `<option>${t[0]}</option>`).join('')}</select></label><label class="drop"><input type="file" accept=".docx" onchange="chooseFile(this,'validationFile')"><span style="font-size:25px">⇧</span><b>${esc(state.validationFile || '选择待核验的 DOCX 合同')}</b><span class="hint">依据模板的固定内容与已发布字段规则核验</span></label><div class="section notice">不符合、无法确定及无法完整比对的内容会保留人工确认入口。</div><div class="section row">${B('管理合同模板', "nav('templates')")}${B('开始模板核验', "validate()", 'primary')}</div>` }
+        function chooseFile(input, key) { let f = input.files?.[0]; if (!f) return; if (f.size > 10 * 1024 * 1024) { toast('文件超过 10 MB，请重新选择'); return } state[key] = f.name; render(); toast('已选择 ' + f.name) }
+        function startReview() { if (!state.file && !state.contractText?.trim()) { toast('请先选择文件或粘贴合同正文'); return } nav('workbench'); toast('示例审查已打开') }
+        function validate() { if (!state.validationFile) { toast('请先选择待核验文件'); return } state.validationResult = true; nav('validations'); toast('示例核验报告已生成') }
+        function renderWorkbench() { let i = state.issues[state.selectedIssue]; return header('合同审查工作台', '云服务采购协议 · 当前稿自动保存 · 可逐条处理修订建议', `${B('返回审查记录', "nav('records')")}${B('重新审查', "openModal('rerun')")}${B('完成审核', "finishReview()", 'primary')}`) + `<div class="workbench"><section class="card"><div class="section-title"><h2>审查概览</h2>${P(state.reviewStatus, state.reviewStatus === '已完成' ? 'good' : 'wait')}</div><div class="status-line"><span>待处理建议</span><strong>${state.issues.filter(x => x.status === '待处理').length} 项</strong></div><div class="status-line"><span>高风险</span><strong>${state.issues.filter(x => x.level === 'high').length} 项</strong></div><div class="status-line"><span>已采纳 / 已拒绝</span><strong>${state.issues.filter(x => x.status === '已采纳').length} / ${state.issues.filter(x => x.status === '已拒绝').length}</strong></div><div class="section-title section"><h2>问题导航</h2>${B('全部展开', "toast('已显示全部问题')")}</div><div class="list">${state.issues.map((x, n) => `<button class="list-item issue ${n === state.selectedIssue ? 'selected' : ''}" onclick="state.selectedIssue=${n};render()"><span><strong>${esc(x.title)}</strong><small>${x.clause} · ${x.status}</small></span>${P(x.levelName, x.level)}</button>`).join('')}</div><div class="section notice">依据当前合同与审查要求生成；建议需结合交易背景人工判断。</div></section><section class="card"><div class="section-title"><h2>合同正文</h2><div class="row">${B('−', "toast('已缩小预览')")}${B('＋', "toast('已放大预览')")}</div></div><div class="choice"><button class="${state.mode === 'marked' ? 'active' : ''}" onclick="set('mode','marked')">修订标记</button><button class="${state.mode === 'current' ? 'active' : ''}" onclick="set('mode','current')">当前稿</button><button class="${state.mode === 'original' ? 'active' : ''}" onclick="set('mode','original')">原始稿</button><button class="${state.mode === 'compare' ? 'active' : ''}" onclick="set('mode','compare')">双栏对照</button></div><div class="paper"><h2>云服务采购协议</h2><p>甲方：星河科技有限公司<br>乙方：远山云计算有限公司</p><p>第一条 服务内容<br>乙方向甲方提供云计算资源、系统维护及技术支持。</p><p>第二条 服务期限<br>本协议自双方签署之日起生效，服务期限为十二个月。</p>${state.issues.map((x, n) => `<div class="clause ${n === state.selectedIssue ? 'selected' : ''}" onclick="state.selectedIssue=${n};render()"><b>${x.clause}</b><br>${esc(state.mode === 'original' ? x.old : x.status === '已采纳' ? x.next : x.old)} ${state.mode === 'marked' && x.status === '待处理' ? P('待确认', x.level) : ''}</div>`).join('')}</div><div class="row">${B('编辑当前稿', "openModal('edit')")}${B('导出当前 Word', "downloadText('当前稿')")}${B('导出修订稿', "downloadText('修订稿')")}</div></section><section class="card"><div class="tabs"><button class="${state.tab === 'opinions' ? 'active' : ''}" onclick="set('tab','opinions')">审查意见</button><button class="${state.tab === 'requirements' ? 'active' : ''}" onclick="set('tab','requirements')">要求核验</button><button class="${state.tab === 'activity' ? 'active' : ''}" onclick="set('tab','activity')">处理记录</button></div>${state.tab === 'opinions' ? `<div class="row">${P(i.levelName, i.level)} ${P(i.status, i.status === '已采纳' ? 'good' : 'wait')}</div><h2 class="section">${esc(i.title)}</h2><p>${i.clause}</p><div class="section"><b>原条款</b><div class="diff-old">${esc(i.old)}</div><b>建议改为</b><div class="diff-new">${esc(i.next)}</div></div><div class="section notice">${esc(i.reason)}</div><div class="section row">${B('采纳建议', "issueAction('已采纳')", 'primary')}${B('拒绝建议', "issueAction('已拒绝')")}${B('调整建议', "openModal('rewrite')")}</div><div class="section">${B('只采纳低风险建议', "acceptLowRisk()")}</div>` : state.tab === 'requirements' ? `<h2>要求覆盖情况</h2><div class="status-line"><span>付款节点与验收挂钩</span>${P('待确认', 'medium')}</div><div class="status-line"><span>服务中断责任</span>${P('不符合', 'high')}</div><div class="status-line"><span>商业秘密保护</span>${P('待确认', 'medium')}</div><div class="section">${B('查看审查清单', "nav('checklists')")}</div>` : `<h2>处理记录</h2>${state.issues.map(x => `<div class="status-line"><span>${esc(x.title)}</span>${P(x.status, x.status === '已采纳' ? 'good' : 'wait')}</div>`).join('')}<div class="section">${B('下载 JSON 审核记录', "downloadText('审核记录')")}</div>`}<div class="section row">${B('意见书预览', "openModal('report')")}${B('导出意见书', "downloadText('意见书')")}</div></section></div>` }
+        function issueAction(status) { state.issues[state.selectedIssue].status = status; render(); toast(status + '：' + state.issues[state.selectedIssue].title) } function acceptLowRisk() { state.issues.filter(x => x.level !== 'high').forEach(x => x.status = '已采纳'); render(); toast('已采纳非高风险建议') } function finishReview() { state.reviewStatus = '已完成'; render(); toast('审核已完成，可导出当前稿和意见书') }
+        function updateFilter(input, key) { let position = input.selectionStart; state[key] = input.value; render(); let next = document.querySelector(`[data-filter="${key}"]`); if (next) { next.focus(); next.setSelectionRange(position, position) } }
+        function renderRecords() { let rows = records.filter(r => r.join(' ').includes(state.recordFilter)); return header('审查记录', '查找审查任务、继续复核或导出交付文件。', B('新建审查', "state.flow='ai';nav('start')", 'primary')) + `<section class="card"><div class="row" style="margin-bottom:15px"><input class="search" data-filter="recordFilter" style="max-width:360px" placeholder="搜索合同名称或状态" value="${esc(state.recordFilter)}" oninput="updateFilter(this,'recordFilter')">${B('清空筛选', "state.recordFilter='';render()")}${B('导出 CSV', "downloadText('审查记录')")}</div><div class="table-wrap"><table class="table"><thead><tr><th>合同名称</th><th>类型</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead><tbody>${rows.map(r => `<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${P(r[2], r[2] === '已完成' ? 'good' : 'wait')}</td><td>${r[3]}</td><td>${B('打开', r[1] === '模板核验' ? "nav('validations')" : "nav('workbench')")}${B('导出', "downloadText('报告')")}</td></tr>`).join('')}</tbody></table>${rows.length ? '' : '<div class="empty">没有匹配的记录</div>'}</div></section>` }
+        function renderValidations() { return header('模板核验记录', '查看固定内容差异、字段规则结果及需要人工确认的事项。', B('新建模板核验', "state.flow='template';nav('start')", 'primary')) + `<section class="card"><div class="table-wrap"><table class="table"><thead><tr><th>核验文件</th><th>基准模板</th><th>业务结论</th><th>时间</th><th>操作</th></tr></thead><tbody><tr><td>${esc(state.validationResult ? state.validationFile : '办公设备采购合同.docx')}</td><td>${esc(state.selectedTemplate)}</td><td>${P('需人工确认', 'medium')}</td><td>2026-10-22</td><td>${B('查看报告', "openModal('validation')")}</td></tr></tbody></table></div></section>` }
+        function renderDrafts() { return header('合同起草', '填写交易需求，生成、编辑并保存合同草稿，随后导出或送审。', `${B('起草记录', "openModal('draftlist')")}${B('新建草稿', "resetDraft()")}`) + `<div class="grid two"><section class="card"><h2>起草需求</h2><div class="form-two"><label class="field">合同类型<select onchange="state.draftType=this.value"><option>服务采购合同</option><option>保密协议</option><option>销售合同</option><option>技术服务合同</option></select></label><label class="field">起草立场<select onchange="state.draftPerspective=this.value"><option>中立审慎</option><option>甲方立场</option><option>乙方立场</option></select></label></div><div class="form-two"><label class="field">甲方<input value="${esc(state.draftPartyA)}" oninput="state.draftPartyA=this.value"></label><label class="field">乙方<input value="${esc(state.draftPartyB)}" oninput="state.draftPartyB=this.value"></label></div><label class="field">交易内容与主要条款<textarea oninput="state.draftReq=this.value" placeholder="描述标的、金额、履行期限与交付要求…">${esc(state.draftReq)}</textarea></label><div class="field">常用关注点</div><div class="row">${['付款安排', '违约责任', '保密义务', '争议解决'].map(t => B(t, `addReq('${t}')`)).join('')}</div><div class="section notice">未提供的必要信息应在正式使用前补充。重新生成会形成新的草稿。</div><div class="section row">${B('填入示例', "state.draftReq='提供云服务资源与技术支持，服务期限十二个月，按验收节点分期付款。';render()")}${B('生成示例草稿', "generateDraft()", 'primary')}</div></section><section class="card"><div class="section-title"><h2>合同草稿</h2>${P(state.draftSaved ? '已保存' : '未保存', state.draftSaved ? 'good' : 'wait')}</div><label class="field">标题<input value="${esc(state.draftTitle)}" oninput="state.draftTitle=this.value;state.draftSaved=false"></label><div class="tabs"><button class="active">编辑与预览</button></div><textarea class="doc-edit" placeholder="生成后可在这里编辑合同正文…" oninput="state.draftText=this.value;state.draftSaved=false">${esc(state.draftText)}</textarea><div class="row">${B('保存草稿', "saveDraft()")}${B('导出 Word', "downloadText('合同草稿')")}${B('送入审查', "draftReview()", 'primary')}</div></section></div>` }
+        function addReq(t) { state.draftReq += (state.draftReq ? '；' : '') + t; render() } function generateDraft() { if (!state.draftReq.trim()) { toast('请先填写交易内容'); return } state.draftText = sample.replace('星河科技有限公司', state.draftPartyA).replace('远山云计算有限公司', state.draftPartyB); state.draftSaved = true; render(); toast('示例草稿已生成并保存') } function saveDraft() { state.draftSaved = true; render(); toast('草稿已保存（原型演示）') } function resetDraft() { state.draftText = ''; state.draftReq = ''; state.draftSaved = false; render() } function draftReview() { if (!state.draftText.trim()) { toast('请先生成或填写合同正文'); return } state.contractText = state.draftText; state.source = 'paste'; state.flow = 'ai'; nav('start'); toast('已将草稿带入审查准备页') }
+        function catalogPage(title, desc, filterKey, rows, columns, actions) { let filtered = rows.filter(r => r.join(' ').includes(state[filterKey])); return header(title, desc, `${B('新建', `openModal('${actions}')`, 'primary')}`) + `<section class="card"><div class="row" style="margin-bottom:15px"><input class="search" data-filter="${filterKey}" style="max-width:350px" placeholder="搜索名称或分类" value="${esc(state[filterKey])}" oninput="updateFilter(this,'${filterKey}')">${B('清空', `state.${filterKey}='';render()`)}</div><div class="table-wrap"><table class="table"><thead><tr>${columns.map(c => `<th>${c}</th>`).join('')}<th>操作</th></tr></thead><tbody>${filtered.map(r => `<tr>${r.map(v => `<td>${esc(v)}</td>`).join('')}<td>${B('查看', `openModal('${actions}detail')`)}${B('编辑', `openModal('${actions}')`)}</td></tr>`).join('')}</tbody></table>${filtered.length ? '' : '<div class="empty">没有匹配项目</div>'}</div></section>` }
+        function renderTemplates() { return catalogPage('合同模板', '管理原件、分组与 DOCX 字段规则；发布后可用于模板核验。', 'templateFilter', templates, ['模板名称', '格式', '规则状态', '分组'], 'template') + `<div class="section row">${B('管理模板分组', "openModal('groups')")}${B('配置模板规则', "openModal('rules')")}${B('新建模板核验', "state.flow='template';nav('start')")}</div>` }
+        function renderChecklists() { return catalogPage('审查清单', '维护企业要求，先确认草稿再发布；审查时固定使用发布版本。', 'checkFilter', checklists, ['清单名称', '业务分类', '状态'], 'checklist') + `<div class="section notice">清单项可设置硬性要求或优先偏好。文件提取的候选要求应逐条人工确认。</div>` }
+        function renderCategories() { return catalogPage('业务分类', '按业务场景组织审查清单与模板。', 'categoryFilter', categories, ['分类名称', '编码', '关联清单'], 'category') }
+        function openModal(type) {
+            let title = '', body = ''; if (type === 'model') { title = '模型配置'; body = '<p class="muted">模型密钥仅在当前浏览器演示，不写入原型文件。</p><label class="field">服务类型<select><option>OpenAI 兼容接口</option><option>DeepSeek</option></select></label><label class="field">模型名称<input placeholder="例如：deepseek-chat"></label><label class="field">API 地址<input placeholder="https://..."></label><label class="field">密钥<input type="password" placeholder="输入 API Key"></label>' } else if (type === 'edit') { title = '编辑当前稿'; body = `<label class="field">合同正文<textarea style="min-height:260px">${esc(sample)}</textarea></label>` } else if (type === 'report') { title = '审查意见书预览'; body = `<p>云服务采购协议 · ${state.reviewStatus}</p><div class="status-line"><span>建议事项</span><b>${state.issues.length} 项</b></div><div class="status-line"><span>待处理</span><b>${state.issues.filter(x => x.status === '待处理').length} 项</b></div><p class="muted">包含背景、要求核验、问题证据、处理状态与导出范围。</p>` } else if (type === 'validation') { title = '模板核验报告'; body = '<div class="status-line"><span>固定条款</span><b>需人工确认</b></div><div class="status-line"><span>必填字段</span><b>通过</b></div><div class="status-line"><span>金额范围</span><b>无法确定</b></div><p class="notice">示例结论仅供展示，不能替代实际规则核验。</p>' } else if (type === 'policy') { title = '制度资料与审查要求'; body = '<label class="field">制度内容<textarea placeholder="粘贴制度内容，或记录具体审查要求"></textarea></label><label class="field">要求性质<select><option>硬性要求</option><option>优先偏好</option></select></label><p class="notice">实际系统支持文件提取、逐项确认与版本快照。</p>' } else if (type === 'rerun') { title = '重新审查'; body = '<p>可根据新的关注点重新执行审查。已有处理记录保留，建议需重新核对。</p><label class="field">补充要求<textarea placeholder="补充本次审查重点…"></textarea></label>' } else if (type === 'rewrite') { title = '调整建议'; body = `<label class="field">修改后的建议条款<textarea>${esc(state.issues[state.selectedIssue].next)}</textarea></label>` } else if (type === 'draftlist') { title = '起草记录'; body = '<div class="list"><button class="list-item" onclick="closeModal();toast(\'已打开示例草稿\')">云服务采购协议 · 最近编辑 →</button></div>' } else if (type === 'rules') { title = '模板规则配置'; body = '<p>DOCX 模板规则：选择原文区域、配置必填/长度/整数/日期/枚举规则、试算后发布版本。</p><div class="status-line"><span>甲方名称</span><b>必填</b></div><div class="status-line"><span>合同金额</span><b>整数范围</b></div><div class="status-line"><span>签署日期</span><b>日期</b></div>' } else if (type === 'groups') { title = '模板分组'; body = '<div class="status-line"><span>采购合同</span><b>2 份模板</b></div><div class="status-line"><span>保密协议</span><b>1 份模板</b></div>' } else { title = ({ template: '合同模板', checklist: '审查清单', category: '业务分类' })[type.replace('detail', '')] || '详情'; body = `<label class="field">名称<input placeholder="输入${title}名称"></label><label class="field">说明<textarea placeholder="补充说明…"></textarea>${type.includes('template') ? '<label class="field">分组<select><option>采购合同</option><option>保密协议</option></select></label>' : ''}` }
+            document.getElementById('modal-body').innerHTML = `<div class="section-title"><h2>${title}</h2><button class="btn" onclick="closeModal()">关闭</button></div>${body}<div class="section row" style="justify-content:flex-end">${B('取消', "closeModal()")}${B(type.includes('detail') ? '完成' : '保存', "closeModal();toast('已记录原型操作')", 'primary')}</div>`; document.getElementById('modal').classList.remove('hide')
+        }
+        function closeModal() { document.getElementById('modal').classList.add('hide') } function downloadText(name) { let blob = new Blob([name + '\n\n' + (state.draftText || sample) + '\n\n此文件是交互原型的示例内容，并非正式 Word 或审核报告。'], { type: 'text/plain;charset=utf-8' }); let a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name + '-原型示例.txt'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast('已下载示例文本') }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal() }); state.page = location.hash.slice(1) || 'start'; if (![...menus.map(x => x[0]), 'workbench'].includes(state.page)) state.page = 'start'; render();
+    </script>
+<link rel="stylesheet" href="detail.css"><script src="detail.js"></script>
+</body>
+
+</html>

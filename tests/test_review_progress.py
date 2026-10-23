@@ -44,6 +44,28 @@ def test_public_trace_is_saved_with_completed_review(isolated_workspace, monkeyp
         assert all(set(item) >= {'stage','detail','time'} for item in run['audit_trace'])
 
 
+def test_failed_review_retries_from_persisted_graph_checkpoint(isolated_workspace, monkeypatch):
+    from backend import workspace_api
+    monkeypatch.setattr(graph, 'get_llm_client', lambda config: None)
+    with TestClient(app) as client:
+        task = client.post('/api/tasks', json={'title': '断点续审', 'text': '第一条 验收后付款。', 'mode': 'quick'}).json()
+        client.post('/api/tasks/' + task['id'] + '/review/stream', json={})
+        task = client.get('/api/tasks/' + task['id']).json()
+        previous = workspace_api.repo.get(task['active_run'], 'run')
+        assert previous['checkpoint']['node'] == 'synthesize_summary'
+        assert previous['checkpoint']['state']['model_config'] == {}
+        workspace_api.repo.update_review(previous['id'], {'status': 'failed', 'error': '连接中断'}, task_changes={'status': 'failed'})
+        task = client.get('/api/tasks/' + task['id']).json()
+        response = client.post('/api/runs/' + previous['id'] + '/retry', json={'task_revision': task['revision']})
+        assert response.status_code == 200
+        assert response.json()['resumed_from'] == 'synthesize_summary'
+        retried = client.get('/api/runs/' + response.json()['run_id'] + '/stream')
+        assert 'event: complete' in retried.text
+        current = workspace_api.repo.get(response.json()['run_id'], 'run')
+        assert current['status'] == 'completed'
+        assert current['retry_of'] == previous['id']
+
+
 def test_public_model_summary_streams_before_review_is_finished():
     issue = {'id':'a','clause_title':'付款条款','severity':'warning','category':'付款',
              'issue_title':'付款期限不明确','legal_basis':'按合同约定',

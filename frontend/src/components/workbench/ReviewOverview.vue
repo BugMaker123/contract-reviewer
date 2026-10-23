@@ -16,7 +16,7 @@ const admissionLabel = computed(() => ({pass:'已通过',rejected:'未通过',ne
         <div v-if="result" class="overview-baseline"><span>本轮审查稿件</span><strong>{{workspace.run?.baseline_kind === 'accepted' ? '上一版已采纳修订稿' : '当时保存的正文快照'}}</strong></div>
       </div>
       <div v-if="workspace.task?.running_run" class="overview-notice"><p>审查已在后台执行或排队，刷新不会取消任务。</p><div class="overview-notice-actions"><button @click="context.startReview(workspace.task.running_run)">重新连接审查进度</button><button @click="context.cancelReview()">取消后台审查</button></div></div>
-      <p v-if="['failed','interrupted'].includes(workspace.task?.status)" class="overview-notice">上次审查失败或中断，已有结果保留；可点击顶部重新审查。</p>
+      <div v-if="['failed','interrupted'].includes(workspace.task?.status)" class="overview-notice"><p>上次审查失败或中断，已有结果保留。</p><div class="overview-notice-actions"><button @click="context.retryReview()" :disabled="context.retryingReview.value">{{ context.retryingReview.value ? '正在重试…' : '继续重试' }}</button></div></div>
       <template v-if="result">
         <div v-if="result.warning" class="overview-notice"><strong>审查提示</strong><p>{{result.warning}}</p></div>
         <section class="overview-section overview-admission"><header><h3>准入结论</h3><span v-if="admissionLabel" class="overview-status" :class="result.admission.status">{{admissionLabel}}</span></header><p>{{result.admission?.reason || '历史版本未记录'}}</p></section>

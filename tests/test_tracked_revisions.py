@@ -282,7 +282,7 @@ def test_review_settings_preserve_document_view(revision_client):
             page.get_by_role('combobox', name='审查立场', exact=True).select_option('中立审慎')
             expect(page.locator('.stale-review-notice')).to_have_count(0)
             expect(page.locator('#card-payment')).to_be_visible()
-            expect(page.locator('#review-summary-panel .wb-nav-issues')).to_be_visible()
+            expect(page.locator('#review-summary-panel .wb-nav-issues')).to_have_count(0)
             expect(page.locator('#card-payment').get_by_role('button', name='采纳', exact=True)).to_be_enabled()
             # The conditions dialog must use the same reversible visibility rule.
             page.get_by_role('button', name='修改审查条件', exact=True).click()
@@ -298,7 +298,7 @@ def test_review_settings_preserve_document_view(revision_client):
             expect(page.locator('#card-payment')).to_be_visible()
             page.reload()
             expect(page.locator('#card-payment')).to_be_visible()
-            expect(page.locator('#review-summary-panel .wb-nav-issues')).to_be_visible()
+            expect(page.locator('#review-summary-panel .wb-nav-issues')).to_have_count(0)
         finally:
             browser.close()
 

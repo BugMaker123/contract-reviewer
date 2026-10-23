@@ -124,6 +124,13 @@ def regions_overlap(start, end, other_start, other_end):
     return start < other_end and end > other_start
 
 
+def default_region_policy(block, start, end):
+    """Allow conditional review for a located field, not a whole prose block."""
+    if block['kind'] != 'cell' and start == 0 and end == len(block['text']):
+        return 'manual'
+    return 'conditional'
+
+
 def validate_regions(fields, blocks):
     lookup = {b['id']: b for b in blocks}
     ids, occupied = set(), {}
@@ -152,8 +159,7 @@ def review_detail(identifier: str):
     document = document_blocks(record['source_id'])
     versions = repo().list('template_release', identifier)
     fields, repaired = preserve_form_labels(rules_for(record), document['blocks'])
-    fields, supplemented = supplement_blank_fields(fields, document['blocks'])
-    return {'template': record, **document, 'fields': fields, 'repaired': repaired, 'supplemented': supplemented,
+    return {'template': record, **document, 'fields': fields, 'repaired': repaired, 'supplemented': 0,
             'releases': [{'id': v['id'], 'version': v['version'], 'created_at': v['created_at'], 'source_id': v['source_id']} for v in versions]}
 
 
@@ -246,7 +252,9 @@ def blank_field_candidates(blocks):
                 end -= min(2, trailing)
             candidate = Region(id=uuid4().hex, name=name[:100], block_id=block['id'],
                                start=match.end(), end=max(match.end(), end),
-                               type='date' if '日期' in label else 'text', origin='rule').model_dump()
+                               type='date' if '日期' in label else 'text',
+                               policy=default_region_policy(block, match.end(), max(match.end(), end)),
+                               origin='rule').model_dump()
             candidates.append((candidate, match.start(), match.end()))
     return candidates
 
@@ -297,7 +305,8 @@ async def extract_fields(identifier: str, body: ExtractInput):
         raise HTTPException(502, 'AI 模型调用失败或返回了无效 JSON，请检查模型连接与配置后重试；已有规则未改变') from error
     if not isinstance(result, dict) or not isinstance(result.get('fields'), list) or len(result['fields']) > 100:
         raise HTTPException(422, 'AI 返回格式不正确：需要 fields 数组且不超过100项；已有规则未改变')
-    lookup = {b['id']: b['text'] for b in document['blocks']}
+    block_lookup = {b['id']: b for b in document['blocks']}
+    lookup = {identifier: block['text'] for identifier, block in block_lookup.items()}
     fields, supplemented = supplement_blank_fields(existing, document['blocks'])
     skipped = []
     for index, row in enumerate(result['fields']):
@@ -344,7 +353,9 @@ async def extract_fields(identifier: str, body: ExtractInput):
             if len(fields) >= 300:
                 raise ValueError('填写区域达到300项上限，请分批维护')
             candidate = Region(id=uuid4().hex, name=name, block_id=row['block_id'], start=start, end=end,
-                               type=row.get('type', 'text'), options=row.get('options') or [], origin='ai').model_dump()
+                               type=row.get('type', 'text'), options=row.get('options') or [],
+                               policy=default_region_policy(block_lookup[row['block_id']], start, end),
+                               origin='ai').model_dump()
             normalized, _ = preserve_form_labels([candidate], document['blocks'])
             candidate = normalized[0]
             validate_regions(fields + [candidate], document['blocks'])

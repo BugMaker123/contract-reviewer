@@ -63,7 +63,7 @@ def test_ai_positions_validated_and_no_implicit_save(monkeypatch):
         result = client.post(base+'/extract-fields', json={'revision': 1}).json()
         assert result['fields'][0]['start'] == 3
         assert not result['fields'][0]['confirmed']
-        assert result['fields'][0]['policy'] == 'manual'
+        assert result['fields'][0]['policy'] == 'conditional'
         assert client.get(base+'/review').json()['fields'] == []
         async def invalid_model(config, prompt):
             return {'fields': [{'name': '编造', 'block_id': 'b0', 'text': '不存在'}]}
@@ -93,12 +93,13 @@ def test_review_browser_manual_mark_persist_publish():
         page.on('pageerror', lambda e: errors.append(str(e)))
         page.goto(address+'/templates/'+record['id']+'/review')
         expect(page.get_by_role('heading', name='模板')).to_be_visible()
-        expect(page.locator('.portal-sidebar')).to_have_count(0)
-        assert page.locator('.tr-workspace').bounding_box()['y'] <= 150
-        expect(page.get_by_role('link', name='返回主页', exact=True)).to_have_attribute('href', '/')
+        expect(page.locator('.portal-sidebar')).to_be_visible()
+        assert page.locator('.tr-workspace').bounding_box()['y'] <= 210
+        expect(page.get_by_role('link', name='返回合同模板', exact=True)).to_have_attribute('href', '/templates')
         page.get_by_role('button', name='手动添加', exact=True).click()
         dialog = page.get_by_role('dialog')
         dialog.get_by_label('原文位置', exact=True).select_option('b0')
+        dialog.locator('.tr-pick-advanced > summary').click()
         dialog.get_by_label('开始位置', exact=True).fill('4')
         dialog.get_by_label('结束位置（包含）', exact=True).fill('7')
         dialog.get_by_role('button', name='保存位置').click()
@@ -123,6 +124,97 @@ def test_review_browser_manual_mark_persist_publish():
         browser.close()
 
 
+def test_manual_field_picker_resets_stale_range_and_defaults_to_blank_insertion():
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright, expect
+    with TestClient(app) as client:
+        record, base = setup_template(client)
+        doc = Document()
+        doc.add_paragraph('一段超过二十个字符的合同正文，用来验证位置不会留在下一次添加中。')
+        doc.add_paragraph('法定代表人：')
+        data = BytesIO()
+        doc.save(data)
+        source = client.post('/api/contracts/import', files={'file': ('manual.docx', data.getvalue())}).json()['source_id']
+        changed = client.put(base, json={'name': '模板', 'group_id': record['group_id'], 'source_id': source, 'revision': 1}).json()
+        client.put(base + '/review', json={'revision': changed['revision'], 'source_id': source, 'fields': []})
+    with live_server() as address, sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page(viewport={'width': 1440, 'height': 900})
+            page.goto(address + '/templates/' + record['id'] + '/review')
+            page.get_by_role('button', name='手动添加', exact=True).click()
+            dialog = page.get_by_role('dialog', name='手动标记位置')
+            dialog.get_by_label('原文位置', exact=True).select_option('b0')
+            dialog.locator('.tr-pick-advanced > summary').click()
+            dialog.get_by_label('开始位置', exact=True).fill('7')
+            dialog.get_by_label('结束位置（包含）', exact=True).fill('20')
+            dialog.get_by_role('button', name='返回正文选择').click()
+            page.get_by_role('button', name='手动添加', exact=True).click()
+            expect(dialog.get_by_label('原文位置', exact=True)).to_have_value('')
+            dialog.get_by_label('原文位置', exact=True).select_option('b1')
+            dialog.locator('.tr-pick-advanced > summary').click()
+            expect(dialog.get_by_label('在空栏插入字段（保留原文字）')).to_be_checked()
+            expect(dialog.get_by_label('插入位置')).to_have_value(str(len('法定代表人：')))
+            expect(dialog.get_by_role('button', name='保存位置')).to_be_enabled()
+            dialog.get_by_label('在空栏插入字段（保留原文字）').uncheck()
+            dialog.get_by_label('开始位置', exact=True).fill('7')
+            dialog.get_by_label('结束位置（包含）', exact=True).fill('20')
+            expect(dialog.get_by_role('alert')).to_contain_text('位置必须在当前段落')
+            expect(dialog.get_by_role('button', name='保存位置')).to_be_disabled()
+            dialog.get_by_label('在空栏插入字段（保留原文字）').check()
+            dialog.get_by_role('button', name='保存位置').click()
+            expect(page.locator('.tr-mark')).to_contain_text('新增填写区域')
+        finally:
+            browser.close()
+
+
+def test_manual_field_can_be_inserted_by_clicking_source_text():
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright, expect
+    with TestClient(app) as client:
+        record, base = setup_template(client)
+    with live_server() as address, sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page(viewport={'width': 1440, 'height': 900})
+            page.goto(address + '/templates/' + record['id'] + '/review')
+            page.get_by_role('button', name='手动添加', exact=True).click()
+            dialog = page.get_by_role('dialog', name='手动标记位置')
+            dialog.get_by_label('原文位置', exact=True).select_option('b0')
+            source_text = dialog.get_by_label('点击或拖选原文')
+            source_text.click(position={'x': 90, 'y': 18})
+            source_text.press('Home')
+            expect(dialog.locator('.tr-pick-preview')).to_contain_text('竖线处')
+            expect(dialog.locator('.tr-caret-context')).to_contain_text('▏')
+            original_text = source_text.input_value()
+            assert source_text.evaluate('(el) => !el.readOnly && getComputedStyle(el).caretColor !== "rgba(0, 0, 0, 0)"')
+            source_text.press('X')
+            assert source_text.input_value() == original_text
+            expect(dialog.get_by_role('button', name='保存位置')).to_be_enabled()
+            dialog.get_by_role('button', name='保存位置').click()
+            expect(page.locator('.tr-mark')).to_contain_text('新增填写区域')
+        finally:
+            browser.close()
+
+
+def test_template_rule_editor_keeps_document_readable_with_sidebar():
+    from test_ui_composition import live_server
+    from playwright.sync_api import sync_playwright, expect
+    with TestClient(app) as client:
+        record, _ = setup_template(client)
+    with live_server() as address, sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page(viewport={'width': 1440, 'height': 900})
+            page.goto(address + '/templates/' + record['id'] + '/review')
+            expect(page.locator('.tr-document-panel')).to_be_visible()
+            assert page.locator('.tr-document-panel').bounding_box()['width'] >= 600
+            assert page.locator('.tr-inspector').bounding_box()['y'] > page.locator('.tr-document-panel').bounding_box()['y']
+            assert not page.evaluate('document.documentElement.scrollWidth > innerWidth')
+        finally:
+            browser.close()
+
+
 def test_ai_partial_results_and_typographic_location(monkeypatch):
     async def fake_model(config, prompt):
         return {'fields': [
@@ -139,7 +231,7 @@ def test_ai_partial_results_and_typographic_location(monkeypatch):
         data = response.json()
         assert len(data['fields']) == 1
         assert data['fields'][0]['start'] == 3 and data['fields'][0]['end'] == 7
-        assert data['fields'][0]['policy'] == 'manual' and not data['fields'][0]['confirmed']
+        assert data['fields'][0]['policy'] == 'conditional' and not data['fields'][0]['confirmed']
         assert len(data['skipped']) == 2
         assert client.get(base+'/review').json()['fields'] == []
 
@@ -397,7 +489,7 @@ def test_blank_form_labels_and_signature_columns_are_covered():
     assert [f['name'] for f in fields]==['甲方法定代表人','甲方地址','甲方法定代表人或授权代表','乙方法定代表人或授权代表','甲方日期','乙方日期']
     assert fields[0]['start']==fields[0]['end']==6
     assert fields[1]['start']==fields[1]['end']==3
-    assert all(not f['confirmed'] and f['policy']=='manual' for f in fields)
+    assert all(not f['confirmed'] and f['policy']=='conditional' for f in fields)
     template_review.validate_regions(fields,blocks)
 
 
@@ -470,6 +562,7 @@ def test_browser_extract_empty_labels_and_manual_blank_insertion(monkeypatch):
         page.get_by_role('button',name='手动添加',exact=True).click()
         dialog=page.get_by_role('dialog')
         dialog.get_by_label('原文位置',exact=True).select_option('b0')
+        dialog.locator('.tr-pick-advanced > summary').click()
         dialog.get_by_label('在空栏插入字段（保留原文字）',exact=True).check()
         dialog.get_by_label('插入位置',exact=True).fill('0')
         dialog.get_by_role('button',name='保存位置',exact=True).click()
@@ -528,7 +621,7 @@ def test_browser_legacy_label_ranges_show_original_words():
         browser.close()
 
 
-def test_open_existing_template_supplements_blanks_without_overwriting_draft():
+def test_open_existing_template_does_not_supplement_blanks_without_user_action():
     with TestClient(app) as client:
         record,base=setup_template(client)
         doc=Document()
@@ -539,14 +632,42 @@ def test_open_existing_template_supplements_blanks_without_overwriting_draft():
         client.put(base,json={'name':'模板','group_id':record['group_id'],'source_id':source,'revision':1})
         existing=region(name='甲方公司名称',start=3,end=6)
         client.put(base+'/review',json={'revision':2,'source_id':source,'fields':[existing]})
+        # Older drafts must not acquire new fields just by opening the editor.
+        legacy = template_review.repo().get(record['id'])
+        legacy_draft = dict(legacy['review_draft'])
+        legacy_draft.pop('auto_discovery_complete', None)
+        template_review.repo().update(record['id'], {'review_draft': legacy_draft}, legacy['revision'])
         detail=client.get(base+'/review').json()
-        assert detail['supplemented']==2
-        assert len(detail['fields'])==3
+        assert detail['supplemented']==0
+        assert len(detail['fields'])==1
         assert detail['fields'][0]['confirmed'] is True
-        assert [f['name'] for f in detail['fields'][1:]]==['甲方法定代表人','甲方地址']
-        assert all(f['origin']=='rule' and not f['confirmed'] for f in detail['fields'][1:])
         assert len(template_review.rules_for(template_review.repo().get(record['id'])))==1
-        assert template_review.repo().get(record['id'])['revision']==3
+        assert template_review.repo().get(record['id'])['revision']==4
+
+
+def test_deleted_blank_field_stays_deleted_after_save_and_publish():
+    with TestClient(app) as client:
+        record, base = setup_template(client)
+        doc = Document()
+        doc.add_paragraph('法定代表人：')
+        doc.add_paragraph('地址：')
+        data = BytesIO()
+        doc.save(data)
+        source = client.post('/api/contracts/import', files={'file': ('blanks.docx', data.getvalue())}).json()['source_id']
+        changed = client.put(base, json={'name': '模板', 'group_id': record['group_id'], 'source_id': source, 'revision': 1}).json()
+        detail = client.get(base + '/review').json()
+        assert detail['supplemented'] == 0
+        assert detail['fields'] == []
+        fields = [{**field, 'confirmed': True} for field, _, _ in template_review.blank_field_candidates(detail['blocks'])]
+        saved = client.put(base + '/review', json={'revision': changed['revision'], 'source_id': source, 'fields': fields}).json()
+        kept = fields[:1]
+        saved = client.put(base + '/review', json={'revision': saved['revision'], 'source_id': source, 'fields': kept}).json()
+        published = client.post(base + '/publish', json={'revision': saved['revision']}).json()
+        reopened = client.get(base + '/review').json()
+        assert reopened['supplemented'] == 0
+        assert [field['id'] for field in reopened['fields']] == [kept[0]['id']]
+        assert reopened['repaired'] == 0
+        assert [field['id'] for field in template_review.repo().get(published['release_id'], 'template_release')['fields']] == [kept[0]['id']]
 
 
 def test_published_validation_uses_frozen_rules():
@@ -598,7 +719,7 @@ def test_browser_review_entry_published_validation(tmp_path):
         page.on('request', lambda r: imports.append(r.url) if r.url.endswith('/api/contracts/import') else None)
         page.on('pageerror', lambda e: errors.append(str(e)))
         page.goto(address)
-        expect(page.get_by_role('heading', name='选择本次审查方式')).to_be_visible()
+        expect(page.get_by_role('heading', name='今天要处理哪份合同？')).to_be_visible()
         page.locator('.review-entry').evaluate('(el)=>el.getAnimations({subtree:true}).forEach(a=>a.finish())')
         page.screenshot(path='artifacts/prototypes/review-entry-implemented.png', full_page=True)
         page.get_by_role('button', name='已有标准模板核验').click()
@@ -606,9 +727,9 @@ def test_browser_review_entry_published_validation(tmp_path):
         page.locator('#validation-file').set_input_files(str(path))
         expect(page.get_by_role('button', name='开始模板合规核验')).to_be_enabled()
         page.get_by_role('button', name='开始模板合规核验').click()
-        expect(page.get_by_role('heading', name='TRUE · 校验通过')).to_be_visible()
+        expect(page.get_by_role('heading', name='符合已配置规则')).to_be_visible()
         expect(page.locator('.report-table-wrap tbody tr')).to_have_count(0)
-        expect(page.get_by_text('没有字段未通过项', exact=True)).to_be_visible()
+        expect(page.get_by_text('没有需处理字段', exact=True)).to_be_visible()
         page.screenshot(path='artifacts/prototypes/review-result-implemented.png', full_page=True)
         assert len(imports) == 1
         assert not errors

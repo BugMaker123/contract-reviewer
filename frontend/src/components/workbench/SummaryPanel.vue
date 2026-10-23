@@ -13,7 +13,10 @@ export default {
         ["applied", "rejected"].includes(props.context.workspace.decisions[issue.id]),
       ).length,
     );
-    return { ...props.context, handledCount };
+    const criticalCount = computed(() => props.context.reviewIssues.value.filter(issue => issue.severity === 'critical').length);
+    const warningCount = computed(() => props.context.reviewIssues.value.filter(issue => issue.severity === 'warning').length);
+    const infoCount = computed(() => props.context.reviewIssues.value.filter(issue => issue.severity === 'info').length);
+    return { ...props.context, handledCount, criticalCount, warningCount, infoCount };
   },
 };
 </script>
@@ -42,15 +45,7 @@ export default {
         </div>
       </section>
 
-      <section v-if="reviewIssues.length" class="wb-nav-issues">
-        <div class="wb-nav-section-title">问题定位 <span>{{ reviewIssues.length }}</span></div>
-        <button v-for="(issue, index) in reviewIssues" :key="issue.id" type="button" class="wb-nav-issue" :class="{ active: focusedIssueId === issue.id }" @click="selectIssue(issue.id)">
-          <span class="wb-nav-index">{{ index + 1 }}</span>
-          <span class="wb-nav-issue-copy"><strong>{{ issue.issue_title }}</strong><small>{{ issue.clause_title }}</small></span>
-          <span class="wb-nav-dot" :class="'is-' + issue.severity" :title="severityLabel(issue.severity)"></span>
-        </button>
-      </section>
-      <p v-else-if="reviewResult" class="wb-nav-empty">本次审查没有需要处理的问题。</p>
+      <p v-if="reviewResult && !reviewIssues.length" class="wb-nav-empty">本次审查没有需要处理的问题。</p>
       </template>
     </div>
     <div

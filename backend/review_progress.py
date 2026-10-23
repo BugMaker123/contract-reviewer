@@ -22,7 +22,7 @@ def emit_progress(stage, detail, **fields):
                   'time': datetime.now(timezone.utc).isoformat(), **fields})
 
 
-async def observable_events(events, snapshot, config):
+async def observable_events(events, snapshot, config, checkpoint=None):
     """Forward progress emitted by graph worker threads before a node completes."""
     loop = asyncio.get_running_loop()
     queue = asyncio.Queue(maxsize=256)
@@ -49,7 +49,8 @@ async def observable_events(events, snapshot, config):
             emit_progress('prepare', f"已接收合同，共 {len(snapshot.get('text', ''))} 字；正在解析原文与审查条件。",
                           contract_chars=len(snapshot.get('text', '')), reference_count=len(snapshot.get('references') or []),
                           priority_count=len(snapshot.get('requirements') or []) + len([line for line in (snapshot.get('focus') or '').splitlines() if line.strip()]) + len((snapshot.get('checklist') or {}).get('items', [])))
-            async for item in events(snapshot, config):
+            source = events(snapshot, config, checkpoint) if checkpoint else events(snapshot, config)
+            async for item in source:
                 await queue.put(item)
         except Exception as error:
             await queue.put(('exception', error))

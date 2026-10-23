@@ -272,7 +272,7 @@ async def consolidate_revisions(result, snapshot, config):
         result['summary'][severity + '_count'] = sum(i['severity'] == severity for i in merged)
 
 
-async def review_events(snapshot, config):
+async def review_events(snapshot, config, checkpoint=None):
     """Yield actual finished stages, then one complete result."""
     requirements = requirements_for(snapshot)
     admission = await admit(snapshot, config, model_json)
@@ -289,10 +289,22 @@ async def review_events(snapshot, config):
             'reference_materials': snapshot['references'], 'segments': [], 'compliance_issues': [], 'balance_issues': [],
             'all_issues': [], 'overall_summary': {}, 'execution_logs': []
         }
-        async for output in graph.review_graph_app.astream(state):
-            for node, update in output.items():
+        nodes = ('segment_contract', 'compliance_check', 'balance_review', 'aggregate_and_redline', 'synthesize_summary')
+        if checkpoint and checkpoint.get('node') in nodes and isinstance(checkpoint.get('state'), dict):
+            state = {**checkpoint['state'], 'model_config': config}
+            remaining = nodes[nodes.index(checkpoint['node']) + 1:]
+            emit_progress('plan', f'已恢复 {checkpoint["node"]} 阶段结果，继续后续审查。')
+            for node in remaining:
+                update = await asyncio.to_thread(getattr(graph, 'node_' + node), state)
                 state.update(update)
+                yield 'checkpoint', {'node': node, 'state': {**state, 'model_config': {}}}
                 yield 'node_update', event(node, update.get('execution_logs', [{}])[-1].get('detail', '已完成'))
+        else:
+            async for output in graph.review_graph_app.astream(state):
+                for node, update in output.items():
+                    state.update(update)
+                    yield 'checkpoint', {'node': node, 'state': {**state, 'model_config': {}}}
+                    yield 'node_update', event(node, update.get('execution_logs', [{}])[-1].get('detail', '已完成'))
         result = {'segments': state['segments'], 'issues': state['all_issues'], 'summary': state['overall_summary'],
                   'tax_settlement': state.get('tax_settlement_audit'), 'logs': state['execution_logs']}
         # Suggestions must belong to actual input text. Never offer a sample-specific replacement as if it were found in another contract.

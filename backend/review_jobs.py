@@ -37,7 +37,7 @@ def key(repo, run_id):
     return (repo.path, run_id)
 
 
-def launch(repo, run, config, review_events):
+def launch(repo, run, config, review_events, checkpoint=None):
     # Keep only live jobs and recent completed subscriptions in memory.
     if len(_jobs) > 128:
         for identifier, previous in list(_jobs.items()):
@@ -70,7 +70,10 @@ def launch(repo, run, config, review_events):
         last_trace_write = 0
         try:
             await asyncio.wait_for(asyncio.shield(job.ticket.ready), timeout=job.queue.wait_timeout)
-            async for kind, data in observable_events(review_events, run['input'], config):
+            async for kind, data in observable_events(review_events, run['input'], config, checkpoint):
+                if kind == 'checkpoint':
+                    await asyncio.to_thread(repo.update, run['id'], {'checkpoint': data, 'last_node': data['node']})
+                    continue
                 if kind == 'progress':
                     trace.append(data)
                     trace[:] = trace[-256:]

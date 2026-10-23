@@ -10,6 +10,7 @@ const views = {
   validations: () => import("../views/ValidationRecords.vue"),
   categories: () => import("../views/BusinessCategories.vue"),
   checklists: () => import("../views/Checklists.vue"),
+  "template-groups": () => import("../views/TemplateGroups.vue"),
 };
 
 export const router = createRouter({
@@ -29,7 +30,13 @@ export const router = createRouter({
           ]);
           return view;
         },
-      })), {path:'/drafting/new',name:'drafting-new',meta:{page:'drafting',title:'新建合同起草'},component:()=>import('../views/ContractDrafting.vue')}, {path:'/drafting/:id/edit',name:'drafting-edit',meta:{page:'drafting',title:'编辑合同草稿'},component:()=>import('../views/ContractDrafting.vue')}, {path: '/templates/:id/review', name: 'template-review', meta: {page: 'templates', title: '模板核验'}, component: () => import('../views/TemplateReview.vue')}],
+      })),
+      {path:'/reviews/new',name:'review-new',meta:{page:'start',title:'新建合同审查'},component:()=>import('../views/StartReview.vue')},
+      {path:'/template-checks/new',name:'template-check-new',meta:{page:'start',title:'新建模板核验'},component:()=>import('../views/StartReview.vue')},
+      {path:'/validation-records/:id',name:'validation-record-detail',meta:{page:'validations',title:'模板核验报告'},component:()=>import('../views/ValidationRecords.vue')},
+      {path:'/drafting/new',name:'drafting-new',meta:{page:'drafting',title:'新建合同起草'},component:()=>import('../views/ContractDrafting.vue')},
+      {path:'/drafting/:id/edit',name:'drafting-edit',meta:{page:'drafting',title:'编辑合同草稿'},component:()=>import('../views/ContractDrafting.vue')},
+      {path: '/templates/:id/review', name: 'template-review', meta: {page: 'templates', title: '模板规则配置'}, component: () => import('../views/TemplateReview.vue')}],
     },
     {
       path: "/workbench",

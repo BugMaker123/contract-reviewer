@@ -21,9 +21,21 @@ export default {
       >
     </div>
     <div v-if="issue.redline" class="revision-clause-preview">
-      <small class="compact-suggestion-label">建议修订条款：</small
-      ><del>{{ issue.redline.original_text || "（新增条款）" }}</del
-      ><ins>{{ issue.redline.suggested_text || "（删除此条款）" }}</ins>
+      <div class="revision-preview-header flex items-center justify-between mb-2">
+        <small class="compact-suggestion-label font-semibold text-slate-700">AI 建议修订条款：</small>
+        <span class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60 font-medium">Redline 差异对比</span>
+      </div>
+      <div class="revision-diff-block revision-diff-original">
+        <span class="diff-tag diff-tag-del">原条款</span>
+        <del>{{ issue.redline.original_text || "（新增条款）" }}</del>
+      </div>
+      <div class="revision-diff-arrow flex items-center justify-center py-1 text-slate-400">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+      </div>
+      <div class="revision-diff-block revision-diff-suggested">
+        <span class="diff-tag diff-tag-ins">AI 建议合规修订</span>
+        <ins>{{ issue.redline.suggested_text || "（删除此条款）" }}</ins>
+      </div>
     </div>
     <p v-else class="revision-empty">
       此项尚未生成条款修订。请先确认处理位置，再生成建议或手动填写修订。

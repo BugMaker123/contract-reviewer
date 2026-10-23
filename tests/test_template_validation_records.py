@@ -93,12 +93,13 @@ def test_browser_report_is_read_only_and_shows_paginated_failures():
     from test_ui_composition import live_server
     from playwright.sync_api import sync_playwright,expect
     with TestClient(app) as client: record,_,_=validation(client)
+    conclusion={'pass':'符合已配置规则','needs_changes':'需修改','needs_review':'需人工确认','incomplete':'检查不完整'}[record['report']['status']]
     with live_server() as address,sync_playwright() as p:
         browser=p.chromium.launch()
         page=browser.new_page(viewport={'width':1440,'height':1100})
         errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
         page.goto(address+'/validation-records?validation='+record['id'])
-        expect(page.get_by_role('heading',name='FALSE · 校验未通过',exact=True)).to_be_visible()
+        expect(page.get_by_role('heading',name=conclusion,exact=True)).to_be_visible()
         expect(page.locator('.report-table-wrap tbody tr')).to_have_count(10)
         page.get_by_role('button',name='下一页',exact=True).click()
         expect(page.locator('.report-table-wrap').get_by_text('字段10',exact=True)).to_be_visible()
@@ -107,13 +108,13 @@ def test_browser_report_is_read_only_and_shows_paginated_failures():
         expect(page.get_by_label('审核人',exact=True)).to_have_count(0)
         page.screenshot(path='artifacts/prototypes/template-validation-read-only.png',full_page=True)
         page.reload()
-        expect(page.get_by_role('heading',name='FALSE · 校验未通过',exact=True)).to_be_visible()
+        expect(page.get_by_role('heading',name=conclusion,exact=True)).to_be_visible()
         page.locator('.report-heading-actions').get_by_role('link',name='核验记录',exact=True).click()
         expect(page.get_by_role('heading',name='模板核验记录',exact=True)).to_be_visible()
-        expect(page.locator('.template-records-table').get_by_text('FALSE · 未通过',exact=True)).to_be_visible()
-        page.get_by_label('校验结果',exact=True).select_option('true')
+        expect(page.locator('.template-records-table').get_by_text(conclusion,exact=True)).to_be_visible()
+        page.get_by_label('核验结论',exact=True).select_option('true')
         expect(page.get_by_text('暂无匹配的核验记录',exact=True)).to_be_visible()
-        page.get_by_label('校验结果',exact=True).select_option('all')
+        page.get_by_label('核验结论',exact=True).select_option('all')
         page.locator('.template-records-table').get_by_role('link',name='查看报告',exact=True).click()
         expect(page.get_by_role('heading',name='模板核验报告',exact=True)).to_be_visible()
         page.locator('.portal-sidebar').get_by_role('link',name='审查记录',exact=True).click()

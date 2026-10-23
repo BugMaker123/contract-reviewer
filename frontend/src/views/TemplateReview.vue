@@ -42,6 +42,8 @@ const pickBlock = ref('');
 const pickStart = ref(0);
 const pickEnd = ref(1);
 const insertBlank = ref(false);
+const positionChosen = ref(false);
+const pickTextArea = ref(null);
 
 const visibleFields = computed(() => (
   fields.value
@@ -56,6 +58,32 @@ const confirmed = computed(() => fields.value.filter((f) => f.confirmed).length)
 const ready = computed(() => fields.value.length > 0 && confirmed.value === fields.value.length);
 const field = computed(() => fields.value.find((f) => f.id === selected.value));
 const chosenBlock = computed(() => blocks.value.find((b) => b.id === pickBlock.value));
+const insertionContext = computed(() => {
+  if (!chosenBlock.value || !positionChosen.value || !insertBlank.value) return '';
+  const characters = points(chosenBlock.value.text);
+  const before = characters.slice(Math.max(0, pickStart.value - 18), pickStart.value).join('');
+  const after = characters.slice(pickStart.value, pickStart.value + 18).join('');
+  return `${pickStart.value > 18 ? '…' : ''}${before}▏${after}${pickStart.value + 18 < characters.length ? '…' : ''}`;
+});
+const pickError = computed(() => {
+  if (!chosenBlock.value) return '';
+  if (!positionChosen.value) return '';
+  const length = points(chosenBlock.value.text).length;
+  if (!Number.isInteger(pickStart.value) || pickStart.value < 0 || pickStart.value > length ||
+      (!insertBlank.value && (!Number.isInteger(pickEnd.value) || pickEnd.value <= pickStart.value || pickEnd.value > length))) {
+    return `位置必须在当前段落的 ${insertBlank.value ? `0–${length}` : `1–${length}`} 字范围内`;
+  }
+  const end = insertBlank.value ? pickStart.value : pickEnd.value;
+  if (fields.value.some((item) => {
+    if (adjusting.value && item.id === selected.value) return false;
+    if (item.block_id !== pickBlock.value) return false;
+    if (pickStart.value === end && item.start === item.end) return pickStart.value === item.start;
+    if (pickStart.value === end) return item.start <= pickStart.value && pickStart.value < item.end;
+    if (item.start === item.end) return pickStart.value <= item.start && item.start < end;
+    return pickStart.value < item.end && end > item.start;
+  })) return '所选位置与已有填写区域重叠，请调整范围';
+  return '';
+});
 
 const readinessReason = computed(() => {
   if (!fields.value.length) return '请先提取或手动添加填写区域';
@@ -88,15 +116,8 @@ async function load() {
     releases.value = data.releases;
     warnings.value = data.warnings;
     selected.value = fields.value[0]?.id || '';
-    dirty.value = Boolean(data.repaired || data.supplemented);
-    if (data.supplemented) {
-      extractionReport.value = {
-        count: data.fields.length,
-        skipped: [],
-        supplemented: data.supplemented,
-        preserved: data.fields.length - data.supplemented,
-      };
-    }
+    dirty.value = Boolean(data.repaired);
+    extractionReport.value = null;
     savedAt.value = record.value.review_draft ? record.value.updated_at : '';
     error.value = '';
   } catch (e) {
@@ -111,12 +132,33 @@ async function load() {
 onMounted(load);
 watch(() => route.params.id, load);
 
-watch(pickBlock, () => {
+function resetPickRange() {
   pickStart.value = 0;
-  pickEnd.value = chosenBlock.value?.kind === 'cell'
-    ? points(chosenBlock.value.text).length
-    : Math.min(1, points(chosenBlock.value?.text || '').length);
-});
+  pickEnd.value = chosenBlock.value?.kind === 'cell' ? points(chosenBlock.value.text).length : Math.min(1, points(chosenBlock.value?.text || '').length);
+  insertBlank.value = Boolean(chosenBlock.value && /[：:]\s*$/.test(chosenBlock.value.text));
+  if (insertBlank.value) pickStart.value = points(chosenBlock.value.text).length;
+  positionChosen.value = insertBlank.value;
+  nextTick(() => {
+    const offset = points(chosenBlock.value?.text || '').slice(0, pickStart.value).join('').length;
+    pickTextArea.value?.setSelectionRange(offset, offset);
+  });
+}
+
+function pickFromText(event) {
+  const text = chosenBlock.value?.text || '';
+  pickStart.value = points(text.slice(0, event.target.selectionStart)).length;
+  pickEnd.value = points(text.slice(0, event.target.selectionEnd)).length;
+  insertBlank.value = pickStart.value === pickEnd.value;
+  positionChosen.value = true;
+}
+
+function restoreSourceText(event) {
+  const start = event.target.selectionStart;
+  const end = event.target.selectionEnd;
+  event.target.value = chosenBlock.value?.text || '';
+  event.target.setSelectionRange(start, end);
+  pickFromText(event);
+}
 
 function openModel() {
   shell.showModel.value = true;
@@ -222,7 +264,7 @@ function addRegion(location) {
       start: location.start,
       end: location.end,
       type: 'text',
-      policy: 'manual',
+      policy: block.kind !== 'cell' && location.start === 0 && location.end === points(block.text).length ? 'manual' : 'conditional',
       required: true,
       max_length: 200,
       minimum: null,
@@ -245,7 +287,12 @@ function addRegion(location) {
 function beginAdd(adjust = false) {
   mode.value = 'structure';
   adjusting.value = adjust;
-  insertBlank.value = false;
+  const location = adjust && field.value ? field.value : selection.value;
+  pickBlock.value = location?.block_id || '';
+  pickStart.value = location?.start ?? 0;
+  pickEnd.value = location?.end ?? 1;
+  insertBlank.value = Boolean(location && location.start === location.end);
+  positionChosen.value = Boolean(location);
   picker.value = true;
 }
 
@@ -386,6 +433,14 @@ onBeforeRouteLeave(() => {
     <template v-if="record">
       <header class="tr-heading">
         <div class="tr-heading-copy">
+          <div class="tr-breadcrumb" style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;">
+            <RouterLink to="/templates" class="text-blue-600 hover:underline flex items-center gap-1 font-medium">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+              返回合同模板
+            </RouterLink>
+            <span style="color:#cbd5e1;">/</span>
+            <span style="color:#64748b;">模板规则配置</span>
+          </div>
           <h1>
             <span class="tr-document-name" :title="record.name">{{ record.name }}</span>
             <span
@@ -646,8 +701,8 @@ onBeforeRouteLeave(() => {
             <label>
               免审处理
               <select aria-label="免审处理" v-model="field.policy" @change="change">
-                <option value="manual">填写后转人工审批</option>
                 <option value="conditional">符合规则时允许免审</option>
+                <option value="manual">填写后转人工审批</option>
               </select>
             </label>
             <label>
@@ -720,10 +775,10 @@ onBeforeRouteLeave(() => {
       <div v-if="picker" class="tr-overlay" @click.self="picker = false">
         <section class="tr-dialog" role="dialog" aria-modal="true" aria-label="手动标记位置">
           <h2>{{ adjusting ? '调整填写范围' : '手动添加填写区域' }}</h2>
-          <p>可直接选中原文，或指定段落 / 表格单元格内的字符范围。字符位置从 1 开始。</p>
+          <p>选择段落后，点击原文中要插入的位置；拖选文字可将其设为可填写字段。</p>
           <label>
             原文位置
-            <select aria-label="原文位置" v-model="pickBlock">
+            <select aria-label="原文位置" v-model="pickBlock" @change="resetPickRange">
               <option value="">请选择位置</option>
               <option v-for="b in blocks" :key="b.id" :value="b.id">
                 {{ b.id }} · {{ b.kind === 'cell' ? '表格' : '段落' }} · {{ b.text.slice(0, 60) }}
@@ -731,16 +786,24 @@ onBeforeRouteLeave(() => {
             </select>
           </label>
           <template v-if="chosenBlock">
-            <div class="tr-quote">{{ chosenBlock.text }}</div>
-            <label class="tr-checkbox">
-              <span>在空栏插入字段（保留原文字）</span>
-              <input v-model="insertBlank" type="checkbox" />
+            <label class="tr-pick-text-label">点击或拖选原文
+              <textarea ref="pickTextArea" class="tr-pick-text" aria-label="点击或拖选原文" :value="chosenBlock.text" rows="4" spellcheck="false" @beforeinput.prevent @paste.prevent @drop.prevent @input="restoreSourceText" @mouseup="pickFromText" @keyup="pickFromText" @select="pickFromText"></textarea>
             </label>
-            <label v-if="insertBlank">
-              插入位置（0为段首，段尾为{{ points(chosenBlock.text).length }}）
-              <input aria-label="插入位置" v-model.number="pickStart" type="number" min="0" :max="points(chosenBlock.text).length" />
-            </label>
-            <div v-else class="tr-number">
+            <div class="tr-pick-preview" aria-live="polite">
+              <span>{{ !positionChosen ? '等待选择位置' : insertBlank ? '字段插入在竖线处，原文保留' : `将“${points(chosenBlock.text).slice(pickStart, pickEnd).join('')}”设为填写字段` }}</span>
+              <strong v-if="insertionContext" class="tr-caret-context">{{ insertionContext }}</strong>
+            </div>
+            <details class="tr-pick-advanced">
+              <summary>精确调整位置</summary>
+              <label class="tr-checkbox">
+                <span>在空栏插入字段（保留原文字）</span>
+                <input v-model="insertBlank" type="checkbox" @change="positionChosen = true" />
+              </label>
+              <label v-if="insertBlank">
+                插入位置（0为段首，段尾为{{ points(chosenBlock.text).length }}）
+                <input aria-label="插入位置" v-model.number="pickStart" type="number" min="0" :max="points(chosenBlock.text).length" @input="positionChosen = true" />
+              </label>
+              <div v-else class="tr-number">
               <label>
                 开始位置
                 <input
@@ -749,7 +812,7 @@ onBeforeRouteLeave(() => {
                   type="number"
                   min="1"
                   :max="points(chosenBlock.text).length"
-                  @input="pickStart = Number($event.target.value) - 1"
+                  @input="pickStart = Number($event.target.value) - 1; positionChosen = true"
                 />
               </label>
               <label>
@@ -757,21 +820,21 @@ onBeforeRouteLeave(() => {
                 <input
                   aria-label="结束位置（包含）"
                   v-model.number="pickEnd"
+                  @input="positionChosen = true"
                   type="number"
                   min="1"
                   :max="points(chosenBlock.text).length"
                 />
               </label>
-            </div>
-            <div class="tr-quote">
-              {{ insertBlank ? '将在此位置插入填写字段' : '选中：' + points(chosenBlock.text).slice(pickStart, pickEnd).join('') }}
-            </div>
+              </div>
+            </details>
+            <p v-if="pickError" class="tr-pick-error" role="alert">{{ pickError }}</p>
           </template>
           <footer>
             <button class="button" @click="picker = false">返回正文选择</button>
             <button
               class="button primary"
-              :disabled="!chosenBlock || pickStart < 0 || pickStart > points(chosenBlock.text).length || (!insertBlank && (pickEnd <= pickStart || pickEnd > points(chosenBlock.text).length))"
+              :disabled="!chosenBlock || !positionChosen || !!pickError"
               @click="addRegion({ block_id: pickBlock, start: pickStart, end: insertBlank ? pickStart : pickEnd })"
             >
               保存位置
@@ -825,6 +888,14 @@ onBeforeRouteLeave(() => {
 .tr-rule{padding:16px 18px 12px;overflow:auto;flex:1;min-height:0;overscroll-behavior:contain}.tr-rule-heading{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#8592a5;margin-bottom:7px}.tr-rule-heading b{font-size:11px;font-weight:400;color:#b29154;background:#fff7e7;border-radius:4px;padding:3px 6px}.tr-rule-heading b.confirmed{background:#edf7f0;color:#6a9879}.tr-rule h2{font-size:17px;line-height:1.6;letter-spacing:-.3px;font-weight:600;color:#1e293b;margin:0 0 12px;overflow-wrap:anywhere}.tr-quote-label{font-size:11px;color:#8190a5;margin-bottom:7px}.tr-quote{white-space:pre-wrap;overflow-wrap:anywhere;padding:9px 11px;font-size:11px;line-height:1.8;max-height:110px;overflow:auto;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;margin:0 0 10px}.tr-range{display:flex;justify-content:space-between;font-size:11px;margin-bottom:14px;color:#2563eb}.tr-range button:last-child{color:#b77979}.tr-section-label{font-size:12px;font-weight:600;color:#475569;display:flex;align-items:center;gap:8px;margin:15px 0 10px}.tr-section-label:after{content:'';height:1px;background:#eef0f4;flex:1}.tr-rule label,.tr-dialog label{display:grid;gap:7px;font-size:12px;color:#64748b;margin:0 0 12px}.tr-rule input,.tr-rule select,.tr-rule textarea,.tr-dialog input,.tr-dialog select{width:100%;min-width:0;min-height:37px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;font:13px "Segoe UI","Microsoft YaHei",sans-serif;color:#334155;padding:8px 10px;transition:border-color .15s}.tr-rule input:hover,.tr-rule select:hover{border-color:#c6d0e4}.tr-rule input:focus,.tr-rule select:focus,.tr-rule textarea:focus{outline:2px solid #edf1ff;border-color:#9aafe9}.tr-rule textarea{min-height:80px;resize:vertical}.tr-number{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tr-rule .tr-checkbox{display:flex;justify-content:space-between;align-items:center;margin:18px 0 0;padding-top:14px;border-top:1px solid #edf0f4}.tr-checkbox input{width:13px;min-height:13px;height:13px;accent-color:#5875d8}.tr-note{font-size:11px;line-height:1.8;padding:10px 0;margin:12px 0 0;color:#acb4c1}.tr-rule-footer{padding:14px 18px 12px;background:#fff;border-top:1px solid var(--line);flex-shrink:0}.tr-full{width:100%;height:37px;border-radius:7px!important;font-size:11px!important;background:#2563eb!important;border-color:#2563eb!important;font-weight:500!important;box-shadow:0 3px 7px #2563eb15}.tr-rule-footer p{font-size:11px;color:#94a3b8;text-align:center;margin:8px 0 0;line-height:1.7}.tr-foot{display:flex;justify-content:flex-end;gap:15px;padding:5px 16px;color:#94a3b8;font-size:11px;flex-shrink:0}.tr-foot time{color:#94a3b8;font-size:10px}.tr-foot span{white-space:nowrap;display:flex;align-items:center;gap:5px}.tr-foot span:before{content:'';width:4px;height:4px;border-radius:50%;background:#a8b4ca}
 .tr-extraction-status{display:flex;align-items:center;gap:12px;background:#edf2ff;border:1px solid #dfe7fc;border-radius:7px;padding:11px 14px;color:#6a80b4;font-size:11px;margin-bottom:12px;flex-shrink:0}.tr-extraction-status strong{font-weight:500}.tr-extraction-status p{font-size:12px;line-height:1.8;margin:4px 0 0}.tr-extraction-status summary{cursor:pointer;font-size:12px;margin-top:6px}.tr-spinner{width:18px;height:18px;border:2px solid #d2ddf7;border-top-color:#617fdb;border-radius:50%;animation:tr-spin 1s linear infinite;flex-shrink:0}.tr-error{font-size:11px;padding:12px 15px;background:#fff1f1;color:#bf7676;border:1px solid #f3dddd;border-radius:7px;margin-bottom:14px;line-height:1.8}.tr-error button{float:right}.is-busy{pointer-events:none;opacity:.65}
 .tr-overlay{position:fixed;inset:0;z-index:80;background:#1b243b55;backdrop-filter:blur(5px);display:grid;place-items:center;padding:20px}.tr-dialog{box-sizing:border-box;width:520px;max-width:100%;max-height:85vh;overflow:auto;background:#fff;border:1px solid #e4e8f1;border-radius:15px;padding:28px;box-shadow:0 24px 80px #17233925;color:#34445e}.tr-dialog h2{font-size:19px;font-weight:600;margin:0 0 13px}.tr-dialog p{font-size:12px;color:#8996ac;line-height:1.9}.tr-dialog label{margin:17px 0}.tr-dialog footer{display:flex;justify-content:flex-end;gap:9px;margin-top:24px}.tr-report{width:760px}.tr-report h3{font-size:13px;margin-top:22px}.tr-report-row{display:grid;gap:5px;border-bottom:1px solid #e7edf5;padding:12px 0;font-size:12px;overflow-wrap:anywhere;white-space:pre-wrap}.tr-report-row small{color:#a58f6d}@keyframes tr-spin{to{transform:rotate(360deg)}}
+.tr-dialog .tr-pick-error{margin:8px 0;color:#b42318}
+.tr-dialog .tr-pick-text-label{display:grid;gap:8px;margin:18px 0 10px;font-weight:600;color:#42526a}
+.tr-dialog .tr-pick-text{width:100%;min-height:94px;max-height:210px;padding:12px;border:1px solid #c8d6ee;border-radius:9px;background:#f8fbff;color:#24344e;font:14px/1.8 'Microsoft YaHei',sans-serif;resize:vertical;cursor:text;user-select:text;caret-color:#2563eb}
+.tr-dialog .tr-pick-text:focus{outline:2px solid #bfdbfe;border-color:#3b82f6}
+.tr-dialog .tr-pick-preview{display:grid;gap:6px;margin:4px 0 12px;color:#2563eb}
+.tr-dialog .tr-caret-context{display:block;padding:8px 10px;border:1px solid #bfdbfe;border-radius:6px;background:#eff6ff;color:#1e3a8a;font:13px/1.6 'Microsoft YaHei',sans-serif;white-space:pre-wrap;overflow-wrap:anywhere}
+.tr-dialog .tr-pick-advanced{border-top:1px solid #e7ebf2;padding-top:10px}
+.tr-dialog .tr-pick-advanced>summary{cursor:pointer;color:#78869c;font-size:12px}
 @media(min-width:1650px){.tr-workspace{grid-template-columns:clamp(360px,21vw,410px) minmax(0,1fr) clamp(380px,24vw,460px)}.tr-rule{padding:18px 20px}.tr-paper{padding:64px 62px 80px}}
 @media(max-width:900px){.tr-workspace{grid-template-columns:208px minmax(0,1fr) 268px}.tr-heading{gap:10px 16px;flex-wrap:wrap}.tr-document-name{font-size:16px}.tr-heading-copy{min-width:0}.tr-actions{margin-left:0}.tr-paper-wrap{padding:16px}.tr-paper{padding:34px 27px}.tr-guide{flex-direction:column;align-items:flex-start;gap:4px}.tr-title{padding:0 14px}.tr-rule{padding:17px 15px}}
 @media(max-width:900px){.template-review{height:auto;min-height:100%}.tr-workspace{flex:none;grid-template-columns:210px minmax(0,1fr);overflow:visible}.tr-fields-panel{border-radius:12px;max-height:650px}.tr-document-panel{border-radius:12px;min-height:550px}.tr-inspector{grid-column:1/-1;border:1px solid var(--line);border-radius:12px}.tr-rule{overflow:visible}.tr-paper-wrap{max-height:600px}.tr-field-list{max-height:420px}.tr-iframe{min-height:500px}.tr-document-name{font-size:17px}.tr-status-badge{font-size:11px}.tr-guide{font-size:11px}.tr-rule-footer p{margin-bottom:0}.tr-rule-footer{padding:15px 20px}.tr-heading-copy{min-width:0}}

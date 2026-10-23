@@ -40,4 +40,8 @@ export const pages = {
     key: "templates", name: "合同模板", icon: "▧",
     data: [], states: [], features: [],
   },
+  "/template-groups": {
+    key: "template-groups", name: "模板分组维护", icon: "▦",
+    data: [], states: [], features: [],
+  },
 };
