@@ -10,6 +10,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END
 from .review_progress import emit_progress, review_cancelled
+from .redaction import RedactionSession
 
 logger = logging.getLogger("contract_reviewer")
 logging.basicConfig(level=logging.INFO)
@@ -63,8 +64,13 @@ def prepare_model_retry(messages, error, attempt, limit, response=None):
     return 0 if isinstance(error, (ValueError, TypeError, KeyError)) else min(2 ** attempt, 4)
 
 
-def stream_public_review(client, messages, attempt):
+def stream_public_review(client, messages, attempt, redaction=None):
     """Stream public findings, never provider reasoning_content or hidden traces."""
+    redaction = redaction or RedactionSession()
+    messages = redaction.messages(messages)
+    if redaction.values:
+        emit_progress('redaction', '已在本地替换敏感字段，仅向模型发送脱敏副本；原文保持不变。',
+                      redaction_counts=redaction.counts())
     if not callable(getattr(client, 'stream', None)):
         return client.invoke(messages)
     content, metadata, cursor, count = '', {}, None, 0
@@ -99,6 +105,10 @@ def stream_public_review(client, messages, attempt):
             count += 1
             if not isinstance(issue, dict):
                 continue
+            safe = redaction.result({'issues': [issue]})['issues']
+            if not safe:
+                continue
+            issue = safe[0]
             # Only completed, explicitly public review fields enter the UI.
             title, analysis = issue.get('issue_title'), issue.get('risk_analysis')
             if not isinstance(title, str) or not isinstance(analysis, str):
@@ -116,13 +126,15 @@ def stream_public_review(client, messages, attempt):
 
 def invoke_review_with_retry(client, messages, config):
     messages = list(messages)
+    redaction = RedactionSession()
     limit = retry_limit(config)
     for attempt in range(limit + 1):
         response = None
         try:
             emit_progress('review', f'正在调用模型分析合同，第 {attempt + 1}/{limit + 1} 次请求；检查实际条款、风险依据及修订建议。', attempt=attempt + 1)
-            response = stream_public_review(client, messages, attempt)
+            response = stream_public_review(client, messages, attempt, redaction)
             parsed = parse_model_review(response)
+            parsed = redaction.result(parsed)
             emit_progress('validate', f"模型回复已通过格式校验，识别 {len(parsed['issues'])} 项问题；接下来核对原文匹配与修订范围。", finding_count=len(parsed['issues']))
             for issue in parsed['issues'][:20]:
                 emit_progress('finding', issue['clause_title'] + '：' + issue['issue_title'])

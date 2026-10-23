@@ -7,6 +7,7 @@ export function reviewActivities(trace, findingCount = 0) {
   for (const event of trace) {
     const {stage,time} = event;
     if (stage === 'prepare') put('prepare', count(event.contract_chars) !== null ? `已接收 ${event.contract_chars} 字合同，整理审查条件。` : '已接收合同，整理审查条件。', time);
+    if (stage === 'redaction') put('redaction', '已在本地自动脱敏，仅向模型发送脱敏副本，原始合同保持不变。', time);
     if (stage === 'admission' && event.admission?.status === 'pass') put('admission', '已完成合同属性与审查用途核对。', time);
     if (stage === 'plan') put('plan', '已建立全文研判、重点要求及修订核验的审查流程。', time);
     if (stage === 'segment') put('segment', count(event.segment_count) !== null ? `已整理 ${event.segment_count} 个条款单元，进入条款分析。` : '已整理合同条款，进入条款分析。', time);

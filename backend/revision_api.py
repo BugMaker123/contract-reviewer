@@ -47,7 +47,7 @@ def create_revision_router(repository, builder):
 审查立场与交易背景：{json.dumps(model_input(run['input']), ensure_ascii=False)}
 本次调整要求：{request.instruction or '保留风险防控目标，换一种更清晰且可执行的表述。'}'''
         try:
-            data = await workspace_review.model_json(request.model_config_data.model_dump(), prompt)
+            data = await workspace_review.model_json({**request.model_config_data.model_dump(), '_selected_original': original}, prompt)
             suggested = data.get('suggested_text')
             explanation = data.get('explanation', '')
             if (not isinstance(suggested, str) or not suggested.strip() or len(suggested) > 20000 or
