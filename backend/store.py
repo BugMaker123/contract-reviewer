@@ -302,6 +302,7 @@ class Repository:
             task['status'] = 'running'
             identifier, stamp = uuid4().hex, now()
             snapshot = {key: task.get(key) for key in ('title', 'type', 'text', 'role', 'mode', 'scale', 'background', 'focus', 'references', 'requirements', 'execution', 'reference_text', 'checklist', 'source_id')}
+            snapshot['knowledge_context'] = task.get('knowledge_context')
             if baseline_kind == 'accepted' and parent_run_id:
                 previous_row = db.execute("SELECT data FROM objects WHERE id=? AND kind='run'", (parent_run_id,)).fetchone()
                 previous_data = json.loads(previous_row['data']) if previous_row else {}

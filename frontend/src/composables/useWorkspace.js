@@ -17,6 +17,10 @@ export function createWorkspaceWorkbench(refs) {
     background: "",
     focus: "",
     references: [],
+    knowledge_document_ids: [],
+    knowledge_session_id: null,
+    knowledge_message_ids: [],
+    knowledge_context_confirmed: false,
     requirements: [],
     execution: "plan",
     reference_text: "",
@@ -76,7 +80,11 @@ export function createWorkspaceWorkbench(refs) {
     scale: conditions.value.scale,
     background: conditions.value.background,
     focus: conditions.value.focus,
-    references: conditions.value.references,
+    references: conditions.value.references.filter(item => item.kind !== 'knowledge'),
+    knowledge_document_ids: conditions.value.knowledge_document_ids || [],
+    knowledge_session_id: conditions.value.knowledge_session_id || null,
+    knowledge_message_ids: conditions.value.knowledge_message_ids || [],
+    knowledge_context_confirmed: conditions.value.knowledge_context_confirmed || false,
     requirements: conditions.value.requirements,
     execution: conditions.value.execution,
     reference_text: conditions.value.reference_text,
@@ -99,6 +107,7 @@ export function createWorkspaceWorkbench(refs) {
         (key) => conditions.value[key] !== (key === 'execution' ? snapshot[key] || 'plan' : snapshot[key]),
       ) ||
       JSON.stringify(conditions.value.requirements || []) !== JSON.stringify(snapshot.requirements || []) ||
+      JSON.stringify(task.value?.knowledge_context || null) !== JSON.stringify(snapshot.knowledge_context || null) ||
       JSON.stringify(conditions.value.references) !==
         JSON.stringify(snapshot.references) ||
       (conditions.value.checklist?.id || null) !==
@@ -163,6 +172,9 @@ export function createWorkspaceWorkbench(refs) {
             revision: task.value.revision,
           });
           lastInput = signature;
+        }
+        if (task.value && JSON.stringify(input()) === signature) {
+          conditions.value.references = task.value.references;
         }
         if (run.value?.status === "completed") {
           const changes = handling(),
@@ -284,6 +296,10 @@ export function createWorkspaceWorkbench(refs) {
           background: record.background,
           focus: record.focus,
           references: record.references,
+          knowledge_document_ids: record.knowledge_document_ids || [],
+          knowledge_session_id: record.knowledge_session_id || null,
+          knowledge_message_ids: record.knowledge_message_ids || [],
+          knowledge_context_confirmed: record.knowledge_context_confirmed || false,
           requirements: record.requirements || [],
           execution: record.execution || "plan",
           reference_text: record.reference_text,

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import ReviewBackground from '../portal/ReviewBackground.vue';
+import KnowledgeSelection from '../portal/KnowledgeSelection.vue';
 import { readDocument, appendMaterial } from '../../portal/services/documents.js';
 const props = defineProps({ context: {type:Object,required:true} });
 const workspace = props.context.workspace;
@@ -59,6 +60,7 @@ const save = async () => {
         </div>
         <div v-if="workspace.conditions.checklist" class="conditions-checklist"><span class="conditions-checklist-icon" aria-hidden="true">✓</span><div><small>本次审查清单</small><strong>{{ workspace.conditions.checklist.name }}</strong></div><span class="conditions-version">v{{ workspace.conditions.checklist.version }} · 版本已固定</span></div>
         <ReviewBackground :context="editor" expanded />
+        <KnowledgeSelection :form="workspace.conditions" />
         <div v-if="workspace.conditions.mode === 'compare'" class="conditions-reference">
           <label class="text-xs">替换参考合同<input type="file" accept=".docx,.txt,.pdf" @change="importDocument($event,'reference')" /></label>
           <label class="block text-xs">参考合同正文<textarea v-model="workspace.conditions.reference_text" class="field h-40" /></label>

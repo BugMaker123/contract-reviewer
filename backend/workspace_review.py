@@ -307,6 +307,8 @@ def rewrite_context_without_conflicts(snapshot, findings):
 async def review_events(snapshot, config, checkpoint=None):
     """Yield actual finished stages, then one complete result."""
     requirements = requirements_for(snapshot)
+    if (snapshot.get('knowledge_context') or {}).get('citations'):
+        emit_progress('knowledge', f'已加载 {len(snapshot["knowledge_context"]["citations"])} 条知识库证据及其来源快照。')
     memory = deepcopy((checkpoint or {}).get('memory', {}))
     saved_graph = {key: deepcopy(checkpoint[key]) for key in ('node', 'state') if checkpoint and key in checkpoint}
     def save_stage(phase):
@@ -489,7 +491,7 @@ async def review_events(snapshot, config, checkpoint=None):
     for severity in ('critical', 'warning', 'info'):
         result['summary'][severity + '_count'] = sum(i['severity'] == severity for i in result['issues'])
     result.update(admission=admission, plan=plan, input_digest=snapshot_digest(snapshot),
-                  execution=snapshot.get('execution', 'plan'))
+                  execution=snapshot.get('execution', 'plan'), knowledge_context=snapshot.get('knowledge_context'))
     result['review_metadata'] = {'mode': mode, 'policy_version': 1,
         'model_name': config.get('model_name', 'deepseek-v4-flash') if admission['source'] == 'model' else None,
         'main_review_source': '基础规则' if mode == 'quick' else '参见执行记录与覆盖范围'}

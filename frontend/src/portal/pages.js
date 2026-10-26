@@ -1,4 +1,6 @@
 export const pages = {
+  '/knowledge': {key:'knowledge',name:'知识库与图谱',data:[],states:[],features:[]},
+  '/chat': {key:'chat',name:'知识库对话',data:[],states:[],features:[]},
   "/drafting": {key:"drafting",name:"合同起草",icon:"✎",data:[],states:[],features:[]},
   "/": {
     key: "start",

@@ -6,6 +6,7 @@ import ContractSource from "../components/portal/ContractSource.vue";
 import ChecklistConfig from "../components/portal/ChecklistConfig.vue";
 import ChecklistSelection from "../components/portal/ChecklistSelection.vue";
 import ReviewBackground from "../components/portal/ReviewBackground.vue";
+import KnowledgeSelection from '../components/portal/KnowledgeSelection.vue';
 export default {
   components: {
     PageFrame,
@@ -13,6 +14,7 @@ export default {
     ChecklistConfig,
     ChecklistSelection,
     ReviewBackground,
+    KnowledgeSelection,
   },
   props: { importedContract: Object },
   emits: ["processing"],
@@ -40,6 +42,8 @@ export default {
       if (form.mode === "checklist" && !selectedList.value) return "请选择已发布的审查清单";
       if (form.mode === "checklist" && !(form.checklist_item_ids ?? selectedList.value.items).length) return "请至少勾选一项审查要点";
       if (form.references.some(ref => ref.kind === 'policy' && !ref.confirmed)) return "请先核对并确认公司制度要求";
+      if (form.knowledge_message_ids?.length && !form.knowledge_context_confirmed) return '请核对并确认用于审核的对话内容';
+      if (form.knowledge_session_id && !form.knowledge_message_ids?.length) return '请选择用于审核的对话消息，或取消对话来源';
       return "";
     });
     return { ...context, context, readiness, addFocus, focusSource };
@@ -112,6 +116,7 @@ export default {
           </div>
         </div>
         <ReviewBackground :context="context" :expanded="false" hide-focus />
+        <KnowledgeSelection :form="form" />
       </section>
       <footer class="review-submit">
         <button @click="createTask" :disabled="!!readiness" class="button primary">{{ busy ? '正在保存…' : '进入工作台核对合同' }}

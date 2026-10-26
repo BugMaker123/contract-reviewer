@@ -8,12 +8,14 @@ const groups = [
     { key: 'records', label: '审查记录', href: '/records', icon: 'records' },
     { key: 'validations', label: '模板核验记录', href: '/validation-records', icon: 'validations' },
     { key: 'drafting', label: '合同起草', href: '/drafting', icon: 'drafting' },
+    { key: 'chat', label: '知识库对话', href: '/chat', icon: 'records' },
   ] },
   { title: '标准与资料', items: [
     { key: 'templates', label: '合同模板', href: '/templates', icon: 'templates' },
     { key: 'template-groups', label: '模板分组', href: '/template-groups', icon: 'categories' },
     { key: 'categories', label: '业务分类', href: '/categories', icon: 'categories' },
     { key: 'checklists', label: '审查清单', href: '/checklists', icon: 'checklists' },
+    { key: 'knowledge', label: '知识库与图谱', href: '/knowledge', icon: 'categories' },
   ] },
 ];
 function navigate(event, href) {

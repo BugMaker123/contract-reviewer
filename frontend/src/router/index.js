@@ -3,6 +3,8 @@ import { pages } from "../portal/pages.js";
 import { loadPageModules } from "../portal/modules.js";
 
 const views = {
+  knowledge: () => import('../views/KnowledgeWorkspace.vue'),
+  chat: () => import('../views/ChatWorkspace.vue'),
   drafting: () => import("../views/ContractDraftList.vue"),
   templates: () => import("../views/ContractTemplates.vue"),
   start: () => import("../views/StartReview.vue"),
@@ -31,8 +33,8 @@ export const router = createRouter({
           return view;
         },
       })),
-      {path:'/reviews/new',name:'review-new',meta:{page:'start',title:'新建合同审查'},component:()=>import('../views/StartReview.vue')},
-      {path:'/template-checks/new',name:'template-check-new',meta:{page:'start',title:'新建模板核验'},component:()=>import('../views/StartReview.vue')},
+      {path:'/reviews/new',name:'review-new',meta:{page:'start',title:'新建合同审查'},component:async()=>{await loadPageModules('start');return import('../views/StartReview.vue')}},
+      {path:'/template-checks/new',name:'template-check-new',meta:{page:'start',title:'新建模板核验'},component:async()=>{await loadPageModules('start');return import('../views/StartReview.vue')}},
       {path:'/validation-records/:id',name:'validation-record-detail',meta:{page:'validations',title:'模板核验报告'},component:()=>import('../views/ValidationRecords.vue')},
       {path:'/drafting/new',name:'drafting-new',meta:{page:'drafting',title:'新建合同起草'},component:()=>import('../views/ContractDrafting.vue')},
       {path:'/drafting/:id/edit',name:'drafting-edit',meta:{page:'drafting',title:'编辑合同草稿'},component:()=>import('../views/ContractDrafting.vue')},

@@ -6,7 +6,7 @@ from .models import ModelConfig
 class ReferenceMaterial(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     text: str = Field(min_length=1, max_length=50000)
-    kind: Literal['reference', 'policy'] = 'reference'
+    kind: Literal['reference', 'policy', 'knowledge'] = 'reference'
     confirmed: bool = False
 
 
@@ -83,6 +83,10 @@ class TaskInput(BaseModel):
     checklist_id: str | None = None
     source_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
     revision: int | None = None
+    knowledge_document_ids: list[str] = Field(default_factory=list, max_length=30)
+    knowledge_session_id: str | None = None
+    knowledge_message_ids: list[str] = Field(default_factory=list, max_length=30)
+    knowledge_context_confirmed: bool = False
 
     @field_validator('title', 'type', 'text')
     @classmethod
@@ -93,6 +97,8 @@ class TaskInput(BaseModel):
 
     @model_validator(mode='after')
     def mode_inputs(self):
+        if self.knowledge_message_ids and not self.knowledge_session_id:
+            raise ValueError('请选择对话来源')
         if len([line for line in self.focus.splitlines() if line.strip()]) + len(self.requirements) > 100:
             raise ValueError('重点要求与逐项要求合计最多100条，请合并整理')
         if len({ref.name for ref in self.references}) != len(self.references):

@@ -4,6 +4,7 @@ import PriorityReview from './PriorityReview.vue';
 const props = defineProps({ context: { type: Object, required: true } });
 const workspace = props.context.workspace;
 const result = computed(() => workspace.run?.result);
+const knowledge = computed(() => (workspace.run?.input || workspace.task)?.knowledge_context);
 const admissionLabel = computed(() => ({pass:'已通过',rejected:'未通过',needs_review:'待确认'})[result.value?.admission?.status]);
 </script>
 <template>
@@ -25,6 +26,7 @@ const admissionLabel = computed(() => ({pass:'已通过',rejected:'未通过',ne
         <details class="overview-trace"><summary><span>执行计划与轨迹</span><small>{{result.audit_trace?.length||0}} 条记录</small></summary><ol><li v-for="(step,index) in (result.audit_trace || [])" :key="index">{{step.detail}}</li></ol><p v-if="!result.audit_trace?.length">本版本未记录执行轨迹。</p></details>
         <p v-if="context.resultStale.value" class="overview-notice">正文或条件已改变，请重新审查；以上结论属于旧版本。</p>
       </template>
+      <details v-if="knowledge?.document_ids?.length || knowledge?.messages?.length" class="overview-trace"><summary>知识库与对话证据 · {{knowledge.citations.length}} 条引用</summary><p>{{knowledge.coverage}}</p><details v-for="citation in knowledge.citations" :key="citation.id"><summary>{{citation.name}} · 提取文本第 {{citation.line}} 行</summary><p style="white-space:pre-wrap">{{citation.text}}</p><small>证据 {{citation.id}} · 索引版本 {{citation.document_revision}}</small></details><details v-for="message in knowledge.messages" :key="message.id"><summary>已确认对话 · {{message.role==='user'?'用户':'助手'}}</summary><p style="white-space:pre-wrap">{{message.text}}</p></details></details>
     </div>
   </section>
 </template>

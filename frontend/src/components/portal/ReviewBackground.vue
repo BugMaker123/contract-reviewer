@@ -50,13 +50,14 @@ export default {
           <div class="flex justify-between">
             <span>{{ material.name }} · {{ material.text.length }} 字</span
             ><button
-              @click="removeMaterial(index)"
+              v-if="material.kind !== 'knowledge'" @click="removeMaterial(index)"
               class="text-slate-400"
             >
               移除
             </button>
           </div>
-          <label class="block mt-2">资料用途
+          <p v-if="material.kind === 'knowledge'" class="mt-2 text-slate-500">知识库证据快照；请在“知识库与对话辅助审查”中调整来源。</p>
+          <label v-else class="block mt-2">资料用途
             <select v-model="material.kind" class="field" @change="material.confirmed = false">
               <option value="reference">背景参考</option><option value="policy">公司制度（逐项核验）</option>
             </select>
@@ -70,6 +71,7 @@ export default {
             <summary class="text-blue-600 cursor-pointer">核对内容</summary>
             <textarea
               v-model="material.text"
+              :readonly="material.kind === 'knowledge'"
               @input="material.confirmed = false"
               class="field mt-2 h-28"
             ></textarea>

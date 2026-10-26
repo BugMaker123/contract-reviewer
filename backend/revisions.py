@@ -59,7 +59,7 @@ def review_document(run, repo, builder, display='markup'):
 def matching_input(task, snapshot):
     def value(record, key):
         return (record.get(key) or ('plan' if key == 'execution' else [])) if key in ('execution', 'requirements') else record.get(key)
-    return all(value(task, key) == value(snapshot, key) for key in ('title', 'text', 'role', 'type', 'mode', 'scale', 'background', 'focus', 'reference_text', 'references', 'requirements', 'execution', 'checklist', 'source_id'))
+    return all(value(task, key) == value(snapshot, key) for key in ('title', 'text', 'role', 'type', 'mode', 'scale', 'background', 'focus', 'reference_text', 'references', 'requirements', 'execution', 'checklist', 'source_id', 'knowledge_context'))
 
 
 def editable_run(repo, run_id, revision):

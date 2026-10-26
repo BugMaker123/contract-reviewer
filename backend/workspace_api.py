@@ -206,6 +206,18 @@ def task_data(request, existing=None):
         if not selected.issubset(available):
             raise HTTPException(422, '所选要点不属于本次清单版本，请重新选择')
         data['checklist'] = {**data['checklist'], 'items': [item for item in data['checklist']['items'] if item['id'] in selected]}
+    from .knowledge import review_material
+    keys = ('text', 'type', 'focus', 'knowledge_document_ids', 'knowledge_session_id', 'knowledge_message_ids', 'knowledge_context_confirmed')
+    if existing and existing.get('knowledge_context') and all(data.get(key) == existing.get(key) for key in keys):
+        materials = [item for item in existing['references'] if item.get('kind') == 'knowledge']
+        context = existing['knowledge_context']
+    else:
+        materials, context = review_material(repo, request)
+    data['references'] = [item for item in data['references'] if item.get('kind') != 'knowledge']
+    if len(data['references']) + len(materials) > 5 or sum(len(item['text']) for item in data['references'] + materials) > 50000:
+        raise HTTPException(422, '知识库与附件合计最多5组资料、50000字，请减少所选资料或对话')
+    data['references'].extend(materials)
+    data['knowledge_context'] = context
     return data
 
 
@@ -836,6 +848,15 @@ def report_document(run, scope='report'):
     document.add_paragraph('模型来源：' + (metadata.get('model_name') or '未记录或未使用模型'))
     for ref in run['input'].get('references') or []:
         document.add_paragraph('参考资料：' + ref['name'] + '；内容校验值：' + snapshot_digest(ref))
+    knowledge_context = run['input'].get('knowledge_context') or {}
+    if knowledge_context.get('document_ids') or knowledge_context.get('messages'):
+        document.add_heading('知识库与对话证据', level=1)
+        document.add_paragraph(knowledge_context['coverage'])
+        for citation in knowledge_context.get('citations', []):
+            document.add_paragraph(f"证据 {citation['id']}：{citation['name']}，提取文本第{citation['line']}行，索引版本{citation['document_revision']}；文档校验值：{citation['digest']}")
+            document.add_paragraph(citation['text'])
+        for message in knowledge_context.get('messages', []):
+            document.add_paragraph('已确认对话 · ' + message['role'] + '：' + message['text'])
     status_names = {'pass': '符合', 'fail': '不符合', 'needs_review': '待确认', 'not_applicable': '不适用'}
     for key, title in [('proposed_requirement_findings', '全部建议稿要求核验（不等于当前采纳稿）')]:
         findings = run['result'].get(key) or []
