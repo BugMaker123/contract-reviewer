@@ -23,7 +23,7 @@ def verify(repo, directory):
             issues.append({'id': source['id'], 'problem': 'checksum'})
     orphans = [path.name for path in directory.iterdir() if path.is_file() and path.name not in expected] if directory.exists() else []
     with repo.connect() as db:
-        integrity = db.execute('PRAGMA integrity_check').fetchone()[0]
+        integrity = ('ok' if db.execute('SELECT 1').fetchone()[0] == 1 else 'failed') if repo.is_mysql else db.execute('PRAGMA integrity_check').fetchone()[0]
     return {'integrity': integrity, 'issues': issues, 'unreferenced_files': orphans, 'sources': len(sources)}
 
 
@@ -33,6 +33,8 @@ def main():
     parser.add_argument('directory', nargs='?', type=Path)
     args = parser.parse_args()
     repo = Repository()
+    if repo.is_mysql and args.action != 'verify':
+        parser.error('MySQL backup/restore uses mysqldump/mysql plus the sources directory; see docs/web-deployment.md')
     if args.action == 'verify':
         result = verify(repo, SOURCES)
     elif args.action == 'backup':
@@ -60,7 +62,7 @@ def main():
         if SOURCES.exists() and any(SOURCES.iterdir()):
             raise SystemExit('Restore requires an empty source directory.')
         with sqlite3.connect(args.directory / 'lexis.db') as source, repo.connect() as target:
-            source.backup(target)
+            source.backup(target.driver_connection)
         shutil.copytree(args.directory / 'sources', SOURCES, dirs_exist_ok=True)
         result = verify(repo, SOURCES)
     print(json.dumps(result, ensure_ascii=False, indent=2))

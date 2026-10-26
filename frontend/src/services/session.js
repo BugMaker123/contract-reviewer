@@ -1,6 +1,8 @@
-/* Tab-scoped working copy: contracts are not persisted across browser sessions. */
+import { auth } from './auth.js';
+/* Legacy desktop cache. Web work is always restored from a server record ID. */
 export const LexisSession = {
   read(key) {
+    if(auth.web) return null;
     try {
       return JSON.parse(sessionStorage.getItem(key) || "null");
     } catch {
@@ -8,6 +10,7 @@ export const LexisSession = {
     }
   },
   write(key, value) {
+    if(auth.web) return;
     sessionStorage.setItem(key, JSON.stringify(value));
   },
   severityLabel(value) {

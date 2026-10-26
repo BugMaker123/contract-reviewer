@@ -153,7 +153,7 @@ function viewTemplates(groupId) {
         <RouterLink to="/templates" class="button">
           <ReviewIcon name="templates" />查看合同模板
         </RouterLink>
-        <button class="button primary" :disabled="busy" @click="openEdit()">
+        <button v-can="'catalog.maintain'" class="button primary" :disabled="busy" @click="openEdit()">
           <ReviewIcon name="plus" />新建分组
         </button>
       </div>
@@ -232,7 +232,7 @@ function viewTemplates(groupId) {
                   >
                     查看模板
                   </button>
-                  <button
+                  <button v-can="'catalog.maintain'"
                     type="button"
                     class="action-link"
                     :disabled="busy"
@@ -261,7 +261,7 @@ function viewTemplates(groupId) {
         <ReviewIcon name="categories" />
         <h3>{{ search ? '没有匹配的模板分组' : '暂无模板分组' }}</h3>
         <p>{{ search ? '调整搜索词后再试。' : '创建业务部门或合同类别分组，让模板归类井然有序。' }}</p>
-        <button v-if="!search" class="button primary" @click="openEdit()">
+        <button v-can="'catalog.maintain'" v-if="!search" class="button primary" @click="openEdit()">
           立即新建分组
         </button>
       </div>
@@ -373,7 +373,7 @@ function viewTemplates(groupId) {
           <button class="button" :disabled="busy" @click="closeRemoval">
             取消
           </button>
-          <button class="button primary" :disabled="busy" @click="remove">
+          <button v-can="'catalog.maintain'" class="button primary" :disabled="busy" @click="remove">
             {{ busy ? '正在删除…' : '确认删除' }}
           </button>
         </footer>

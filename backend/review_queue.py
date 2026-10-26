@@ -1,6 +1,7 @@
 """Replaceable FIFO admission queue for review jobs; local adapter is process-local."""
 import asyncio
 import hashlib
+import os
 from fastapi import HTTPException
 from contextlib import asynccontextmanager
 from uuid import uuid4
@@ -34,7 +35,7 @@ class _Group:
 class LocalReviewQueue:
     """All mutations run atomically on one asyncio loop. FIFO is per credential."""
     def __init__(self, limit=5, global_limit=10, max_waiting=100, wait_timeout=300):
-        if limit < 1:
+        if min(limit,global_limit,max_waiting,wait_timeout) < 1:
             raise ValueError('Concurrency limit must be positive')
         self.limit = limit
         self.groups = {}
@@ -99,11 +100,17 @@ _queues = WeakKeyDictionary()
 def get_review_queue() -> ReviewQueue:
     loop = asyncio.get_running_loop()
     if loop not in _queues:
-        _queues[loop] = LocalReviewQueue(limit=5)
+        _queues[loop] = LocalReviewQueue(limit=int(os.environ.get('LEXIS_REVIEW_PER_MODEL','5')),
+            global_limit=int(os.environ.get('LEXIS_REVIEW_CONCURRENCY','10')),
+            max_waiting=int(os.environ.get('LEXIS_REVIEW_MAX_WAITING','100')),
+            wait_timeout=int(os.environ.get('LEXIS_REVIEW_WAIT_TIMEOUT','300')))
     return _queues[loop]
 
 
 def credential_group(config):
+    from .security import enabled
+    if enabled():
+        return 'central-model'
     from .graph import resolved_api_key
     credential = resolved_api_key(config)
     value = 'credential:' + credential if credential else 'local:no-model'

@@ -2691,3 +2691,20 @@
 .workbench-view .wb-risk-filter-tabs button.risk-critical.active { border-color:#dc2626; background:#fff1f2; color:#b91c1c; box-shadow:0 0 0 1px #dc2626; }
 .workbench-view .wb-risk-filter-tabs button.risk-warning.active { border-color:#d97706; background:#fffbeb; color:#b45309; box-shadow:0 0 0 1px #d97706; }
 .workbench-view .wb-opinion-filter-row select { flex:1; width:100%; }
+
+/* Long clause comparisons share the card scroll; retain both sides in compact mode. */
+.workbench-view #opinion-drawer .revision-clause-preview{max-height:none;overflow:visible;padding:14px;margin-top:12px;background:#fff;border:1px solid #e3e9f2;border-radius:9px}
+.workbench-view #opinion-drawer .revision-preview-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.workbench-view #opinion-drawer .revision-diff-block{min-width:0;padding:12px 14px;border-radius:7px}
+.workbench-view #opinion-drawer .revision-diff-original{background:#fff8f7;border:1px solid #f0dedb}
+.workbench-view #opinion-drawer .revision-diff-suggested{background:#f3f9f6;border:1px solid #dcece3}
+.workbench-view #opinion-drawer .revision-diff-block del,.workbench-view #opinion-drawer .revision-diff-block ins{display:block!important;margin:6px 0 0;padding:0;background:transparent!important;font-size:15px;line-height:1.9;font-weight:400;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal}
+.workbench-view #opinion-drawer .revision-diff-original del{color:#916c68!important;text-decoration:none;opacity:1}
+.workbench-view #opinion-drawer .prototype-risk-card .revision-diff-suggested ins{color:#315e4b!important;text-decoration:none}
+.workbench-view #opinion-drawer .revision-diff-suggested ins::before{content:none}
+.workbench-view #opinion-drawer .diff-tag{font-size:11px;font-weight:500;margin:0;padding:3px 7px;line-height:1.5;letter-spacing:0}
+.workbench-view #opinion-drawer .revision-diff-arrow{padding:7px 0;color:#a5b3c6}
+.workbench-view .document-reading-zoom{display:flex;align-items:center;gap:7px;margin-left:auto;font-size:12px;color:#7c8da5;white-space:nowrap}
+.workbench-view .document-reading-zoom select{height:29px;padding:3px 7px;border:1px solid #dfe6f0;border-radius:6px;background:#fff;color:#526b90;font-size:12px}
+.workbench-view .wb-document-toolbar{gap:12px;flex-wrap:wrap}
+@media(max-width:900px){.workbench-view .document-reading-zoom>span{display:none}}

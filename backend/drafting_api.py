@@ -32,6 +32,7 @@ class DraftContent(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     text: str = Field(min_length=1, max_length=200000)
     revision: int = Field(ge=1)
+    brief: DraftBrief | None = None
 
     @field_validator('title', 'text')
     @classmethod
@@ -45,6 +46,8 @@ class DraftOutput(BaseModel):
 
 @router.post('/api/contract-drafts/generate')
 async def generate(request: DraftGenerate):
+    from .security import require
+    require('drafting.create')
     brief = request.brief.model_dump()
     try:
         result = DraftOutput.model_validate(await model_json(request.model_config_data.model_dump(),
@@ -77,7 +80,7 @@ def detail(draft_id: str):
 @router.put('/api/contract-drafts/{draft_id}')
 def save(draft_id: str, request: DraftContent):
     detail(draft_id)
-    return workspace.repo.update(draft_id, request.model_dump(exclude={'revision'}), request.revision)
+    return workspace.repo.update(draft_id, request.model_dump(exclude={'revision'},exclude_none=True), request.revision)
 
 @router.get('/api/contract-drafts/{draft_id}/word')
 def export(draft_id: str):

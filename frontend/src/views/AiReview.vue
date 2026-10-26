@@ -49,6 +49,7 @@ export default {
 <template>
   <PageFrame :context="context">
     <section class="review-start">
+      <p v-if="draftSave" role="status">{{ draftSave.status.value }} <span v-if="draftSave.error.value">：{{ draftSave.error.value }}</span> <button v-if="draftSave.error.value" class="button" @click="draftSave.save().catch(()=>{})">重试保存</button></p>
       <section class="review-settings card review-conditions-first">
         <div class="review-section-heading">
           <div>
@@ -114,7 +115,7 @@ export default {
         <ReviewBackground :context="context" :expanded="false" hide-focus />
       </section>
       <footer class="review-submit">
-        <button @click="createTask" :disabled="!!readiness" class="button primary">{{ busy ? '正在保存…' : '进入工作台核对合同' }}
+        <button v-can="'review.create'" @click="createTask" :disabled="!!readiness" class="button primary">{{ busy ? '正在保存…' : '进入工作台核对合同' }}
 </button>
         <div><strong>{{ error ? '创建任务失败' : readiness ? '完成准备后，开始合同审查' : '准备就绪，可以进入审查工作台' }}</strong>
           <p :role="error ? 'alert' : 'status'" :class="{ 'review-submit-error': error }">{{ error || readiness ||

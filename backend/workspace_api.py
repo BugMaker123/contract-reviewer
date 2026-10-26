@@ -168,8 +168,8 @@ def edit_source(source_id: str, request: SourceEdit):
         raise HTTPException(422, str(error))
     output = BytesIO()
     document.save(output)
-    version = repo.create('source', {'extension': '.docx', 'text': request.text, 'name': source['name']})
-    (SOURCES / (version['id'] + '.docx')).write_bytes(output.getvalue())
+    from .source_storage import save_source
+    version = save_source(repo,SOURCES,{'extension':'.docx','text':request.text,'name':source['name']},output.getvalue())
     return {'source_id': version['id'], 'text': request.text}
 
 
@@ -612,6 +612,9 @@ def list_checklists(page: int | None = Query(None, ge=1), page_size: int = Query
 
 @router.post('/api/checklists')
 def create_checklist(request: ChecklistInput):
+    from .security import require
+    if request.published:
+        require('checklists.publish')
     validate_category(request)
     return repo.create('checklist', {**request.model_dump(exclude={'revision'}), 'version': 1, 'archived': False})
 
@@ -620,6 +623,9 @@ def create_checklist(request: ChecklistInput):
 def update_checklist(identifier: str, request: ChecklistInput):
     validate_category(request)
     existing = repo.get(identifier, 'checklist')
+    from .security import require
+    if request.published != existing.get('published'):
+        require('checklists.publish')
     if request.revision is None:
         raise HTTPException(422, '保存需要记录版本号')
     # Every published version remains available to already created tasks.

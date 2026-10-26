@@ -40,6 +40,18 @@ def review(client, task):
     return json.loads(completed.split('data: ', 1)[1])
 
 
+def complete_for_export(client, task_id):
+    """Use the real handling and completion APIs before delivery assertions."""
+    task=client.get('/api/tasks/'+task_id).json()
+    run=task['run']
+    decisions={issue['id']:('applied' if issue['id'] in run['applied'] else 'rejected') for issue in run['result']['issues']}
+    saved=client.put('/api/runs/'+run['id']+'/handling',json={'revision':run['revision'],'applied':run['applied'],'decisions':decisions,'comments':run.get('comments',{})})
+    assert saved.status_code==200,saved.text
+    task=client.get('/api/tasks/'+task_id).json()
+    completed=client.post('/api/tasks/'+task_id+'/complete',json={'revision':task['revision'],'archived':False,'confirmations':{}})
+    assert completed.status_code==200,completed.text
+
+
 def test_multiple_contracts_and_versions_survive_reopen(client):
     first = create_task(client, title='合同一')
     second = create_task(client, title='合同二')
@@ -138,6 +150,8 @@ def test_handling_survives_and_is_bound_to_the_correct_run(client):
     assert client.put('/api/runs/' + run['id'] + '/handling', json=handling).status_code == 409
     invalid = {**handling, 'revision': saved['revision'], 'applied': ['foreign_issue']}
     assert client.put('/api/runs/' + run['id'] + '/handling', json=invalid).status_code == 422
+    assert client.get('/api/runs/' + run['id'] + '/export?scope=current').status_code == 409
+    complete_for_export(client, task['id'])
     document = client.get('/api/runs/' + run['id'] + '/export?scope=current')
     assert document.status_code == 200
     text = '\n'.join(p.text for p in Document(BytesIO(document.content)).paragraphs)
@@ -188,6 +202,7 @@ def test_word_preserves_uploaded_table_layout_and_contains_native_comments(clien
     run = workspace_api.repo.update(run['id'], {'result': result})
     response = client.put('/api/runs/' + run['id'] + '/handling', json={'revision': run['revision'], 'applied': ['fixture'], 'comments': {'fixture': '业务确认付款期限'}})
     assert response.status_code == 200
+    complete_for_export(client, task['id'])
     clean = client.get('/api/runs/' + run['id'] + '/export?scope=current')
     assert clean.headers['X-Word-Layout'] == 'preserved'
     exported = Document(BytesIO(clean.content))
@@ -304,18 +319,25 @@ def test_formatted_source_edit_preserves_runs_tables_and_original(client):
     assert client.post('/api/sources/' + old + '/edit', json={'text': 'Merged'}).status_code == 422
 
 
-def test_current_document_download_does_not_require_review(client):
+def test_current_document_download_requires_current_completed_review(client):
     task = create_task(client)
-    response = client.get('/api/tasks/'+task['id']+'/document')
+    assert client.get('/api/tasks/'+task['id']+'/document').status_code == 409
+    review(client, task)
+    assert client.get('/api/tasks/'+task['id']+'/document').status_code == 409
+    complete_for_export(client,task['id'])
+    response=client.get('/api/tasks/'+task['id']+'/document')
     assert response.status_code == 200
     assert task['text'].split('\n')[-1] in [p.text for p in Document(BytesIO(response.content)).paragraphs]
-    review(client, task)
     latest = client.get('/api/tasks/'+task['id']).json()
-    client.put('/api/tasks/'+task['id'], json={**latest, 'text': latest['text']+'\nNew manual edit'})
-    current = client.get('/api/tasks/'+task['id']+'/document')
+    changed=client.put('/api/tasks/'+task['id'], json={**latest, 'text': latest['text']+'\nNew manual edit'})
+    assert changed.status_code == 200,changed.text
+    assert client.get('/api/tasks/'+task['id']+'/document').status_code == 409
+    assert client.get('/api/tasks/'+task['id']+'/document?run='+latest['active_run']).status_code == 409
+    review(client,changed.json())
+    complete_for_export(client,task['id'])
+    current=client.get('/api/tasks/'+task['id']+'/document')
+    assert current.status_code == 200
     assert 'New manual edit' in [p.text for p in Document(BytesIO(current.content)).paragraphs]
-    snapshot = client.get('/api/tasks/'+task['id']+'/document?run='+latest['active_run'])
-    assert 'New manual edit' not in [p.text for p in Document(BytesIO(snapshot.content)).paragraphs]
 
 
 def test_adopted_document_preview_uses_same_formatted_document(client):
@@ -333,7 +355,10 @@ def test_adopted_document_preview_uses_same_formatted_document(client):
     workspace_api.repo.update(run['id'], {'result': run['result'], 'applied': [issue['id']]})
     info = client.get('/api/sources/'+imported['source_id']+'?include_text=true&run='+run['id']).json()
     assert info['text'] == 'Agreement payment Amount: 200'
+    assert client.get('/api/runs/'+run['id']+'/preview-file/inline?scope=current').status_code == 200
+    complete_for_export(client,task['id'])
     file = client.get('/api/runs/'+run['id']+'/export?scope=current')
+    assert file.status_code == 200,file.text if file.status_code != 200 else ''
     preview = Document(BytesIO(file.content))
     assert preview.paragraphs[0].text == info['text']
     assert preview.paragraphs[0].runs[0].bold
@@ -347,6 +372,9 @@ def test_all_suggestions_preview_handles_sample(client):
     info = client.get('/api/sources/'+imported['source_id']+'?include_text=true&run='+run['run_id']+'&scope=all')
     assert info.status_code == 200, info.text
     assert info.json()["preview_warnings"]
+    assert client.get('/api/runs/'+run['run_id']+'/preview-file?scope=all').status_code == 409
+    assert client.get('/api/runs/'+run['run_id']+'/preview-file/inline?scope=all').status_code == 200
+    complete_for_export(client,task['id'])
     response = client.get('/api/runs/'+run['run_id']+'/preview-file?scope=all')
     assert response.status_code == 200, response.text
 
@@ -422,3 +450,15 @@ def test_checklist_without_model_keeps_full_rule_review_and_discloses_limit(clie
     assert result['checklist_findings'][0]['status'] == 'fail'
     assert '未完成深度语义研判' in result['warning']
     assert '基础规则' in result['coverage']
+
+
+def test_run_summaries_keep_large_payloads_out_and_order_newest_first(tmp_path):
+    repo=Repository(tmp_path/'history.db')
+    task=repo.create('task',{'title':'历史合同','text':'原始正文','status':'draft'})
+    older=repo.create('run',{'number':1,'status':'completed','input':{'text':'大段正文'*100000},'result':{'details':'大型报告'*100000}},parent=task['id'])
+    newer=repo.create('run',{'number':2,'status':'completed','input':{'text':'后续正文'*100000}},parent=task['id'])
+    summaries=repo.run_summaries(task['id'])
+    assert [row['id'] for row in summaries]==[newer['id'],older['id']]
+    assert [row['number'] for row in summaries]==[2,1]
+    assert all('input' not in row and 'result' not in row for row in summaries)
+    assert len(json.dumps(summaries,ensure_ascii=False))<3000

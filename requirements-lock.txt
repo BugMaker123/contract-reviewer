@@ -1,4 +1,11 @@
 # Validated on Windows / Python 3.14; includes development tools.
+SQLAlchemy==2.1.6
+PyMySQL==1.2.3
+argon2-cffi==25.1.0
+argon2-cffi-bindings==26.1.0
+cffi==2.1.1
+cryptography==50.0.2
+pycparser==3.12
 PyYAML==6.0.3
 Pygments==2.21.0
 annotated-doc==0.0.5

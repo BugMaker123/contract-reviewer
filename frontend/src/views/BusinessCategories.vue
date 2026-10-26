@@ -22,7 +22,7 @@ export default {
             统一业务分类与适用范围，为企业审查清单绑定专项标准
           </p>
         </div>
-        <button @click="editCategory()" :disabled="busy" class="button primary">
+        <button v-can="'catalog.maintain'" @click="editCategory()" :disabled="busy" class="button primary">
           ＋ 新增业务分类
         </button>
       </header>
@@ -60,10 +60,10 @@ export default {
               <td><div class="checklists-row-actions">
                 <RouterLink :to="'/checklists?category=' + row.id" class="checklists-use">查看清单</RouterLink>
                 <RouterLink :to="'/checklists?category=' + row.id + '&create=1'">添加清单</RouterLink>
-                <button :disabled="busy" @click="editCategory(row)">
+                <button v-can="'catalog.maintain'" :disabled="busy" @click="editCategory(row)">
                   编辑
                 </button>
-                <button :disabled="busy" @click="requestDelete(row)" class="is-secondary">删除</button>
+                <button v-can="'catalog.maintain'" :disabled="busy" @click="requestDelete(row)" class="is-secondary">删除</button>
               </div></td>
             </tr>
           </tbody>

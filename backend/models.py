@@ -1,7 +1,16 @@
 from typing import List, Optional, Literal, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 class ModelConfig(BaseModel):
+    @model_validator(mode='before')
+    @classmethod
+    def centralized_web_configuration(cls,value):
+        from .security import enabled
+        if enabled():
+            from .model_settings import load_model
+            return load_model()
+        return value
+
     model_name: str = Field(default="deepseek-v4-flash", description="模型标识符，如 deepseek-v4-flash, deepseek-chat 等")
     api_key: Optional[str] = Field(default=None, description="用户自定义 API Key，若留空则尝试读取环境变量 DEEPSEEK_API_KEY")
     base_url: Optional[str] = Field(default="https://api.deepseek.com/v1", description="API 基础端点")

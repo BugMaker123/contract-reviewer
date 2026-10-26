@@ -472,7 +472,7 @@ onBeforeRouteLeave(() => {
             <ReviewIcon name="sparkles" />
             {{ extracting ? '正在提取…' : 'AI 提取' }}
           </button>
-          <button class="button" :disabled="busy" @click="save">
+          <button v-can="'templates.maintain'" class="button" :disabled="busy" @click="save">
             <ReviewIcon name="save" />
             {{ saving ? '保存中…' : '保存草稿' }}
           </button>
@@ -482,7 +482,7 @@ onBeforeRouteLeave(() => {
           <button class="button" :title="readinessReason" :disabled="busy || !ready" @click="trialFile.click()">
             验证合同
           </button>
-          <button class="button primary" :title="readinessReason" :disabled="busy || !ready" @click="confirmModal = 'publish'">
+          <button v-can="'templates.publish'" class="button primary" :title="readinessReason" :disabled="busy || !ready" @click="confirmModal = 'publish'">
             发布版本
             <ReviewIcon name="arrow" />
           </button>

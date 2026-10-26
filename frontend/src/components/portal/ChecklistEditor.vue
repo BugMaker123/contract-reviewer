@@ -48,7 +48,7 @@ export default {
           <button type="button" class="checklist-add-requirement" @click="addChecklistItem" :disabled="checklistEditor.items.length >= 100">＋ 添加一条要求</button>
         </fieldset>
       </div>
-      <footer class="checklist-editor-footer"><span>{{ checklistEditor.id ? '保存后生成新版本，已有审查记录不受影响。' : '默认按要求进行审查，无需逐项配置规则。' }}</span><div><button @click="saveChecklist(false)" :disabled="busy || importing" class="button">存为草稿</button><button @click="saveChecklist(true)" :disabled="busy || importing" class="button primary">{{ busy ? '正在保存…' : '保存并启用' }}</button></div></footer>
+      <footer class="checklist-editor-footer"><span>{{ checklistEditor.id ? '保存后生成新版本，已有审查记录不受影响。' : '默认按要求进行审查，无需逐项配置规则。' }}</span><div><button @click="saveChecklist(false)" :disabled="busy || importing" class="button">存为草稿</button><button v-can="'checklists.publish'" @click="saveChecklist(true)" :disabled="busy || importing" class="button primary">{{ busy ? '正在保存…' : '保存并启用' }}</button></div></footer>
     </section>
   </div>
 </template>

@@ -1,19 +1,22 @@
 <script>
-import { computed, watch } from "vue";
+import { computed, watch, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import { usePortalShell } from "../stores/portal.js";
 import ModelSettings from "../components/portal/ModelSettings.vue";
 import Help from "../components/portal/Help.vue";
+import UserAccountMenu from "../components/portal/UserAccountMenu.vue";
 import WorkspaceSidebar from "../components/portal/WorkspaceSidebar.vue";
+import { auth, can, logout } from '../services/auth.js';
 
 export default {
   name: "PortalLayout",
-  components: { ModelSettings, Help, WorkspaceSidebar },
+  components: { ModelSettings, Help, WorkspaceSidebar, UserAccountMenu },
   setup() {
     const shell = usePortalShell();
     const route = useRoute();
+    watch(() => route.path, async () => { await nextTick(); const main=document.querySelector('.portal-main'); if(main) main.scrollTop=0; });
     watch(() => route.path, () => shell.loadRecords().catch(() => shell.notify('最近工作读取失败，请稍后重试')), { immediate: true });
-    return { ...shell, shell, page: computed(() => route.meta.page) };
+    return { ...shell, shell, auth, can, logout, page: computed(() => route.meta.page) };
   },
 };
 </script>
@@ -29,13 +32,15 @@ export default {
         <div class="prototype-breadcrumb">合同工作 <span>/</span> <strong>{{ $route.meta.title || '工作台' }}</strong></div>
       </div>
       <div class="flex gap-3 items-center">
-        <button v-if="$route.name!=='template-review'" @click="showHelp = true" class="portal-help-button"><span aria-hidden="true">?</span>操作手册</button>
-        <button v-if="$route.name!=='template-review'" @click="showModel = true" class="button">⚙ 模型配置</button>
+        <button v-if="!auth.web && $route.name!=='template-review'" @click="showHelp = true" class="portal-help-button"><span aria-hidden="true">?</span>操作手册</button>
+        <button v-if="!auth.web && $route.name!=='template-review'" @click="showModel = true" class="button">⚙ 模型配置</button>
+        <UserAccountMenu @help="showHelp = true" />
+
       </div>
     </header>
 
     <div class="flex flex-1 overflow-hidden">
-      <WorkspaceSidebar :active="page" />
+      <WorkspaceSidebar :active="$route.params.section || page" />
 
       <main class="portal-main flex-1 overflow-y-auto p-8">
         <RouterView v-slot="{ Component, route }"

@@ -1,6 +1,7 @@
 export function setup(context) {
   const { busy, showModel, modelTest, model, api, notify } = context;
   const saveModel = () => {
+    if(context.auth.web) { location.assign('/admin/model'); return; }
     try {
       localStorage.setItem("LEXIS_API_KEY", model.api_key);
       localStorage.setItem("LEXIS_BASE_URL", model.base_url);

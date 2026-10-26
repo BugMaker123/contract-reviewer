@@ -1,5 +1,7 @@
 import { appendMaterial } from "../services/documents.js";
 import { watch } from "vue";
+import { auth } from '../../services/auth.js';
+import { serverDraft } from '../../services/autosave.js';
 
 export function setup(context) {
   const {
@@ -18,6 +20,8 @@ export function setup(context) {
     sourceDrafts,
     model,
   } = context;
+  const remoteDraft=auth.web?serverDraft('review-new',()=>({...form,inputMethod:inputMethod.value,sourceDrafts:{...sourceDrafts}}),saved=>{const {inputMethod:method,sourceDrafts:copies,...values}=saved;Object.assign(form,values);if(method)inputMethod.value=method;if(copies)Object.assign(sourceDrafts,copies);}):null;
+  context.draftSave=remoteDraft;
   const extractRequirements = async (material) => {
     busy.value = true;
     error.value = "";
@@ -72,6 +76,7 @@ export function setup(context) {
     busy.value = true;
     error.value = "";
     try {
+      if(remoteDraft) await remoteDraft.save();
       if (inputMethod.value === 'paste') {
         const pasted = await api('/api/contracts/paste','POST',{html:form.paste_html || '',text:form.text,title:form.title});
         form.text = pasted.text; form.source_id = pasted.source_id;
@@ -87,11 +92,12 @@ export function setup(context) {
           form.mode === "checklist" ? form.checklist_item_ids : null,
       };
       const task = await api("/api/tasks", "POST", body);
-      sessionStorage.removeItem("LEXIS_HOME_DRAFT");
-      await navigate("/workbench?task=" + task.id);
+      if(!auth.web) sessionStorage.removeItem("LEXIS_HOME_DRAFT");
       form.title = ''; form.text = ''; form.paste_html = ''; form.source_id = null;
       Object.keys(sourceDrafts).forEach(key => delete sourceDrafts[key]);
-      sessionStorage.removeItem('LEXIS_HOME_DRAFT');
+      if(remoteDraft) await remoteDraft.save();
+      else sessionStorage.removeItem('LEXIS_HOME_DRAFT');
+      await navigate("/workbench?task=" + task.id);
     } catch (err) {
       error.value = err.message;
     } finally {
@@ -106,7 +112,7 @@ export function setup(context) {
     form,
     () => {
       try {
-        sessionStorage.setItem(
+        if(!auth.web) sessionStorage.setItem(
           "LEXIS_HOME_DRAFT",
           JSON.stringify({ ...form, inputMethod: inputMethod.value }),
         );
@@ -115,7 +121,8 @@ export function setup(context) {
     { deep: true },
   );
   const initialize = async () => {
-    const saved = JSON.parse(
+    if(remoteDraft) await remoteDraft.loaded;
+    const saved = auth.web ? null : JSON.parse(
       sessionStorage.getItem("LEXIS_HOME_DRAFT") || "null",
     );
     if (saved) {

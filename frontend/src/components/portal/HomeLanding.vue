@@ -33,8 +33,8 @@ const taskDate = value => value ? new Date(value).toLocaleDateString('zh-CN', { 
       <section class="prototype-home-card">
         <header><div><h2>发起新任务</h2><p>按合同来源选择合适的处理方式。</p></div></header>
         <div class="prototype-paths">
-          <button type="button" aria-label="AI 智能全面审查" @click="$emit('review')"><span class="prototype-path-icon">✧</span><span class="prototype-path-copy"><strong>审查合同风险</strong><small>适合外部拟定、非标准或复杂合同。查看风险、审查意见与修改建议。</small></span><b>开始风险审查 <span aria-hidden="true">→</span></b></button>
-          <button type="button" aria-label="已有标准模板核验" @click="$emit('template')"><span class="prototype-path-icon green">☑</span><span class="prototype-path-copy"><strong>核验标准模板</strong><small>适合按已发布 DOCX 模板填写的合同。核对固定条款与字段规则。</small></span><b>开始模板核验 <span aria-hidden="true">→</span></b></button>
+          <button type="button" v-can="'review.create'" aria-label="AI 智能全面审查" @click="$emit('review')"><span class="prototype-path-icon">✧</span><span class="prototype-path-copy"><strong>审查合同风险</strong><small>适合外部拟定、非标准或复杂合同。查看风险、审查意见与修改建议。</small></span><b>开始风险审查 <span aria-hidden="true">→</span></b></button>
+          <button type="button" v-can="'validation.execute'" aria-label="已有标准模板核验" @click="$emit('template')"><span class="prototype-path-icon green">☑</span><span class="prototype-path-copy"><strong>核验标准模板</strong><small>适合按已发布 DOCX 模板填写的合同。核对固定条款与字段规则。</small></span><b>开始模板核验 <span aria-hidden="true">→</span></b></button>
         </div>
       </section>
       <div class="prototype-home-metrics">

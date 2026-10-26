@@ -3,6 +3,8 @@ import { ref, reactive, computed, onActivated, onDeactivated } from 'vue';
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router';
 import ReviewIcon from '../components/portal/ReviewIcon.vue';
 import { usePortalShell } from '../stores/portal.js';
+import { auth, can } from '../services/auth.js';
+import { serverDraft } from '../services/autosave.js';
 
 const shell = usePortalShell();
 const router = useRouter();
@@ -21,7 +23,7 @@ const empty = () => ({
 });
 
 const brief = reactive(empty());
-if (!route.params.id) {
+if (!route.params.id && !auth.web) {
   try {
     const cached = sessionStorage.getItem('contract_drafting_new_brief');
     if (cached) Object.assign(brief, JSON.parse(cached));
@@ -29,7 +31,7 @@ if (!route.params.id) {
 }
 import { watch } from 'vue';
 watch(brief, (val) => {
-  if (!route.params.id) {
+  if (!route.params.id && !auth.web) {
     try {
       sessionStorage.setItem('contract_drafting_new_brief', JSON.stringify(val));
     } catch {}
@@ -42,6 +44,10 @@ const busy = ref(false);
 const error = ref('');
 const operation = ref('');
 const mode = ref('edit');
+const remoteDraft=auth.web && !route.params.id?serverDraft('drafting-new',()=>({brief:{...brief}}),value=>{Object.assign(brief,empty(),value.brief);}):null;
+let persistQueue=Promise.resolve();
+let contentTimer;
+watch([title,text,brief],()=>{if(auth.web && draft.value){clearTimeout(contentTimer);contentTimer=setTimeout(()=>persist().catch(e=>{error.value=e.message;}),700);}},{deep:true});
 
 const contractTypes = [
   '采购合同',
@@ -76,7 +82,7 @@ const briefChanged = computed(() => (
 const missing = computed(() => draft.value?.missing_information || []);
 
 const dirty = computed(() => (
-  draft.value && (title.value !== draft.value.title || text.value !== draft.value.text)
+  draft.value && (title.value !== draft.value.title || text.value !== draft.value.text || briefChanged.value)
 ));
 
 const isEmpty = computed(() => (
@@ -97,6 +103,11 @@ function show(saved) {
 }
 
 async function persist() {
+  clearTimeout(contentTimer);
+  persistQueue=persistQueue.catch(()=>{}).then(persistNow);
+  return persistQueue;
+}
+async function persistNow() {
   if (!dirty.value) return draft.value;
   if (!title.value.trim() || !text.value.trim()) {
     throw new Error('合同名称和正文不能为空，请补充后保存');
@@ -105,6 +116,7 @@ async function persist() {
     title: title.value,
     text: text.value,
     revision: draft.value.revision,
+    brief: {...brief},
   });
   draft.value = saved;
   return saved;
@@ -128,13 +140,14 @@ async function action(fn, name = 'load') {
 function generate() {
   if (!canGenerate.value || busy.value) return;
   action(async () => {
+    if(remoteDraft) await remoteDraft.save();
     await persist();
     const saved = await shell.api('/api/contract-drafts/generate', 'POST', {
       brief: { ...brief },
       model_config_data: shell.model,
     });
     shell.notify('合同草稿已生成并保存');
-    sessionStorage.removeItem('contract_drafting_new_brief');
+    if(!auth.web) sessionStorage.removeItem('contract_drafting_new_brief');
     busy.value = false;
     await router.replace('/drafting/' + saved.id + '/edit');
     Object.assign(brief, empty());
@@ -180,8 +193,7 @@ function review() {
       focus: saved.brief.requirements,
     });
     busy.value = false;
-    try { sessionStorage.setItem('workbench_return_to', '/drafting/' + saved.id + '/edit'); } catch {}
-    await router.push('/workbench?task=' + task.id);
+    await router.push('/workbench?task=' + task.id + '&draft_id=' + saved.id);
   }, 'review');
 }
 
@@ -228,6 +240,7 @@ onBeforeRouteLeave(async () => {
       return false;
     }
   }
+  if(remoteDraft){try{await remoteDraft.save();}catch(e){error.value=e.message;return false;}}
 });
 
 async function loadDraft() {
@@ -248,10 +261,11 @@ onDeactivated(() => {
 </script>
 <template>
   <div class="drafting-page">
+    <p v-if="remoteDraft" role="status">{{ remoteDraft.status.value }} <span v-if="remoteDraft.error.value">：{{ remoteDraft.error.value }}</span><button v-if="remoteDraft.error.value" class="button" @click="remoteDraft.save().catch(()=>{})">重试保存</button></p>
     <RouterLink to="/drafting" class="back-link"><ReviewIcon name="arrow"/>返回起草列表</RouterLink>
     <header class="drafting-heading">
       <div><h1>{{route.params.id?'编辑合同草稿':'新建合同起草'}}</h1><p>{{route.params.id?'完善合同内容，保存后导出或发起审查。':'填写交易需求，生成可编辑的合同草稿。'}}</p></div>
-      <div class="heading-actions"><RouterLink to="/drafting" class="button">返回列表</RouterLink><button v-if="draft" class="button primary" :disabled="busy||!dirty" @click="save"><ReviewIcon name="save"/>{{operation==='save'?'保存中…':'保存草稿'}}</button></div>
+      <div class="heading-actions"><RouterLink to="/drafting" class="button">返回列表</RouterLink><button v-can="'drafting.edit'" v-if="draft" class="button primary" :disabled="busy||!dirty" @click="save"><ReviewIcon name="save"/>{{operation==='save'?'保存中…':'保存草稿'}}</button></div>
     </header>
     <ol v-if="!route.params.id||draft" class="drafting-workflow" aria-label="合同起草流程">
       <li class="active"><span>1</span><div><strong>描述起草需求</strong><small>明确交易内容与我方立场</small></div></li>
@@ -263,7 +277,7 @@ onDeactivated(() => {
     <div v-else class="drafting-layout">
       <form class="drafting-brief drafting-card" @submit.prevent="generate">
         <div class="card-heading"><div class="section-title"><span class="section-icon"><ReviewIcon name="settings"/></span><div><h2>起草需求</h2><p>信息越完整，草稿越贴合实际交易</p></div></div><button type="button" class="text-button" :disabled="busy||!isEmpty" title="仅在需求为空时填入示例" @click="example">填入示例</button></div>
-        <fieldset :disabled="busy">
+        <fieldset :disabled="busy || !can('drafting.edit')">
           <div class="form-section"><h3>基本信息 <small>确定合同类型与起草视角</small></h3>
             <label>合同名称 <span class="required">*</span><input v-model="brief.title" required maxlength="200" placeholder="例如：年度设备采购合同"/></label>
             <div class="drafting-pair"><label>合同类型<select v-model="brief.contract_type"><option v-for="v in contractTypes" :key="v">{{v}}</option></select></label><label>起草立场<select v-model="brief.perspective"><option>中立审慎</option><option>甲方立场</option><option>乙方立场</option></select></label></div>
@@ -277,13 +291,13 @@ onDeactivated(() => {
             <div class="focus-options" aria-label="常用起草要求"><button v-for="item in focusOptions" :key="item" type="button" :aria-pressed="brief.requirements.split('；').includes(item)" :class="{selected:brief.requirements.split('；').includes(item)}" @click="addFocus(item)">＋ {{item}}</button></div>
             <label>其他起草要求 <span class="optional">选填</span><textarea v-model="brief.requirements" maxlength="10000" rows="3" placeholder="补充违约责任、解除条件、争议解决等要求…"/></label>
           </div>
-          <div class="generate-footer"><p class="drafting-note"><ReviewIcon name="info"/>未提供的必要信息将留空，并列入待补充清单。</p><button class="button primary drafting-generate" :disabled="busy||!canGenerate" type="submit"><span v-if="operation==='generate'" class="spinner"/><ReviewIcon v-else name="sparkles"/>{{operation==='generate'?'正在生成合同草稿…':draft?'按当前需求生成新草稿':'生成合同草稿'}}</button><p class="readiness" aria-live="polite">{{draft?'重新生成将另存一份，保留当前草稿':readiness}}</p></div>
+          <div class="generate-footer"><p class="drafting-note"><ReviewIcon name="info"/>未提供的必要信息将留空，并列入待补充清单。</p><button v-can="'drafting.generate'" class="button primary drafting-generate" :disabled="busy||!canGenerate" type="submit"><span v-if="operation==='generate'" class="spinner"/><ReviewIcon v-else name="sparkles"/>{{operation==='generate'?'正在生成合同草稿…':draft?'按当前需求生成新草稿':'生成合同草稿'}}</button><p class="readiness" aria-live="polite">{{draft?'重新生成将另存一份，保留当前草稿':readiness}}</p></div>
         </fieldset>
       </form>
       <section class="drafting-output drafting-card" :aria-busy="busy">
         <div class="card-heading"><div class="section-title"><span class="section-icon"><ReviewIcon name="document"/></span><div><h2>合同草稿</h2><p>{{draft?'完善正文后，可导出或继续审查':'生成后自动保存，支持在线修改'}}</p></div></div><span v-if="draft" class="save-state" :class="{unsaved:dirty}" role="status"><i/>{{dirty?'有未保存修改':'已保存'}}</span><span v-else class="pill">待生成</span></div>
         <template v-if="draft">
-          <div class="drafting-tools"><div class="view-switch" role="group" aria-label="正文显示方式"><button :aria-pressed="mode==='edit'" :class="{active:mode==='edit'}" @click="mode='edit'">编辑</button><button :aria-pressed="mode==='preview'" :class="{active:mode==='preview'}" @click="mode='preview'">预览</button></div><button class="button" :disabled="busy" @click="download">{{operation==='download'?'导出中…':'导出 Word'}}</button></div>
+          <div class="drafting-tools"><div class="view-switch" role="group" aria-label="正文显示方式"><button :aria-pressed="mode==='edit'" :class="{active:mode==='edit'}" @click="mode='edit'">编辑</button><button :aria-pressed="mode==='preview'" :class="{active:mode==='preview'}" @click="mode='preview'">预览</button></div><button v-can="'drafting.export'" class="button" :disabled="busy" @click="download">{{operation==='download'?'导出中…':'导出 Word'}}</button></div>
           <div class="drafting-document">
             <label v-if="mode==='edit'" class="drafting-output-title">合同名称<input v-model="title" :disabled="busy" maxlength="200" aria-label="草稿合同名称" required/></label>
             <details v-if="missing.length" class="drafting-missing"><summary><ReviewIcon name="info"/>待补充信息 <span>{{missing.length}} 项</span><small>展开查看</small></summary><p>以下为生成时识别的缺失信息，请在正文中核对并补充。</p><ul><li v-for="(item,i) in missing" :key="i">{{item}}</li></ul></details>
@@ -291,7 +305,7 @@ onDeactivated(() => {
             <textarea v-if="mode==='edit'" v-model="text" :disabled="busy" class="drafting-editor" aria-label="合同草稿正文" maxlength="200000" spellcheck="false"/>
             <article v-else class="document-preview" aria-label="合同草稿预览"><h3>{{title}}</h3><div>{{text.startsWith(title+'\n')?text.slice(title.length).trimStart():text}}</div></article>
           </div>
-          <footer class="output-footer"><div><span>{{text.length.toLocaleString()}} 字</span><p>导出或送审前会保存当前修改</p></div><button class="button primary" :disabled="busy||!title.trim()||!text.trim()" @click="review"><ReviewIcon name="shield"/>{{operation==='review'?'正在创建审查…':'进入合同审查'}}<ReviewIcon name="arrow"/></button></footer>
+          <footer class="output-footer"><div><span>{{text.length.toLocaleString()}} 字</span><p>导出或送审前会保存当前修改</p></div><button v-can="'review.create'" class="button primary" :disabled="busy||!title.trim()||!text.trim()" @click="review"><ReviewIcon name="shield"/>{{operation==='review'?'正在创建审查…':'进入合同审查'}}<ReviewIcon name="arrow"/></button></footer>
         </template>
         <div v-else class="drafting-empty" role="status">
           <template v-if="operation==='generate'"><span class="empty-icon"><span class="spinner"/></span><h3>正在将交易需求整理成合同</h3><p>正在生成条款与待补充清单，请稍候。<br/>完成后草稿将自动保存到起草记录。</p><div class="generation-skeleton"><i/><i/><i/><i/></div></template>

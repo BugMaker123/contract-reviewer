@@ -9,6 +9,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import HTTPException
+from .database import Database
 
 
 def now():
@@ -16,8 +17,13 @@ def now():
 
 
 class Repository:
-    def __init__(self, path=None):
+    def __init__(self, path=None, *, url=None):
         self.path = str(path or os.environ.get('LEXIS_DB_PATH') or Path(os.environ.get('LEXIS_DATA_DIR') or Path(__file__).parent.parent / 'data') / 'lexis.db')
+        self.database = Database(self.path, url or (os.environ.get('LEXIS_DATABASE_URL') if path is None else None))
+        self.is_mysql = self.database.mysql
+        if self.is_mysql:
+            self.database.initialize_mysql()
+            return
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as db:
             db.execute('''CREATE TABLE IF NOT EXISTS objects (
@@ -34,19 +40,21 @@ class Repository:
                     raise RuntimeError('分类名称或编码存在重复，请备份后合并重复分类再启动') from error
             db.execute('CREATE INDEX IF NOT EXISTS objects_kind_updated ON objects(kind, updated DESC, id)')
             db.execute("CREATE INDEX IF NOT EXISTS objects_checklist_category ON objects(json_extract(data,'$.category_id')) WHERE kind='checklist'")
+            columns = {row['name'] for row in db.execute('PRAGMA table_info(objects)')}
+            for column in ('owner_user_id', 'created_by', 'updated_by'):
+                if column not in columns:
+                    db.execute(f'ALTER TABLE objects ADD COLUMN {column} TEXT')
+            db.execute('CREATE INDEX IF NOT EXISTS objects_owner_updated ON objects(owner_user_id,updated)')
 
     @contextmanager
     def connect(self):
-        connection = sqlite3.connect(self.path, timeout=15)
-        connection.row_factory = sqlite3.Row
-        try:
-            yield connection
-            connection.commit()
-        except BaseException:
-            connection.rollback()
-            raise
-        finally:
-            connection.close()
+        with self.database.connect() as connection:
+            from .security import actor
+            if actor.get():
+                from .access import ScopedConnection
+                yield ScopedConnection(connection)
+            else:
+                yield connection
 
     @staticmethod
     def unpack(row):
@@ -255,7 +263,11 @@ class Repository:
 
     def run_summaries(self, task_id):
         with self.connect() as db:
-            rows = db.execute("SELECT id,revision,created,updated,json_object('number',json_extract(data,'$.number'),'status',json_extract(data,'$.status'),'error',json_extract(data,'$.error'),'baseline_kind',json_extract(data,'$.baseline_kind'),'parent_run_id',json_extract(data,'$.parent_run_id'),'queue',json_extract(data,'$.queue')) AS data FROM objects WHERE kind='run' AND parent=? ORDER BY created DESC", (task_id,)).fetchall()
+            rows = db.execute("SELECT id,revision,created,updated,json_object('number',json_extract(data,'$.number'),'status',json_extract(data,'$.status'),'error',json_extract(data,'$.error'),'baseline_kind',json_extract(data,'$.baseline_kind'),'parent_run_id',json_extract(data,'$.parent_run_id'),'queue',json_extract(data,'$.queue')) AS data FROM objects WHERE kind='run' AND parent=?", (task_id,)).fetchall()
+        # MySQL filesort can allocate space for the large source JSON even
+        # when only a small JSON projection is selected. Sort the compact
+        # summaries in Python instead; never sort full review payloads in SQL.
+        rows.sort(key=lambda row: (row['created'], row['id']), reverse=True)
         return [self.unpack(row) for row in rows]
 
     def complete_review(self, task_id, task_revision, run_id, run_revision, confirmations):

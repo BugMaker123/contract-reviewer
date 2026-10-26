@@ -12,6 +12,9 @@ import ReviewConditions from "../components/workbench/ReviewConditions.vue";
 import DocumentEditor from "../components/workbench/DocumentEditor.vue";
 import WorkbenchModelSettings from "../components/workbench/WorkbenchModelSettings.vue";
 import ReportPreview from "../components/workbench/ReportPreview.vue";
+import UserAccountMenu from "../components/portal/UserAccountMenu.vue";
+import Help from "../components/portal/Help.vue";
+import { usePortalShell } from "../stores/portal.js";
 import WorkspaceSidebar from "../components/portal/WorkspaceSidebar.vue";
 
 
@@ -27,10 +30,11 @@ export default {
     DocumentEditor,
     WorkbenchModelSettings,
     ReportPreview,
-    WorkspaceSidebar,
+    WorkspaceSidebar, UserAccountMenu, Help,
   },
   emits: ["ready"],
   setup(_props, { emit }) {
+    const shell = usePortalShell();
     const context = useWorkbench();
     Object.assign(context, useTrackedReview(context));
     emit("ready", context);
@@ -94,7 +98,7 @@ export default {
     });
 
     const searchParams = new URLSearchParams(location.search);
-    const fromDraftUrl = ref(searchParams.get('draft_id') ? '/drafting/' + searchParams.get('draft_id') + '/edit' : (sessionStorage.getItem('workbench_return_to') || ''));
+    const fromDraftUrl = ref(searchParams.get('draft_id') ? '/drafting/' + searchParams.get('draft_id') + '/edit' : '');
     return {
       ...context,
       context,
@@ -104,7 +108,7 @@ export default {
       startRightResize,
       resetLeftWidth,
       resetRightWidth,
-      fromDraftUrl,
+      fromDraftUrl, shell,
     };
   },
 };
@@ -115,12 +119,13 @@ export default {
     <WorkbenchToast :context="context" />
     <ReviewProgress :context="context" />
     <header class="workbench-global-header">
-      <div class="workbench-global-brand"><a href="/" @click.prevent="workspace.leaveFor('/')"><span>⚖</span><strong>LexisGraph</strong></a></div><a class="wb-workspace-link" href="/records" @click.prevent="workspace.leaveFor('/records')">工作台⌄</a>
+      <div class="prototype-breadcrumb">合同工作 <span>/</span> <strong>合同审查</strong></div>
       <div class="workbench-nav-actions flex items-center gap-4">
         <a v-if="fromDraftUrl" class="app-draft-link flex items-center gap-1 text-xs text-blue-600 hover:underline" :href="fromDraftUrl" @click.prevent="workspace.leaveFor(fromDraftUrl)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14" /></svg>
           返回合同草稿
         </a>
+        <UserAccountMenu @help="shell.showHelp.value = true" />
       </div>
     </header>
     <WorkbenchHeader :context="context" />
@@ -135,6 +140,11 @@ export default {
     <DocumentEditor :context="context" />
     <WorkbenchModelSettings :context="context" />
     <ReportPreview :context="context" />
+    <Help :context="shell" />
   </div>
 </template>
 <style src="../styles/workbench.css"></style>
+
+<style scoped>
+.workbench-view .workbench-global-header{height:64px!important;min-height:64px!important;justify-content:space-between;padding:0 24px!important;overflow:visible}.workbench-nav-actions{margin-left:auto}
+</style>

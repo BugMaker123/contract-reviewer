@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { pages } from "../portal/pages.js";
 import { loadPageModules } from "../portal/modules.js";
+import { auth, authReady, can, homeForUser } from '../services/auth.js';
 
 const views = {
   drafting: () => import("../views/ContractDraftList.vue"),
@@ -16,10 +17,13 @@ const views = {
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {path:'/access-denied',component:()=>import('../views/AccessDenied.vue'),meta:{title:'没有访问权限'}},
+    {path:'/login',component:()=>import('../views/Login.vue'),meta:{title:'登录'}},
+    {path:'/change-password',component:()=>import('../views/Login.vue'),meta:{title:'修改密码'}},
     {
       path: "/",
       component: () => import("../layouts/PortalLayout.vue"),
-      children: [...Object.entries(pages).map(([path, page]) => ({
+      children: [{path:'/admin/:section(users|roles|model)',component:()=>import('../views/SystemAdmin.vue'),meta:{title:'系统管理',page:'admin'}}, ...Object.entries(pages).map(([path, page]) => ({
         path,
         name: page.key,
         meta: { page: page.key, title: page.name },
@@ -52,7 +56,15 @@ export const router = createRouter({
   ],
 });
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
+  await authReady;
+  if(views[to.meta.page]) await loadPageModules(to.meta.page);
+  if(auth.web){
+    if(!auth.user && to.path!=='/login') return {path:'/login',query:{return:to.fullPath}};
+    if(auth.user?.must_change_password && !['/change-password','/login'].includes(to.path)) return '/change-password';
+    const permission=to.name==='workbench'?'review.view':to.name==='template-review'?'templates.maintain':to.params.section ? {users:'users.manage',roles:'roles.manage',model:'models.manage'}[to.params.section] : {start:'review.view',records:'review.view',validations:'validation.view',drafting:'drafting.view',templates:'templates.view',checklists:'checklists.view',categories:'catalog.view','template-groups':'catalog.view'}[to.meta.page];
+    if(permission && !can(permission)) return {path:to.path==='/'?homeForUser():'/access-denied',replace:true};
+  }
   if (to.path === '/records' && to.query.tab === 'templates') {
     const {tab, ...query} = to.query;
     return {path:'/validation-records',query,replace:true};

@@ -51,8 +51,8 @@ export default {
           </p>
         </div>
         <div class="records-heading-actions">
-          <a href="/api/reports/reviews?format=csv" class="button">导出全部审查报表</a>
-          <RouterLink to="/" class="button primary">＋ 新建审查</RouterLink>
+          <a v-can="'review.export'" href="/api/reports/reviews?format=csv" class="button">导出全部审查报表</a>
+          <RouterLink v-can="'review.create'" to="/" class="button primary">＋ 新建审查</RouterLink>
         </div>
       </div>
 
@@ -171,7 +171,7 @@ export default {
                     <button v-if="task.active_run" class="text-blue-600" @click="comparisonTask = task">
                       前后对比
                     </button>
-                    <button
+                    <button v-can="'review.archive'"
                       @click="archive('tasks', task)"
                       :disabled="['running', 'queued'].includes(task.status) || busy"
                       class="text-slate-400"

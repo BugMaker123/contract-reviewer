@@ -52,4 +52,22 @@ def revision_opcodes(original, revised):
         return result
     left, right = offsets(before), offsets(after)
     for tag, a, b, c, d in SequenceMatcher(None, before, after, autojunk=False).get_opcodes():
-        yield tag, left[a], left[b], right[c], right[d]
+        original_part, revised_part = original[left[a]:left[b]], revised[right[c]:right[d]]
+        # Numeric tokens need exact digit-level highlighting (30 -> 60 changes
+        # only the first digit); Chinese legal terms remain whole-word edits.
+        if tag == 'replace' and re.fullmatch(r'[0-9.,%+\-]+', original_part) and re.fullmatch(r'[0-9.,%+\-]+', revised_part):
+            prefix=0
+            while prefix<min(len(original_part),len(revised_part)) and original_part[prefix]==revised_part[prefix]:
+                prefix+=1
+            suffix=0
+            while suffix<min(len(original_part),len(revised_part))-prefix and original_part[-1-suffix]==revised_part[-1-suffix]:
+                suffix+=1
+            if prefix:
+                yield 'equal',left[a],left[a]+prefix,right[c],right[c]+prefix
+            x,y=left[a]+prefix,left[b]-suffix
+            u,v=right[c]+prefix,right[d]-suffix
+            yield 'replace' if x<y and u<v else 'delete' if x<y else 'insert',x,y,u,v
+            if suffix:
+                yield 'equal',y,left[b],v,right[d]
+        else:
+            yield tag, left[a], left[b], right[c], right[d]

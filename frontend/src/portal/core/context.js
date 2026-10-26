@@ -1,5 +1,6 @@
 import { createPresentation } from "./presentation.js";
 import { ref, reactive, computed } from "vue";
+import { auth, can } from '../../services/auth.js';
 
 export function createContext(page, requiredData) {
   const tasks = ref([]);
@@ -19,10 +20,10 @@ export function createContext(page, requiredData) {
     showHelp = ref(false),
     modelTest = ref(null);
   const model = reactive({
-    model_name: localStorage.getItem("LEXIS_MODEL_NAME") || "deepseek-chat",
+    model_name: (!auth.web && localStorage.getItem("LEXIS_MODEL_NAME")) || "deepseek-chat",
     base_url:
-      localStorage.getItem("LEXIS_BASE_URL") || "https://api.deepseek.com/v1",
-    api_key: localStorage.getItem("LEXIS_API_KEY") || "",
+      (!auth.web && localStorage.getItem("LEXIS_BASE_URL")) || "https://api.deepseek.com/v1",
+    api_key: (!auth.web && localStorage.getItem("LEXIS_API_KEY")) || "",
   });
   const notify = (message) => {
     toast.value = message;
@@ -54,6 +55,7 @@ export function createContext(page, requiredData) {
     row.title?.toLowerCase().includes(search.value.trim().toLowerCase());
 
   const context = {
+    auth, can,
     ...createPresentation(),
     page,
     tasks,

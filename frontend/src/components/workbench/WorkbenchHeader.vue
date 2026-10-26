@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, onScopeDispose } from "vue";
 import ChevronIcon from "../ChevronIcon.vue";
 import ReviewOverviewDialog from "./ReviewOverviewDialog.vue";
+import { auth, can } from '../../services/auth.js';
 export default {
   components: { ChevronIcon, ReviewOverviewDialog },
   props: { context: { type: Object, required: true } },
@@ -30,7 +31,7 @@ export default {
       props.context.workspace.exportScope = scope;
       return props.context.workspace.exportWord();
     };
-    return { ...props.context, overviewOpen, exportOpen, download, toggleExport };
+    return { ...props.context, auth, can, overviewOpen, exportOpen, download, toggleExport };
   },
 };
 </script>
@@ -68,7 +69,7 @@ export default {
             <select
               v-model="partyRole"
               aria-label="审查立场"
-              :disabled="workspace.historical || workspace.loading || isReviewing || ['running','queued'].includes(workspace.task?.status)"
+              :disabled="!can('review.edit') || workspace.historical || workspace.loading || isReviewing || ['running','queued'].includes(workspace.task?.status)"
               class="border border-slate-200 rounded-lg px-3 py-2"
             >
               <option value="乙方(卖方/开发方/服务方)">
@@ -85,13 +86,13 @@ export default {
             <h3>审查方式与条件</h3>
             <div class="wb-conditions-row">
               <span>{{ workspace.modeName }} · {{ workspace.conditions.scale }}</span>
-              <button class="wb-conditions-edit" @click="workspace.showConditions = true">修改审查条件</button>
+              <button v-can="'review.edit'" class="wb-conditions-edit" @click="workspace.showConditions = true">修改审查条件</button>
             </div>
           </section>
           <section>
-            <h3>审查模型</h3>
+            <h3 v-if="!auth.web">审查模型</h3>
             <div
-              class="flex items-center space-x-1.5 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5"
+              v-if="!auth.web" class="flex items-center space-x-1.5 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5"
             >
               <span class="text-slate-500 text-xs">模型:</span>
               <select
@@ -145,10 +146,10 @@ export default {
         </div>
       </details>
       <button class="wb-overview-action" @click="overviewOpen = true">审查结论与执行记录</button>
-      <button @click="showReportModal = true" :disabled="!reviewResult" class="wb-report-action">审查意见书</button>
+      <button v-can="'review.export'" @click="showReportModal = true" :disabled="!reviewResult" class="wb-report-action">审查意见书</button>
 
       <button v-if="!isReviewing && workspace.task?.running_run" class="wb-background-progress" @click="startReview(workspace.task.running_run)">查看后台进度</button>
-      <button
+      <button v-can="'review.execute'"
         @click="requestReview"
         :disabled="
           isReviewing ||
@@ -197,7 +198,7 @@ export default {
           isReviewing ? reviewQueue?.status === "queued" ? "排队等待…" : "正在审查…" : reviewResult ? "重新审查" : "开始审查"
         }}</span>
       </button>
-      <button
+      <button v-can="'review.edit'"
         v-if="!workspace.conditions.source_id && !workspace.task?.source_id && workspace.task?.status !== 'completed'"
         @click="openEditor"
         :disabled="
@@ -210,7 +211,7 @@ export default {
       >
         编辑正文
       </button>
-      <button
+      <button v-can="'review.edit'"
         @click="saveDocument"
         :disabled="
           documentSaving ||
@@ -223,9 +224,9 @@ export default {
         {{ workspace.saving ? "保存中…" : "保存" }}
       </button>
 
-      <button @click="workspace.finish" :disabled="workspace.historical || resultStale || workspace.saving || workspace.verifying || workspace.finishing || workspace.task?.status !== 'pending_review'" :title="resultStale ? '请先重新审查当前正文' : ''" class="wb-finish-action">{{ workspace.task?.status === 'completed' ? '已完成审核' : workspace.finishing || workspace.verifying ? '正在保存…' : '完成审核' }}</button>
+      <button v-can="'review.edit'" @click="workspace.finish" :disabled="workspace.historical || resultStale || workspace.saving || workspace.verifying || workspace.finishing || workspace.task?.status !== 'pending_review'" :title="resultStale ? '请先重新审查当前正文' : ''" class="wb-finish-action">{{ workspace.task?.status === 'completed' ? '已完成审核' : workspace.finishing || workspace.verifying ? '正在保存…' : '完成审核' }}</button>
       <div class="wb-export-menu wb-menu">
-        <button class="wb-delivery-button"
+        <button v-can="'review.export'" class="wb-delivery-button"
           :title="workspace.canExport ? '导出修订稿' : '请先完成审核'" :aria-expanded="exportOpen"
           aria-haspopup="menu" @click="toggleExport">导出 <ChevronIcon /></button>
         <div v-if="exportOpen" class="wb-delivery-menu" role="menu" aria-label="导出审核文件">

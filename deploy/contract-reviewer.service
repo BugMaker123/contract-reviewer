@@ -1,0 +1,17 @@
+[Unit]
+Description=Contract Reviewer Web
+After=network.target
+
+[Service]
+User=lexis
+WorkingDirectory=/srv/contract-reviewer
+EnvironmentFile=/srv/contract-reviewer/.env.web
+ExecStart=/srv/contract-reviewer/.venv/bin/python /srv/contract-reviewer/run_web.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

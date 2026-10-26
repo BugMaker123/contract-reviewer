@@ -50,8 +50,8 @@ const download = () => { props.context.workspace.exportScope = scope.value; prop
       <header class="wb-report-toolbar no-print">
         <div class="wb-report-toolbar-title"><strong id="report-preview-title">审查意见书</strong><span>第 {{ context.workspace.run?.number }} 次审查</span></div><div class="wb-report-actions">
         <select class="wb-report-scope" v-model="scope" aria-label="意见书范围"><option value="report">全部审查意见</option><option value="applied_report">仅已采纳意见</option></select>
-        <button class="wb-report-download" :disabled="loading || !!error || !context.workspace.canExportReport" :title="context.workspace.canExportReport ? '' : '请先完成审查'" @click="download">下载 Word</button>
-        <button :disabled="loading || !!error || !context.workspace.canExportReport" :title="context.workspace.canExportReport ? '' : '请先完成审查'" @click="print">打印 / 存为 PDF</button>
+        <button v-can="'review.export'" class="wb-report-download" :disabled="loading || !!error || !context.workspace.canExportReport" :title="context.workspace.canExportReport ? '' : '请先完成审查'" @click="download">下载 Word</button>
+        <button v-can="'review.export'" :disabled="loading || !!error || !context.workspace.canExportReport" :title="context.workspace.canExportReport ? '' : '请先完成审查'" @click="print">打印 / 存为 PDF</button>
         <button aria-label="关闭意见书" @click="context.showReportModal.value = false">关闭</button>
       </div></header>
       <p v-if="loading" class="p-4">正在生成意见书…</p><p v-if="error" role="alert" class="p-4 text-red-600">{{ error }}</p>

@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import time
+from contextvars import copy_context
 from dataclasses import dataclass, field
 from .store import now
 from .graph import ModelCallError
@@ -62,7 +63,10 @@ def launch(repo, run, config, review_events, checkpoint=None):
     # Only the fingerprint enters the scheduler; credentials stay in the job closure.
     group = credential_group(config)
     job.queue = get_review_queue()
-    job.ticket = job.queue.enqueue(group, key(repo, run['id']), queue_changed)
+    # A release by user A may promote user B's ticket. Its persistence must
+    # retain B's request identity rather than inherit A's callback context.
+    submission_context=copy_context()
+    job.ticket = job.queue.enqueue(group, key(repo, run['id']),lambda state:submission_context.run(queue_changed,state))
 
     async def execute():
         progress, trace = list(run.get('progress_log', [])), list(run.get('audit_trace', []))

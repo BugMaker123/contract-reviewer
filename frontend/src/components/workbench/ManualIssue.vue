@@ -7,7 +7,7 @@ const save = async () => { if (await props.context.workspace.addManualIssue({...
 </script>
 <template>
   <div class="wb-manual-issue">
-    <button :disabled="!context.reviewReady.value || context.workspace.historical || context.resultStale.value" @click="open = !open">{{ open ? '收起人工意见' : '＋ 添加人工意见' }}</button>
+    <button v-can="'review.edit'" :disabled="!context.reviewReady.value || context.workspace.historical || context.resultStale.value" @click="open = !open">{{ open ? '收起人工意见' : '＋ 添加人工意见' }}</button>
     <form v-if="open" @submit.prevent="save" class="wb-functional-overview">
       <label>意见标题<input v-model="draft.title" required maxlength="200" /></label>
       <label>风险等级<select v-model="draft.severity"><option value="critical">重大风险</option><option value="warning">一般风险</option><option value="info">优化建议</option></select></label>

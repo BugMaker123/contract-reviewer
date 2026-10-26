@@ -16,3 +16,11 @@ def test_word_diff_insert_delete_and_empty():
         edits = list(revision_opcodes(before, after))
         assert "".join(before[a:b] for _, a, b, _, _ in edits) == before
         assert "".join(after[c:d] for _, _, _, c, d in edits) == after
+
+
+def test_numeric_replacements_highlight_only_changed_digits():
+    before,after='验收后30日付款，金额1000.00元。','验收后60日付款，金额1200.00元。'
+    edits=list(revision_opcodes(before,after))
+    assert ''.join(before[a:b] for _,a,b,_,_ in edits)==before
+    assert ''.join(after[c:d] for _,_,_,c,d in edits)==after
+    assert [(before[a:b],after[c:d]) for tag,a,b,c,d in edits if tag!='equal']==[('3','6'),('0','2')]

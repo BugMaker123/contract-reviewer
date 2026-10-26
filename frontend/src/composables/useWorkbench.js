@@ -10,6 +10,7 @@ import {
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import { createWorkspaceWorkbench } from "./useWorkspace.js";
 import { LexisSession } from "../services/session.js";
+import { auth, can } from '../services/auth.js';
 
 export function useWorkbench() {
   const contractTitle = ref("未命名合同");
@@ -17,7 +18,7 @@ export function useWorkbench() {
   const partyRole = ref("中立审慎");
   const contractText = ref("");
   const selectedModel = ref(
-    localStorage.getItem("LEXIS_MODEL_NAME") || "deepseek-chat",
+    (!auth.web && localStorage.getItem("LEXIS_MODEL_NAME")) || "deepseek-chat",
   );
   const selectedSampleKey = ref("");
   const reviewProgress = ref(0);
@@ -88,11 +89,11 @@ export function useWorkbench() {
   });
 
   const modelConfig = ref({
-    model_name: localStorage.getItem("LEXIS_MODEL_NAME") || "deepseek-v4-flash",
+    model_name: (!auth.web && localStorage.getItem("LEXIS_MODEL_NAME")) || "deepseek-v4-flash",
     base_url:
-      localStorage.getItem("LEXIS_BASE_URL") || "https://api.deepseek.com/v1",
-    api_key: localStorage.getItem("LEXIS_API_KEY") || "",
-    max_retries: Number(localStorage.getItem("LEXIS_MAX_RETRIES") ?? 3),
+      (!auth.web && localStorage.getItem("LEXIS_BASE_URL")) || "https://api.deepseek.com/v1",
+    api_key: (!auth.web && localStorage.getItem("LEXIS_API_KEY")) || "",
+    max_retries: Number(auth.web ? 3 : localStorage.getItem("LEXIS_MAX_RETRIES") ?? 3),
   });
 
   const sampleContracts = ref({});
@@ -158,6 +159,7 @@ export function useWorkbench() {
         workspace.isStale),
   );
   const persist = () => {
+    if(auth.web) return;
     try {
       LexisSession.write("LEXIS_WORK", {
         title: contractTitle.value,
@@ -1066,6 +1068,7 @@ export function useWorkbench() {
   };
 
   const openModelModal = () => {
+    if(auth.web){if(can('models.manage'))location.assign('/admin/model');return;}
     if (selectedModel.value !== "custom")
       modelConfig.value.model_name = selectedModel.value;
     showModelModal.value = true;
@@ -1073,6 +1076,7 @@ export function useWorkbench() {
   };
 
   const saveModelConfig = () => {
+    if(auth.web) return;
     localStorage.setItem("LEXIS_API_KEY", modelConfig.value.api_key || "");
     modelConfig.value.max_retries = Math.max(
       0,
@@ -1387,6 +1391,8 @@ export function useWorkbench() {
   window.addEventListener("beforeunload", protectEditorUnload);
   onScopeDispose(() => window.removeEventListener("beforeunload", protectEditorUnload));
   const saveBeforeNavigation = async () => {
+    // A failed initial load has no editable snapshot to save.
+    if (workspace.taskId && !workspace.task && !contractText.value.trim() && !(documentDraft.value?.text?.trim()) && !(clauseEdit.value && clauseEdit.value.text !== clauseEdit.value.original) && !(showEditor.value && editText.value.trim())) return true;
     if (!workspace.taskId && !contractText.value.trim()) return true;
     if (isReviewing.value) return true; // The saved snapshot continues in the backend.
     try {

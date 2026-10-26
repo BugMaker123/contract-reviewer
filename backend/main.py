@@ -22,7 +22,10 @@ from .word_export import SOURCES, visible_paragraph_text
 
 @asynccontextmanager
 async def lifespan(app):
-    repository.interrupt_running()
+    from .security import enabled, Security
+    if enabled():
+        await asyncio.to_thread(Security,repository)
+    await asyncio.to_thread(repository.interrupt_running)
     from .data_maintenance import verify
     import logging
     inventory = await asyncio.to_thread(verify, repository, SOURCES)
@@ -49,13 +52,19 @@ from .template_review import router as template_review_router
 app.include_router(template_review_router)
 from .template_validation_api import router as template_validation_router
 app.include_router(template_validation_router)
+from .account_api import router as account_router
+from .model_settings import router as model_settings_router
+app.include_router(account_router)
+app.include_router(model_settings_router)
+from .work_copy_api import router as work_copy_router
+app.include_router(work_copy_router)
 from .document_import import ImportBodyLimit
 app.add_middleware(ImportBodyLimit)
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost', '[::1]', 'testserver'])
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=os.environ.get('LEXIS_ALLOWED_HOSTS','127.0.0.1,localhost,[::1],testserver').split(','))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8001", "http://localhost:8001"],
+    allow_origins=os.environ.get('LEXIS_ALLOWED_ORIGINS','http://127.0.0.1:8001,http://localhost:8001').split(','),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -65,7 +74,13 @@ app.add_middleware(
 def health():
     with repository.connect() as db:
         db.execute('SELECT 1').fetchone()
-    return {'status': 'ok', 'deployment': 'local-single-worker'}
+    return {'status': 'ok', 'deployment': 'web-single-worker' if repository.is_mysql else 'local-single-worker'}
+
+
+@app.get('/api/client-config')
+def client_config():
+    from .security import enabled
+    return {'web_mode':enabled()}
 
 
 @app.middleware('http')
@@ -77,10 +92,14 @@ async def request_identity(request, call_next):
     if origin and request.method not in ('GET', 'HEAD', 'OPTIONS'):
         from urllib.parse import urlsplit
         parsed = urlsplit(origin)
-        if parsed.scheme not in ('http', 'https') or parsed.hostname not in ('localhost', '127.0.0.1', '::1'):
-            return JSONResponse({'detail': '仅允许本机页面发起修改请求'}, status_code=403, headers={'X-Request-ID': request_id})
+        allowed = os.environ.get('LEXIS_ALLOWED_ORIGINS','http://127.0.0.1:8001,http://localhost:8001').split(',')
+        from .security import enabled
+        valid = origin in allowed if enabled() else parsed.scheme in ('http','https') and parsed.hostname in ('localhost','127.0.0.1','::1')
+        if not valid:
+            return JSONResponse({'detail': '不允许此来源发起修改请求'}, status_code=403, headers={'X-Request-ID': request_id})
     try:
-        response = await call_next(request)
+        from .web_middleware import authenticate_request
+        response = await authenticate_request(request,call_next,repository)
     except Exception:
         logging.getLogger(__name__).exception('Request failed: request_id=%s method=%s path=%s', request_id, request.method, request.url.path)
         raise

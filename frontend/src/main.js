@@ -2,8 +2,13 @@ import { createApp } from "vue";
 import App from "./App.vue";
 import { router } from "./router/index.js";
 import "./styles/portal.css";
+import { can } from './services/auth.js';
 
 const app = createApp(App);
+app.directive('can', {
+  mounted(el, binding) { if(!can(binding.value)) el.style.setProperty('display','none','important'); },
+  updated(el, binding) { if(!can(binding.value)) el.style.setProperty('display','none','important'); },
+});
 app.use(router);
 router
   .isReady()

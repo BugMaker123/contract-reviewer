@@ -226,10 +226,10 @@ const previewUrl = computed(() => !preview.value ? '' : preview.value.extension 
         <RouterLink to="/template-groups" class="button">
           <ReviewIcon name="categories" />维护分组
         </RouterLink>
-        <button class="button" :disabled="busy" @click="edit('group')">
+        <button v-can="'catalog.maintain'" class="button" :disabled="busy" @click="edit('group')">
           <ReviewIcon name="plus" />新建分组
         </button>
-        <button class="button primary" :disabled="busy" @click="edit('template')">
+        <button v-can="'templates.maintain'" class="button primary" :disabled="busy" @click="edit('template')">
           <ReviewIcon name="plus" />新增模板
         </button>
       </div>
@@ -341,7 +341,7 @@ const previewUrl = computed(() => !preview.value ? '' : preview.value.extension 
                 <div class="template-row-actions">
                   <RouterLink
                     v-if="row.extension === '.docx'"
-                    class="configure-link"
+                    v-can="'templates.maintain'" class="configure-link"
                     :to="'/templates/' + row.id + '/review'"
                   >
                     {{ row.configuration_status === 'published' ? '维护规则' : '配置规则' }}
@@ -362,7 +362,7 @@ const previewUrl = computed(() => !preview.value ? '' : preview.value.extension 
         <ReviewIcon name="templates" />
         <h3>{{ search || status !== 'all' || group ? '没有符合条件的模板' : '暂无合同模板' }}</h3>
         <p>{{ search || status !== 'all' || group ? '调整关键词或筛选条件后再试。' : '填写模板名称并导入文件，即可开始配置标准规则。' }}</p>
-        <button v-if="!search && status === 'all' && !group" class="button primary" @click="edit('template')">
+        <button v-can="'templates.maintain'" v-if="!search && status === 'all' && !group" class="button primary" @click="edit('template')">
           新增模板
         </button>
       </div>
@@ -399,8 +399,8 @@ const previewUrl = computed(() => !preview.value ? '' : preview.value.extension 
         <a role="menuitem" :href="'/api/contract-templates/' + actionMenu.row.id + '/download'" @click="actionMenu = null">
           下载原件
         </a>
-        <button role="menuitem" @click="menuAction('edit')">编辑信息 / 调整分组</button>
-        <button role="menuitem" class="danger" @click="menuAction('delete')">删除模板</button>
+        <button v-can="'templates.maintain'" role="menuitem" @click="menuAction('edit')">编辑信息 / 调整分组</button>
+        <button v-can="'templates.maintain'" role="menuitem" class="danger" @click="menuAction('delete')">删除模板</button>
       </div>
     </div>
 
@@ -507,7 +507,7 @@ const previewUrl = computed(() => !preview.value ? '' : preview.value.extension 
         <p v-if="modalError" class="notice" role="alert">{{ modalError }}</p>
         <footer>
           <button class="button" :disabled="busy" @click="removal = null">取消</button>
-          <button class="button primary" :disabled="busy" @click="remove">
+          <button v-can="'templates.maintain'" class="button primary" :disabled="busy" @click="remove">
             {{ busy ? '正在删除…' : '确认删除' }}
           </button>
         </footer>

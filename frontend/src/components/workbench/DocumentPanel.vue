@@ -1,10 +1,15 @@
 <script>
+import { ref } from "vue";
 import ChevronIcon from "../ChevronIcon.vue";
 import RevisionRibbon from "./RevisionRibbon.vue";
 export default {
   components: { ChevronIcon, RevisionRibbon },
   props: { context: { type: Object, required: true } },
-  setup: (props) => props.context,
+  setup(props) {
+    const documentZoom=ref('1.15'), revisionFrame=ref(null);
+    const applyDocumentZoom=()=>revisionFrame.value?.contentWindow?.postMessage(documentZoom.value==='fit'?{type:'lexis-fit-width'}:{type:'lexis-set-zoom',scale:Number(documentZoom.value)},location.origin);
+    return {...props.context,documentZoom,revisionFrame,applyDocumentZoom};
+  },
 };
 </script>
 
@@ -12,6 +17,7 @@ export default {
   <section class="flex-1 min-w-0 flex flex-col bg-slate-100/60 overflow-hidden">
     <div v-if="reviewReady" class="wb-document-toolbar">
       <RevisionRibbon :context="context" />
+      <label v-if="useRevisionDocument" class="document-reading-zoom"><span>阅读缩放</span><select v-model="documentZoom" aria-label="合同阅读缩放" @change="applyDocumentZoom"><option value="fit">适应宽度</option><option value="0.8">80%</option><option value="1">100%</option><option value="1.15">115%</option><option value="1.25">125%</option><option value="1.5">150%</option></select></label>
       <div v-if="reviewReady" class="prototype-issue-nav">
         <button
           @click="moveRevision(-1)"
@@ -75,6 +81,8 @@ export default {
       :data-rendered-revision="revisionRenderedVersion"
     >
       <iframe
+        ref="revisionFrame"
+        @load="applyDocumentZoom"
         :src="revisionDocumentUrl"
         title="合同修订文档"
         sandbox="allow-scripts allow-same-origin allow-downloads"
@@ -232,7 +240,7 @@ export default {
               <p class="text-xs text-slate-400 mt-1">
                 可返回首页上传文件，或使用示例合同熟悉流程
               </p>
-              <button
+              <button v-can="'review.edit'"
                 @click="openEditor"
                 :disabled="
                   documentSaving ||

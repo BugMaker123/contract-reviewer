@@ -1,5 +1,6 @@
 import { computed, nextTick, onScopeDispose, reactive, ref, watch } from "vue";
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
+import { can } from '../services/auth.js';
 
 export function useTrackedReview(context) {
   const {
@@ -111,6 +112,7 @@ export function useTrackedReview(context) {
   );
   const revisionReadOnly = computed(
     () =>
+      !can('review.edit') ||
       revisionBusy.value ||
       batchBusy.value ||
       workspace.historical ||

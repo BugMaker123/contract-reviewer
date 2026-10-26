@@ -5,6 +5,9 @@ __pycache__/
 data/
 artifacts/
 .env
+.env.web
+.env.web.*
+!.env.web.example
 
 frontend/node_modules/
 frontend/dist/

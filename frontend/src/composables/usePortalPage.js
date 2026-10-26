@@ -74,6 +74,7 @@ export function usePortalPage(key) {
       return false;
     }
     context.scrollTop = document.querySelector(".portal-main")?.scrollTop || 0;
+    if(context.draftSave && !actionNavigation){try{await context.draftSave.save();}catch(e){context.error.value=e.message;context.notify('草稿尚未保存，请重试后再离开');return false;}}
     active = false;
   });
   return context;

@@ -1342,3 +1342,17 @@ select:not([multiple]) { appearance:none; background-image:url("data:image/svg+x
   .portal-header-leading:has(.app-home-link) { gap: 12px; }
   .app-home-link { padding: 4px 9px; gap: 5px; }
 }
+
+/* Keep the navigation and account footer within the viewport. */
+:is(.portal-shell,.workbench-view) .workspace-sidebar{padding:22px 14px 16px;overflow:visible}
+.workspace-sidebar .prototype-side-brand{flex-shrink:0}
+.workspace-sidebar .prototype-side-label{margin:24px 13px 12px}
+.workspace-sidebar .portal-navigation{display:block;flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#ffffff18 transparent;padding-bottom:12px}
+.workspace-sidebar .portal-nav-group{gap:3px}
+.workspace-sidebar .portal-nav-group+.portal-nav-group{margin-top:18px;padding-top:18px;border-top:1px solid #ffffff0d}
+.workspace-sidebar .nav-link{padding:10px 13px;border:0;border-radius:7px;font-size:13px;min-height:38px}
+.workspace-sidebar .nav-link.active{background:#ffffff0c;color:#edf3ff;box-shadow:inset 2px 0 #739ce4;outline:0}
+.workspace-sidebar .nav-link.active .nav-icon{color:#91b5ee}
+.workspace-sidebar .sidebar-account{padding-top:12px}
+.portal-main:has(.admin-page){padding:28px 40px!important;min-height:0;scroll-behavior:auto}
+@media(max-width:800px){:is(.portal-shell,.workbench-view) .workspace-sidebar{padding:18px 8px 14px}.workspace-sidebar .portal-navigation{margin-top:20px}.workspace-sidebar .nav-link{padding:10px}.portal-main:has(.admin-page){padding:22px 18px!important}}

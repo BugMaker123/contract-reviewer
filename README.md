@@ -14,7 +14,13 @@ npm --prefix frontend run build
 .venv/Scripts/python.exe run.py
 ```
 
-访问 http://127.0.0.1:8001。当前默认是仅本机可访问的单个内部实例，尚未接入组织账号、权限和审批流。
+访问 http://127.0.0.1:8001。此入口保留原本机 SQLite 模式。
+
+## Web 模式
+
+支持 MySQL 8.0、个人账号、角色与操作权限、个人记录隔离、服务端草稿及统一模型配置。复制 `.env.web.example` 为 `.env.web` 后初始化管理员，使用 `python run_web.py` 启动，默认端口 8002。生产环境只运行一个后端进程，通过 Nginx 提供 HTTPS。
+
+迁移、部署、备份和恢复步骤见 [Web 部署说明](docs/web-deployment.md)，本次本地验证结果见 [Web 验证记录](docs/web-validation.md)。
 
 ## 功能
 

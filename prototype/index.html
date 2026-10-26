@@ -791,7 +791,8 @@
         function closeModal() { document.getElementById('modal').classList.add('hide') } function downloadText(name) { let blob = new Blob([name + '\n\n' + (state.draftText || sample) + '\n\n此文件是交互原型的示例内容，并非正式 Word 或审核报告。'], { type: 'text/plain;charset=utf-8' }); let a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name + '-原型示例.txt'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast('已下载示例文本') }
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal() }); state.page = location.hash.slice(1) || 'start'; if (![...menus.map(x => x[0]), 'workbench'].includes(state.page)) state.page = 'start'; render();
     </script>
-<link rel="stylesheet" href="detail.css"><script src="detail.js"></script>
+    <link rel="stylesheet" href="detail.css">
+    <script src="detail.js"></script>
 </body>
 
 </html>

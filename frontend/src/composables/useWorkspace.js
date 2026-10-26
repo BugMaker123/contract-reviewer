@@ -1,6 +1,7 @@
 /* Durable task adapter. Saves are serialized and use optimistic revisions. */
 import { ref, computed, watch, nextTick, onScopeDispose } from "vue";
 import { router } from "../router/index.js";
+import { auth, can } from '../services/auth.js';
 
 export function createWorkspaceWorkbench(refs) {
   onScopeDispose(() => clearTimeout(timer));
@@ -106,7 +107,7 @@ export function createWorkspaceWorkbench(refs) {
       (conditions.value.source_id || null) !== (snapshot.source_id || null)
     );
   });
-  const dirty = computed(() => !hydrating.value && !historical.value &&
+  const dirty = computed(() => !(taskId.value && !task.value) && !hydrating.value && !historical.value &&
     (JSON.stringify(input()) !== lastInput || (run.value?.status === "completed" && JSON.stringify(handling()) !== lastHandling)));
   const canExport = computed(() => task.value?.status === "completed" &&
     task.value?.active_run === run.value?.id && run.value?.status === "completed" &&
@@ -158,6 +159,7 @@ export function createWorkspaceWorkbench(refs) {
           await router.replace("/workbench?task=" + taskId.value);
           lastInput = signature;
         } else if (signature !== lastInput) {
+          if (!task.value) throw new Error("合同任务尚未读取成功，请刷新页面后重试");
           task.value = await api("/api/tasks/" + taskId.value, "PUT", {
             ...current,
             revision: task.value.revision,
@@ -186,7 +188,7 @@ export function createWorkspaceWorkbench(refs) {
               task.value = await api("/api/tasks/" + taskId.value);
           }
         }
-        refs.saveStatus.value = dirty.value ? "有待保存的修改" : "已保存到本机服务";
+        refs.saveStatus.value = dirty.value ? "有待保存的修改" : "已保存到服务器";
       } catch (err) {
         error.value = err.message;
         refs.saveStatus.value = "保存失败，请重试";
@@ -201,9 +203,11 @@ export function createWorkspaceWorkbench(refs) {
   const schedule = () => {
     if (
       hydrating.value ||
+      (taskId.value && !task.value) ||
       refs.isReviewing.value ||
       historical.value ||
-      !taskId.value
+      (!taskId.value && (!auth.web || !refs.contractText.value.trim() || !can('review.create'))) ||
+      (auth.web && !can('review.edit'))
     )
       return;
     refs.saveStatus.value = "有待保存的修改";
@@ -315,7 +319,7 @@ export function createWorkspaceWorkbench(refs) {
   };
   const leaveFor = async (path) => {
     try {
-      if (taskId.value) await flush();
+      if (task.value || (!taskId.value && refs.contractText.value.trim())) await flush();
       await router.push(path);
     } catch (err) {
       refs.showToast("保存未完成：" + err.message);
