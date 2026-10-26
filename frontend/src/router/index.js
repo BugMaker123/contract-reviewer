@@ -62,7 +62,7 @@ router.beforeEach(async (to) => {
   if(auth.web){
     if(!auth.user && to.path!=='/login') return {path:'/login',query:{return:to.fullPath}};
     if(auth.user?.must_change_password && !['/change-password','/login'].includes(to.path)) return '/change-password';
-    const permission=to.name==='workbench'?'review.view':to.name==='template-review'?'templates.maintain':to.params.section ? {users:'users.manage',roles:'roles.manage',model:'models.manage'}[to.params.section] : {start:'review.view',records:'review.view',validations:'validation.view',drafting:'drafting.view',templates:'templates.view',checklists:'checklists.view',categories:'catalog.view','template-groups':'catalog.view'}[to.meta.page];
+    const permission=to.name==='review-new'?'review.create':to.name==='template-check-new'?'validation.execute':to.name==='workbench'?'review.view':to.name==='template-review'?'templates.maintain':to.params.section ? {users:'users.manage',roles:'roles.manage',model:'models.manage'}[to.params.section] : {start:'review.view',records:'review.view',validations:'validation.view',drafting:'drafting.view',templates:'templates.view',checklists:'checklists.view',categories:'catalog.view','template-groups':'catalog.view'}[to.meta.page];
     if(permission && !can(permission)) return {path:to.path==='/'?homeForUser():'/access-denied',replace:true};
   }
   if (to.path === '/records' && to.query.tab === 'templates') {
